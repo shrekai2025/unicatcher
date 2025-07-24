@@ -19,13 +19,27 @@ export default async function LoginPage({
     const username = formData.get("username") as string;
     const password = formData.get("password") as string;
 
+    console.log("[LOGIN] 开始登录流程:", {
+      username,
+      hasPassword: !!password,
+      passwordLength: password?.length,
+      timestamp: new Date().toISOString()
+    });
+
     try {
-      await signIn("credentials", {
+      console.log("[LOGIN] 调用 signIn...");
+      const result = await signIn("credentials", {
         username,
         password,
         redirectTo: "/",
       });
+      console.log("[LOGIN] signIn 结果:", result);
     } catch (error) {
+      console.error("[LOGIN] signIn 错误:", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined
+      });
       // 重定向到登录页面并显示错误
       redirect("/login?error=credentials");
     }

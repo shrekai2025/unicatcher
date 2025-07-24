@@ -19,6 +19,7 @@
     "server-login": "node scripts/server-login.js",
     "quick-login": "node scripts/quick-login.js",
     "login-state": "node scripts/login-state-manager.mjs",
+    "debug-auth": "node debug-auth.mjs",
     "test-optimization": "node scripts/test-resource-optimization.mjs",
     "docker:build": "docker-compose build",
     "docker:up": "docker-compose up -d",

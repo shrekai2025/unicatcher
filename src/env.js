@@ -50,3 +50,14 @@ export const env = createEnv({
    */
   emptyStringAsUndefined: true,
 });
+
+// 调试输出环境变量
+console.log("[ENV] 环境变量加载情况:", {
+  NODE_ENV: process.env.NODE_ENV,
+  hasAUTH_SECRET: !!process.env.AUTH_SECRET,
+  hasDATABASE_URL: !!process.env.DATABASE_URL,
+  hasNEXTAUTH_URL: !!process.env.NEXTAUTH_URL,
+  hasPORT: !!process.env.PORT,
+  SKIP_ENV_VALIDATION: !!process.env.SKIP_ENV_VALIDATION,
+  timestamp: new Date().toISOString()
+});

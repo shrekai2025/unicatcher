@@ -151,4 +151,13 @@ export const config = {
 // 配置类型定义
 export type Config = typeof config;
 export type BrowserType = typeof config.playwright.browser;
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error'; 
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+// 调试输出配置信息
+console.log("[CONFIG] 配置加载完成:", {
+  authUsername: config.auth.username,
+  authPassword: config.auth.password ? "***已设置***" : "未设置",
+  hasAuthSecret: !!config.auth.secret,
+  nodeEnv: process.env.NODE_ENV,
+  timestamp: new Date().toISOString()
+}); 

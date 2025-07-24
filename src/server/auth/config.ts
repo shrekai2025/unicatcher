@@ -5,6 +5,15 @@ import CredentialsProvider from "next-auth/providers/credentials";
 // import { db } from "~/server/db";
 import { config } from "~/lib/config";
 
+console.log("[AUTH CONFIG] 初始化身份验证配置:", {
+  configLoaded: !!config,
+  authConfigExists: !!config.auth,
+  expectedUsername: config.auth?.username,
+  hasExpectedPassword: !!config.auth?.password,
+  hasAuthSecret: !!config.auth?.secret,
+  timestamp: new Date().toISOString()
+});
+
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
@@ -78,14 +87,32 @@ export const authConfig = {
   // 移除 PrismaAdapter，因为我们使用 JWT 策略
   // adapter: PrismaAdapter(db),
   callbacks: {
-    session: ({ session, token }) => ({
-      ...session,
-      user: {
-        ...session.user,
-        id: token.sub ?? "admin",
-      },
-    }),
+    session: ({ session, token }) => {
+      console.log("[AUTH CALLBACK] Session 回调:", {
+        hasSession: !!session,
+        hasToken: !!token,
+        tokenSub: token?.sub,
+        sessionUserId: session?.user?.id,
+        timestamp: new Date().toISOString()
+      });
+      
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          id: token.sub ?? "admin",
+        },
+      };
+    },
     jwt: ({ token, user }) => {
+      console.log("[AUTH CALLBACK] JWT 回调:", {
+        hasToken: !!token,
+        hasUser: !!user,
+        userId: user?.id,
+        tokenId: token?.id,
+        timestamp: new Date().toISOString()
+      });
+      
       if (user) {
         token.id = user.id;
       }
@@ -98,5 +125,17 @@ export const authConfig = {
   session: {
     strategy: "jwt", // 使用JWT而不是数据库会话
     maxAge: config.auth.sessionMaxAge,
+  },
+  debug: process.env.NODE_ENV === "development", // 启用调试模式
+  logger: {
+    error: (error: Error) => {
+      console.error("[NEXTAUTH ERROR]", error.message, error.stack);
+    },
+    warn: (code: string) => {
+      console.warn("[NEXTAUTH WARN]", code);
+    },
+    debug: (code: string, metadata?: any) => {
+      console.log("[NEXTAUTH DEBUG]", code, metadata);
+    },
   },
 } satisfies NextAuthConfig;
