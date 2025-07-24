@@ -68,10 +68,10 @@ RUN npm run build
 # 安装Playwright浏览器
 RUN npx playwright install chromium
 
-# 创建数据目录并设置权限
+# 创建数据目录并设置权限（包括Playwright浏览器目录）
 RUN mkdir -p /app/data/database /app/data/logs /app/data/browser-data && \
-    chown -R appuser:appgroup /app/data /app/prisma && \
-    chmod -R 755 /app/data /app/prisma
+    chown -R appuser:appgroup /app/data /app/prisma /ms-playwright && \
+    chmod -R 755 /app/data /app/prisma /ms-playwright
 
 # 切换到非 root 用户
 USER appuser
