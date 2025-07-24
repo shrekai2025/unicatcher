@@ -19,7 +19,7 @@ export default function TasksPage() {
     {
       // refetchInterval: 5000, // 5秒轮询一次
       refetchOnWindowFocus: true, // 仅在窗口聚焦时刷新
-      keepPreviousData: true,
+      // keepPreviousData 在新版本中已移除，现在数据会自动缓存
     }
   );
 
