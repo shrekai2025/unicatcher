@@ -39,8 +39,11 @@ Thumbs.db
 
 # 文档和说明
 README.md
-*.md
 docs/
+# 保留部署相关的md文件
+!Docker*.md
+!Ubuntu*.md
+!*部署*.md
 
 # 测试和开发工具
 coverage/

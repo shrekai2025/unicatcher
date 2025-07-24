@@ -31,21 +31,19 @@ RUN apt-get update && apt-get install -y \
     # 清理缓存
     && rm -rf /var/lib/apt/lists/*
 
-# 复制package文件
+# 复制package文件和prisma配置
 COPY package*.json ./
+COPY prisma ./prisma
 
-# 安装依赖
+# 安装依赖 (现在prisma generate可以成功运行)
 RUN npm install
 
 # 安装Playwright浏览器
 RUN npx playwright install chromium
 RUN npx playwright install-deps chromium
 
-# 复制源代码
+# 复制剩余源代码
 COPY . .
-
-# 生成Prisma客户端
-RUN npx prisma generate
 
 # 创建数据目录
 RUN mkdir -p /app/data/database /app/data/logs /app/data/browser-data

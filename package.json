@@ -12,7 +12,7 @@
     "dev": "cross-env PORT=3067 next dev --turbo",
     "postinstall": "prisma generate",
     "preview": "next build && next start",
-    "start": "next start",
+    "start": "cross-env PORT=3067 next start",
     "typecheck": "tsc --noEmit",
     "setup-dev": "node scripts/setup-dev.js",
     "login": "node scripts/manual-login.js",
