@@ -87,11 +87,11 @@ export const createTRPCRouter = t.router;
 const timingMiddleware = t.middleware(async ({ next, path }) => {
   const start = Date.now();
 
-  if (t._config.isDev) {
-    // artificial delay in dev
-    const waitMs = Math.floor(Math.random() * 400) + 100;
-    await new Promise((resolve) => setTimeout(resolve, waitMs));
-  }
+  // 移除人工延迟，避免请求被取消
+  // if (t._config.isDev) {
+  //   const waitMs = Math.floor(Math.random() * 400) + 100;
+  //   await new Promise((resolve) => setTimeout(resolve, waitMs));
+  // }
 
   const result = await next();
 
@@ -122,7 +122,11 @@ export const protectedProcedure = t.procedure
   .use(timingMiddleware)
   .use(({ ctx, next }) => {
     if (!ctx.session?.user) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
+      console.log('[TRPC] Unauthorized access attempt - no valid session');
+      throw new TRPCError({ 
+        code: "UNAUTHORIZED",
+        message: "请先登录系统"
+      });
     }
     return next({
       ctx: {
