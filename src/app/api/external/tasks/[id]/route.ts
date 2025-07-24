@@ -14,7 +14,7 @@ function validateApiKey(request: NextRequest): boolean {
 // 获取任务详情
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // API Key验证
@@ -25,8 +25,8 @@ export async function GET(
       );
     }
 
-    const { params } = context;
-    const taskId = params.id;
+    const resolvedParams = await params;
+    const taskId = resolvedParams.id;
     
     if (!taskId) {
       return NextResponse.json(
