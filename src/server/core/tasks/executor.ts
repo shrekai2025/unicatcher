@@ -115,9 +115,9 @@ export class TaskExecutor {
    */
   private async initializeBrowser(): Promise<void> {
     try {
-      // 创建并启动浏览器（强制非headless模式，便于调试）
+      // 创建并启动浏览器（根据环境和配置自动判断headless模式）
       const browserConfig = {
-        headless: false, // 强制显示浏览器窗口
+        headless: config.playwright.headless, // 使用配置文件中的headless设置
         timeout: config.playwright.timeout,
         viewport: config.playwright.viewport,
         userAgent: config.spider.userAgent,
