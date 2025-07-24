@@ -62,16 +62,20 @@ ENV AUTH_SECRET=build-time-secret
 ENV DATABASE_URL="file:./prisma/db.sqlite"
 ENV NEXTAUTH_URL=http://localhost:3067
 
+# 设置Playwright环境变量（在安装前设置）
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
 # 构建Next.js应用
 RUN npm run build
 
-# 安装Playwright浏览器
+# 安装Playwright浏览器（确保路径正确）
 RUN npx playwright install chromium
 
 # 创建数据目录并设置权限（包括Playwright浏览器目录）
 RUN mkdir -p /app/data/database /app/data/logs /app/data/browser-data && \
-    chown -R appuser:appgroup /app/data /app/prisma /ms-playwright && \
-    chmod -R 755 /app/data /app/prisma /ms-playwright
+    chown -R appuser:appgroup /app/data /app/prisma && \
+    chmod -R 755 /app/data /app/prisma && \
+    if [ -d "/ms-playwright" ]; then chown -R appuser:appgroup /ms-playwright && chmod -R 755 /ms-playwright; fi
 
 # 切换到非 root 用户
 USER appuser
@@ -82,7 +86,6 @@ EXPOSE 3067
 # 设置环境变量
 ENV NODE_ENV=production
 ENV PORT=3067
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
