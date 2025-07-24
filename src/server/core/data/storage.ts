@@ -1,0 +1,455 @@
+/**
+ * 数据存储服务
+ * 负责推文数据和任务的数据库操作
+ */
+
+import { db } from '~/server/db';
+import type { TweetData, SpiderTaskConfig, TaskStatus, TaskResult } from '~/types/spider';
+
+export class StorageService {
+  /**
+   * 创建爬虫任务
+   */
+  async createTask(config: SpiderTaskConfig): Promise<string> {
+    try {
+      const task = await db.spiderTask.create({
+        data: {
+          type: 'twitter_list',
+          listId: config.listId,
+          status: 'created',
+          tweetCount: 0,
+        },
+      });
+
+      console.log(`任务创建成功: ${task.id}`);
+      return task.id;
+    } catch (error) {
+      console.error('创建任务失败:', error);
+      throw new Error('创建任务失败');
+    }
+  }
+
+  /**
+   * 更新任务状态
+   */
+  async updateTaskStatus(taskId: string, status: TaskStatus, result?: TaskResult): Promise<void> {
+    try {
+      const updateData: any = {
+        status,
+        updatedAt: new Date(),
+      };
+
+      if (status === 'running') {
+        updateData.startedAt = new Date();
+      }
+
+      if (status === 'completed' || status === 'failed') {
+        updateData.completedAt = new Date();
+      }
+
+      if (result) {
+        updateData.result = JSON.stringify(result);
+      }
+
+      await db.spiderTask.update({
+        where: { id: taskId },
+        data: updateData,
+      });
+
+      console.log(`任务状态更新: ${taskId} -> ${status}`);
+    } catch (error) {
+      console.error('更新任务状态失败:', error);
+      throw new Error('更新任务状态失败');
+    }
+  }
+
+  /**
+   * 更新任务推文计数
+   */
+  async updateTaskTweetCount(taskId: string, count: number): Promise<void> {
+    try {
+      await db.spiderTask.update({
+        where: { id: taskId },
+        data: { tweetCount: count },
+      });
+    } catch (error) {
+      console.error('更新推文计数失败:', error);
+    }
+  }
+
+  /**
+   * 获取任务信息
+   */
+  async getTask(taskId: string): Promise<any> {
+    try {
+      return await db.spiderTask.findUnique({
+        where: { id: taskId },
+        include: {
+          tweets: {
+            orderBy: { publishedAt: 'desc' },
+          },
+        },
+      });
+    } catch (error) {
+      console.error('获取任务失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 获取任务列表
+   */
+  async getTasks(page = 1, limit = 10, status?: TaskStatus): Promise<{
+    tasks: any[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    try {
+      const where = status ? { status } : {};
+      const skip = (page - 1) * limit;
+
+      const [tasks, total] = await Promise.all([
+        db.spiderTask.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        db.spiderTask.count({ where }),
+      ]);
+
+      return { tasks, total, page, limit };
+    } catch (error) {
+      console.error('获取任务列表失败:', error);
+      return { tasks: [], total: 0, page, limit };
+    }
+  }
+
+  /**
+   * 检查推文是否存在
+   */
+  async checkTweetExists(tweetId: string): Promise<boolean> {
+    try {
+      const tweet = await db.tweet.findUnique({
+        where: { id: tweetId },
+      });
+      return !!tweet;
+    } catch (error) {
+      console.error('检查推文存在失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 获取List中已存在的推文ID列表
+   */
+  async getExistingTweetIds(listId: string): Promise<Set<string>> {
+    try {
+      const tweets = await db.tweet.findMany({
+        where: { listId },
+        select: { id: true },
+      });
+
+      return new Set(tweets.map((tweet: any) => tweet.id));
+    } catch (error) {
+      console.error('获取已存在推文ID失败:', error);
+      return new Set();
+    }
+  }
+
+  /**
+   * 保存推文数据
+   */
+  async saveTweet(tweetData: TweetData, taskId: string): Promise<void> {
+    try {
+      await db.tweet.create({
+        data: {
+          id: tweetData.id,
+          content: tweetData.content,
+          userNickname: tweetData.userNickname,
+          userUsername: tweetData.userUsername,
+          replyCount: tweetData.replyCount,
+          retweetCount: tweetData.retweetCount,
+          likeCount: tweetData.likeCount,
+          viewCount: tweetData.viewCount,
+          imageUrls: tweetData.imageUrls ? JSON.stringify(tweetData.imageUrls) : null,
+          tweetUrl: tweetData.tweetUrl,
+          publishedAt: BigInt(tweetData.publishedAt),
+          listId: tweetData.listId,
+          scrapedAt: BigInt(tweetData.scrapedAt),
+          taskId,
+        },
+      });
+    } catch (error) {
+      console.error('保存推文失败:', error);
+      throw new Error('保存推文失败');
+    }
+  }
+
+  /**
+   * 批量保存推文数据
+   */
+  async saveTweets(tweets: TweetData[], taskId: string): Promise<number> {
+    let savedCount = 0;
+
+    try {
+      for (const tweet of tweets) {
+        try {
+          await this.saveTweet(tweet, taskId);
+          savedCount++;
+        } catch (error) {
+          console.error(`保存推文失败 ${tweet.id}:`, error);
+          // 继续保存其他推文，不中断整个过程
+        }
+      }
+
+      console.log(`批量保存完成: ${savedCount}/${tweets.length} 条推文`);
+      return savedCount;
+    } catch (error) {
+      console.error('批量保存推文失败:', error);
+      return savedCount;
+    }
+  }
+
+  /**
+   * 获取推文数据
+   */
+  async getTweets(
+    taskId?: string,
+    listId?: string,
+    page = 1,
+    limit = 20
+  ): Promise<{
+    tweets: any[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    try {
+      const where: any = {};
+      if (taskId) where.taskId = taskId;
+      if (listId) where.listId = listId;
+
+      const skip = (page - 1) * limit;
+
+      const [tweets, total] = await Promise.all([
+        db.tweet.findMany({
+          where,
+          orderBy: { publishedAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        db.tweet.count({ where }),
+      ]);
+
+      // 解析图片URLs并转换BigInt为数字
+      const parsedTweets = tweets.map((tweet: any) => ({
+        ...tweet,
+        imageUrls: tweet.imageUrls ? JSON.parse(tweet.imageUrls) : [],
+        publishedAt: tweet.publishedAt ? Number(tweet.publishedAt) : 0,
+        scrapedAt: tweet.scrapedAt ? Number(tweet.scrapedAt) : 0,
+      }));
+
+      return { tweets: parsedTweets, total, page, limit };
+    } catch (error) {
+      console.error('获取推文数据失败:', error);
+      return { tweets: [], total: 0, page, limit };
+    }
+  }
+
+  /**
+   * 删除任务及相关推文
+   */
+  async deleteTask(taskId: string): Promise<void> {
+    try {
+      // 先删除相关推文，再删除任务
+      await db.tweet.deleteMany({
+        where: { taskId },
+      });
+
+      await db.spiderTask.delete({
+        where: { id: taskId },
+      });
+
+      console.log(`任务删除成功: ${taskId}`);
+    } catch (error) {
+      console.error('删除任务失败:', error);
+      throw new Error('删除任务失败');
+    }
+  }
+
+  /**
+   * 清理旧数据（可选功能）
+   */
+  async cleanupOldData(daysOld = 30): Promise<void> {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+
+      // 删除旧的已完成任务
+      const oldTasks = await db.spiderTask.findMany({
+        where: {
+          status: 'completed',
+          completedAt: {
+            lt: cutoffDate,
+          },
+        },
+        select: { id: true },
+      });
+
+      for (const task of oldTasks) {
+        await this.deleteTask(task.id);
+      }
+
+      console.log(`清理完成: 删除了 ${oldTasks.length} 个旧任务`);
+    } catch (error) {
+      console.error('清理旧数据失败:', error);
+    }
+  }
+
+  /**
+   * 获取统计信息
+   */
+  async getStats(): Promise<{
+    totalTasks: number;
+    completedTasks: number;
+    runningTasks: number;
+    failedTasks: number;
+    totalTweets: number;
+  }> {
+    try {
+      const [
+        totalTasks,
+        completedTasks,
+        runningTasks,
+        failedTasks,
+        totalTweets,
+      ] = await Promise.all([
+        db.spiderTask.count(),
+        db.spiderTask.count({ where: { status: 'completed' } }),
+        db.spiderTask.count({ where: { status: 'running' } }),
+        db.spiderTask.count({ where: { status: 'failed' } }),
+        db.tweet.count(),
+      ]);
+
+      return {
+        totalTasks,
+        completedTasks,
+        runningTasks,
+        failedTasks,
+        totalTweets,
+      };
+    } catch (error) {
+      console.error('获取统计信息失败:', error);
+      return {
+        totalTasks: 0,
+        completedTasks: 0,
+        runningTasks: 0,
+        failedTasks: 0,
+        totalTweets: 0,
+      };
+    }
+  }
+
+  /**
+   * 删除单个推文
+   */
+  async deleteTweet(tweetId: string): Promise<void> {
+    try {
+      await db.tweet.delete({
+        where: { id: tweetId },
+      });
+      console.log(`推文删除成功: ${tweetId}`);
+    } catch (error) {
+      console.error('删除推文失败:', error);
+      throw new Error('删除推文失败');
+    }
+  }
+
+  /**
+   * 批量删除推文
+   */
+  async batchDeleteTweets(tweetIds: string[]): Promise<number> {
+    try {
+      const result = await db.tweet.deleteMany({
+        where: {
+          id: {
+            in: tweetIds,
+          },
+        },
+      });
+      
+      console.log(`批量删除推文成功: ${result.count} 条`);
+      return result.count;
+    } catch (error) {
+      console.error('批量删除推文失败:', error);
+      throw new Error('批量删除推文失败');
+    }
+  }
+
+  /**
+   * 导出推文数据
+   */
+  async exportTweets(
+    taskId?: string,
+    listId?: string,
+    format: 'json' | 'csv' = 'json'
+  ): Promise<string> {
+    try {
+      const where: any = {};
+      if (taskId) where.taskId = taskId;
+      if (listId) where.listId = listId;
+
+      const tweets = await db.tweet.findMany({
+        where,
+        orderBy: { publishedAt: 'desc' },
+      });
+
+      // 解析图片URLs
+      const parsedTweets = tweets.map((tweet: any) => ({
+        ...tweet,
+        imageUrls: tweet.imageUrls ? JSON.parse(tweet.imageUrls) : [],
+      }));
+
+      if (format === 'json') {
+        return JSON.stringify(parsedTweets, null, 2);
+      } else {
+        // CSV格式
+        if (parsedTweets.length === 0) {
+          return '';
+        }
+
+        const headers = [
+          'id', 'content', 'userNickname', 'userUsername',
+          'replyCount', 'retweetCount', 'likeCount', 'viewCount',
+          'imageUrls', 'tweetUrl', 'publishedAt', 'listId', 'scrapedAt'
+        ];
+
+        const csvRows = [
+          headers.join(','),
+          ...parsedTweets.map((tweet: any) => [
+            tweet.id,
+            `"${tweet.content.replace(/"/g, '""')}"`,
+            `"${tweet.userNickname}"`,
+            `"${tweet.userUsername}"`,
+            tweet.replyCount,
+            tweet.retweetCount,
+            tweet.likeCount,
+            tweet.viewCount,
+            `"${tweet.imageUrls.join(';')}"`,
+            tweet.tweetUrl,
+            new Date(tweet.publishedAt).toISOString(),
+            tweet.listId,
+            new Date(tweet.scrapedAt).toISOString(),
+          ].join(','))
+        ];
+
+        return csvRows.join('\n');
+      }
+    } catch (error) {
+      console.error('导出数据失败:', error);
+      throw new Error('导出数据失败');
+    }
+  }
+} 

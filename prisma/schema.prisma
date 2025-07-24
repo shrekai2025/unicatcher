@@ -1,0 +1,119 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表 - 目前使用JWT策略，此表主要作为关联使用，实际会话不存储在数据库
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[] // 关联的第三方账号（如Google）
+  sessions      Session[] // 会话记录（JWT策略下暂不使用）
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 第三方账号表 - 存储OAuth提供商的账号信息（如Google）
+// 目前使用CredentialsProvider固定账号登录，此表暂未使用，但保留以备将来扩展
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// 会话表 - 用于数据库会话策略
+// 当前使用JWT策略，此表暂不使用，但保留以备将来切换到数据库会话时使用
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 邮箱验证令牌表 - 用于邮箱验证功能
+// 当前项目使用固定账号认证，此表暂不使用，但保留以备将来添加邮箱验证功能
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// 爬虫任务表 - 记录爬取任务的状态和配置
+model SpiderTask {
+  id          String   @id @default(cuid())
+  type        String   // 任务类型：twitter_list
+  listId      String   // Twitter List ID
+  status      String   // 任务状态：created, queued, running, completed, failed
+  result      String?  // 成功信息或错误信息（JSON格式）
+  tweetCount  Int      @default(0) // 已爬取的推文数量
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联的推文数据
+  tweets Tweet[]
+
+  @@index([status])
+  @@index([type])
+  @@index([listId])
+}
+
+// 推文数据表 - 存储爬取到的推文内容
+model Tweet {
+  id            String   @id // 推文ID（从URL提取的数字）
+  content       String   // 推文正文
+  userNickname  String   // 用户昵称（显示名）
+  userUsername  String   // 用户名（@handle）
+  replyCount    Int      @default(0) // 评论数
+  retweetCount  Int      @default(0) // 转发数
+  likeCount     Int      @default(0) // 点赞数
+  viewCount     Int      @default(0) // 浏览数
+  imageUrls     String?  // 配图URLs（JSON数组格式）
+  tweetUrl      String   // 推文完整链接
+  publishedAt   BigInt   // 发推时间戳
+  listId        String   // 来源List ID
+  scrapedAt     BigInt   // 爬取时间戳
+  
+  // 关联任务
+  taskId     String
+  task       SpiderTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([listId])
+  @@index([publishedAt])
+  @@index([taskId])
+}
