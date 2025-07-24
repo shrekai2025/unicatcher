@@ -70,14 +70,20 @@ RUN mkdir -p /app/data/database /app/data/logs /app/data/browser-data && \
     chown -R appuser:appgroup /app/data /app/prisma && \
     chmod -R 755 /app/data /app/prisma
 
+# 设置Playwright环境变量（在用户切换前设置）
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright
+
 # 切换到非 root 用户
 USER appuser
 
-# 设置Playwright环境变量（在用户切换后设置）
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright
+# 创建Playwright浏览器目录
+RUN mkdir -p /home/appuser/.cache/ms-playwright
 
 # 安装Playwright浏览器（在用户切换后执行，确保权限正确）
 RUN npx playwright install chromium
+
+# 验证安装
+RUN ls -la /home/appuser/.cache/ms-playwright/ || echo "Warning: Playwright directory not created properly"
 
 # 暴露端口
 EXPOSE 3067
