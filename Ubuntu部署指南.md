@@ -1,3 +1,28 @@
+# 重装命令
+# 停止容器
+docker-compose down
+
+# 清理构建缓存
+docker system prune -f
+# 清理旧的镜像
+docker-compose down --rmi all
+
+# 重新构建（确保包含所有修复）
+docker-compose build --no-cache --pull
+
+# 启动容器
+docker-compose up -d
+
+# 测试Playwright浏览器
+docker-compose exec unicatcher npx playwright --version
+
+# 开启实时日志监控
+docker-compose logs -f unicatcher
+
+# 查看当前容器日志
+docker-compose logs unicatcher | tail -20
+
+
 # UniCatcher Ubuntu 部署运行指南
 
 本指南详细说明如何在Ubuntu环境下成功部署和运行UniCatcher项目。

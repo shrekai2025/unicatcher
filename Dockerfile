@@ -62,23 +62,22 @@ ENV AUTH_SECRET=build-time-secret
 ENV DATABASE_URL="file:./prisma/db.sqlite"
 ENV NEXTAUTH_URL=http://localhost:3067
 
-# 设置Playwright环境变量（在安装前设置）
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-
 # 构建Next.js应用
 RUN npm run build
 
-# 安装Playwright浏览器（确保路径正确）
-RUN npx playwright install chromium
-
-# 创建数据目录并设置权限（包括Playwright浏览器目录）
+# 创建数据目录并设置权限
 RUN mkdir -p /app/data/database /app/data/logs /app/data/browser-data && \
     chown -R appuser:appgroup /app/data /app/prisma && \
-    chmod -R 755 /app/data /app/prisma && \
-    if [ -d "/ms-playwright" ]; then chown -R appuser:appgroup /ms-playwright && chmod -R 755 /ms-playwright; fi
+    chmod -R 755 /app/data /app/prisma
 
 # 切换到非 root 用户
 USER appuser
+
+# 设置Playwright环境变量（在用户切换后设置）
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright
+
+# 安装Playwright浏览器（在用户切换后执行，确保权限正确）
+RUN npx playwright install chromium
 
 # 暴露端口
 EXPOSE 3067
