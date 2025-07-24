@@ -2,114 +2,31 @@ version: '3.8'
 
 services:
   unicatcher:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: unicatcher-app
+    # 使用 .env 文件来管理环境变量
+    env_file:
+      - .env
     ports:
       - "3067:3067"
-    environment:
-      - NODE_ENV=production
-      - PORT=3067
-      - AUTH_SECRET=unicatcher-secret-key-2024
-      - NEXTAUTH_URL=http://localhost:3067
-      - DATABASE_URL=file:./prisma/db.sqlite
-      - ENABLE_RESOURCE_OPTIMIZATION=true
     volumes:
       # 数据持久化
       - unicatcher-data:/app/data
-      # 浏览器数据持久化
-      - unicatcher-browser:/app/data/browser-data
       # 数据库持久化
       - unicatcher-db:/app/prisma
-      # 日志持久化
-      - unicatcher-logs:/app/data/logs
     restart: unless-stopped
+    # 添加健康检查
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3067/api/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
       start_period: 60s
-    networks:
-      - unicatcher-network
-    labels:
-      # Watchtower标签，用于自动更新
-      - "com.centurylinklabs.watchtower.enable=true"
-      - "com.centurylinklabs.watchtower.lifecycle.pre-update=echo 'Stopping UniCatcher...'"
-      - "com.centurylinklabs.watchtower.lifecycle.post-update=echo 'UniCatcher updated successfully!'"
-
-  # 自动更新服务（可选）
-  watchtower:
-    image: containrrr/watchtower
-    container_name: unicatcher-watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      # 每天凌晨2点检查更新
-      - WATCHTOWER_SCHEDULE=0 0 2 * * *
-      - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_LABEL_ENABLE=true
-      - WATCHTOWER_INCLUDE_RESTARTING=true
-      - WATCHTOWER_INCLUDE_STOPPED=false
-      # 通知配置（可选）
-      - WATCHTOWER_NOTIFICATIONS=slack
-      - WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL=${SLACK_WEBHOOK_URL}
-    restart: unless-stopped
-    networks:
-      - unicatcher-network
-    profiles:
-      - autoupdate
-
-  # Nginx反向代理（可选，用于生产环境）
-  nginx:
-    image: nginx:alpine
-    container_name: unicatcher-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - unicatcher
-    restart: unless-stopped
-    networks:
-      - unicatcher-network
-    profiles:
-      - production
-
-  # 数据库备份服务（可选）
-  backup:
-    image: alpine:latest
-    container_name: unicatcher-backup
-    volumes:
-      - unicatcher-data:/data:ro
-      - ./backups:/backups
-    command: >
-      sh -c "
-        apk add --no-cache tar gzip &&
-        while true; do
-          echo 'Creating backup...' &&
-          tar -czf /backups/unicatcher-backup-$$(date +%Y%m%d-%H%M%S).tar.gz -C /data . &&
-          find /backups -name '*.tar.gz' -mtime +7 -delete &&
-          echo 'Backup completed. Next backup in 24 hours.' &&
-          sleep 86400
-        done
-      "
-    restart: unless-stopped
-    profiles:
-      - backup
 
 volumes:
   unicatcher-data:
-    name: unicatcher-data
-  unicatcher-browser:
-    name: unicatcher-browser
+    driver: local
   unicatcher-db:
-    name: unicatcher-db
-  unicatcher-logs:
-    name: unicatcher-logs
-
-networks:
-  unicatcher-network:
-    name: unicatcher-network
-    driver: bridge 
+    driver: local 
