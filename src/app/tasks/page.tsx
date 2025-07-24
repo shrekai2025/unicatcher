@@ -192,7 +192,7 @@ export default function TasksPage() {
                         {task.status === 'running' && (
                           <button
                             onClick={() => handleCancelTask(task.id)}
-                            disabled={cancelTask.isLoading}
+                            disabled={cancelTask.isPending}
                             className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                           >
                             取消
@@ -201,7 +201,7 @@ export default function TasksPage() {
                         {task.status === 'failed' && (
                           <button
                             onClick={() => handleRetryTask(task.id)}
-                            disabled={retryTask.isLoading}
+                            disabled={retryTask.isPending}
                             className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                           >
                             重试
@@ -210,7 +210,7 @@ export default function TasksPage() {
                         {(task.status === 'completed' || task.status === 'failed') && (
                           <button
                             onClick={() => handleDeleteTask(task.id)}
-                            disabled={deleteTask.isLoading}
+                            disabled={deleteTask.isPending}
                             className="inline-flex items-center px-3 py-1 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
                           >
                             删除
@@ -240,7 +240,7 @@ export default function TasksPage() {
             <div className="mt-6 flex justify-center">
               <button
                 onClick={() => setCurrentPage(prev => prev + 1)}
-                disabled={tasksQuery.isLoading}
+                disabled={tasksQuery.isPending}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
               >
                 加载更多
@@ -305,10 +305,10 @@ export default function TasksPage() {
                   </button>
                   <button
                     onClick={handleCreateTask}
-                    disabled={createTask.isLoading}
+                    disabled={createTask.isPending}
                     className="flex-1 px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50"
                   >
-                    {createTask.isLoading ? '创建中...' : '创建任务'}
+                    {createTask.isPending ? '创建中...' : '创建任务'}
                   </button>
                 </div>
               </div>

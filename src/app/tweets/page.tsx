@@ -137,7 +137,7 @@ export default function TweetsPage() {
               />
               <button
                 onClick={handleSearch}
-                disabled={tweetsQuery.isLoading}
+                disabled={tweetsQuery.isPending}
                 className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 rounded-r-md shadow-sm text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
               >
                 🔍 搜索
@@ -146,7 +146,7 @@ export default function TweetsPage() {
             <div className="flex space-x-2">
               <button
                 onClick={handleExport}
-                disabled={exportTweets.isLoading}
+                disabled={exportTweets.isPending}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
               >
                 📥 导出数据
@@ -154,7 +154,7 @@ export default function TweetsPage() {
               {selectedTweets.length > 0 && (
                 <button
                   onClick={handleBatchDelete}
-                  disabled={batchDeleteTweets.isLoading}
+                  disabled={batchDeleteTweets.isPending}
                   className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
                 >
                   🗑️ 批量删除 ({selectedTweets.length})
@@ -222,7 +222,7 @@ export default function TweetsPage() {
                                 </a>
                                 <button
                                   onClick={() => handleDeleteTweet(tweet.id)}
-                                  disabled={deleteTweet.isLoading}
+                                  disabled={deleteTweet.isPending}
                                   className="text-red-600 hover:text-red-800 text-sm disabled:opacity-50"
                                 >
                                   删除
@@ -311,7 +311,7 @@ export default function TweetsPage() {
             <div className="mt-6 flex justify-center">
               <button
                 onClick={() => setCurrentPage(prev => prev + 1)}
-                disabled={tweetsQuery.isLoading}
+                disabled={tweetsQuery.isPending}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
               >
                 加载更多
