@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 import { auth, signIn } from "~/server/auth";
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: { error?: string };
+}) {
   const session = await auth();
 
   // 如果已登录，重定向到主页
@@ -43,6 +47,17 @@ export default async function LoginPage() {
           <h2 className="text-2xl font-bold text-white text-center mb-6">
             管理员登录
           </h2>
+
+          {searchParams.error && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
+              <p className="text-red-200 text-sm text-center">
+                {searchParams.error === 'credentials' 
+                  ? '用户名或密码错误，请重试'
+                  : '登录失败，请重试'
+                }
+              </p>
+            </div>
+          )}
 
           <form action={handleLogin} className="space-y-6">
             <div>
