@@ -14,11 +14,14 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // API 查询
-  const tasksQuery = api.tasks.list.useQuery({
-    page: currentPage,
-    limit: 10,
-    status: statusFilter === 'all' ? undefined : statusFilter as any,
-  });
+  const tasksQuery = api.tasks.list.useQuery(
+    { page: currentPage, limit: 10 },
+    {
+      // refetchInterval: 5000, // 5秒轮询一次
+      refetchOnWindowFocus: true, // 仅在窗口聚焦时刷新
+      keepPreviousData: true,
+    }
+  );
 
   // API 变更
   const createTask = api.tasks.create.useMutation({
