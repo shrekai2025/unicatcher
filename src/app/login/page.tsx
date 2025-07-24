@@ -4,9 +4,12 @@ import { auth, signIn } from "~/server/auth";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>; // Next.js 15: searchParams is now a Promise
 }) {
   const session = await auth();
+
+  // Resolve the searchParams Promise
+  const resolvedSearchParams = await searchParams;
 
   // 如果已登录，重定向到主页
   if (session?.user) {
@@ -62,10 +65,10 @@ export default async function LoginPage({
             管理员登录
           </h2>
 
-          {searchParams.error && (
+          {resolvedSearchParams.error && (
             <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
               <p className="text-red-200 text-sm text-center">
-                {searchParams.error === 'credentials' 
+                {resolvedSearchParams.error === 'credentials' 
                   ? '用户名或密码错误，请重试'
                   : '登录失败，请重试'
                 }
