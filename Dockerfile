@@ -45,6 +45,9 @@ RUN npx playwright install-deps chromium
 # 复制剩余源代码
 COPY . .
 
+# 构建Next.js应用
+RUN npm run build
+
 # 创建数据目录
 RUN mkdir -p /app/data/database /app/data/logs /app/data/browser-data
 
