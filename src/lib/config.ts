@@ -20,7 +20,7 @@ export const config = {
   // Playwright配置
   playwright: {
     browser: 'chromium' as const,
-    headless: false, // 可切换为false进行调试
+    headless: true, // 可切换为false进行调试
     userDataDir: './data/browser-data',
     timeout: 30000, // 页面超时时间，可配置，默认30秒
     viewport: { width: 1280, height: 720 },
@@ -36,6 +36,35 @@ export const config = {
     // 浏览器实例管理策略
     instanceStrategy: 'immediate_close', // 任务结束后立即关闭浏览器实例
     healthCheck: true, // 启用浏览器健康检查
+    // 资源优化配置 - 节省带宽和提高加载速度
+    resourceOptimization: {
+      enabled: process.env.ENABLE_RESOURCE_OPTIMIZATION !== 'false', // 启用资源拦截优化（默认启用，设置环境变量为false可禁用）
+      blockedResourceTypes: [
+        'image',      // 拦截图片（主要节省带宽）
+        'media',      // 拦截视频/音频
+        'font',       // 拦截字体文件
+        'other'       // 拦截其他类型文件
+        // 注意：保留stylesheet，确保页面结构正常识别
+      ],
+      // 允许加载的关键资源
+      allowedResourceTypes: [
+        'document',   // 允许HTML文档
+        'script',     // 允许JavaScript（必需）
+        'stylesheet', // 允许CSS样式（确保页面结构正常）
+        'xhr',        // 允许AJAX请求
+        'fetch',      // 允许Fetch请求
+        'websocket'   // 允许WebSocket连接
+      ],
+      // 基于URL模式的精确控制
+      allowedDomains: [
+        'x.com',
+        'twitter.com',
+        'abs.twimg.com', // Twitter API相关
+        'pbs.twimg.com', // Twitter媒体服务器（但会被image类型拦截）
+      ],
+      // 调试模式下显示拦截的资源
+      logBlockedRequests: process.env.NODE_ENV === 'development',
+    },
   },
 
   // 数据库配置

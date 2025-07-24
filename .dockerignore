@@ -1,0 +1,80 @@
+# Docker构建忽略文件
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js
+.next/
+out/
+
+# 环境文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE/编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# 文档和说明
+README.md
+*.md
+docs/
+
+# 测试和开发工具
+coverage/
+.nyc_output/
+jest.config.js
+cypress/
+cypress.json
+
+# 日志文件
+logs/
+*.log
+
+# 临时文件
+tmp/
+temp/
+.tmp/
+
+# 数据文件（构建时不需要）
+data/
+backups/
+*.sqlite
+*.db
+
+# 开发脚本
+scripts/test-*.js
+scripts/test-*.mjs
+scripts/*-test.*
+
+# Docker相关
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Ubuntu部署相关
+scripts/docker-*.sh
+Ubuntu*.md
+Docker*.md 

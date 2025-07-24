@@ -8,6 +8,7 @@
 import { chromium } from 'playwright';
 import fs from 'fs/promises';
 import path from 'path';
+import { config } from '../src/lib/config.js';
 
 console.log('🚀 UniCatcher 快速登录工具启动...\n');
 
@@ -17,10 +18,10 @@ async function quickLogin() {
   let page = null;
 
   try {
-    // 启动浏览器（非无头模式）
+    // 启动浏览器（遵循全局配置）
     console.log('📱 启动浏览器...');
     browser = await chromium.launch({
-      headless: false,
+      headless: config.playwright.headless, // 使用全局配置
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',

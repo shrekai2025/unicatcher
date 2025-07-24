@@ -16,8 +16,15 @@
     "typecheck": "tsc --noEmit",
     "setup-dev": "node scripts/setup-dev.js",
     "login": "node scripts/manual-login.js",
+    "server-login": "node scripts/server-login.js",
     "quick-login": "node scripts/quick-login.js",
-    "login-state": "node scripts/login-state-manager.mjs"
+    "login-state": "node scripts/login-state-manager.mjs",
+    "test-optimization": "node scripts/test-resource-optimization.mjs",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f unicatcher",
+    "docker:health": "curl -f http://localhost:3067/api/health"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.2",

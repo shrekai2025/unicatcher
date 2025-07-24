@@ -59,6 +59,9 @@ export class BrowserManager {
       // 设置页面超时
       this.page.setDefaultTimeout(this.browserConfig.timeout);
       
+      // 设置资源拦截以节省带宽
+      await this.setupResourceOptimization();
+      
       // 监听页面错误
       this.page.on('pageerror', (error) => {
         console.error('页面错误:', error);
@@ -419,6 +422,109 @@ export class BrowserManager {
     } catch (error) {
       console.error('验证storageState失败:', error);
       return false;
+    }
+  }
+
+  /**
+   * 设置资源优化 - 拦截图片、视频等资源以节省带宽
+   */
+  private async setupResourceOptimization(): Promise<void> {
+    if (!this.page || !config.playwright.resourceOptimization.enabled) {
+      return;
+    }
+
+    try {
+      const optimizationConfig = config.playwright.resourceOptimization;
+      
+      // 启用请求拦截
+      await this.page.route('**/*', (route) => {
+        const request = route.request();
+        const resourceType = request.resourceType();
+        const url = request.url();
+
+        // 检查是否为需要拦截的资源类型
+        if (optimizationConfig.blockedResourceTypes.includes(resourceType as any)) {
+          // 检查是否在允许的域名列表中
+          const isAllowedDomain = optimizationConfig.allowedDomains.some(domain => 
+            url.includes(domain)
+          );
+
+          // 如果不在允许域名列表中，则拦截
+          if (!isAllowedDomain) {
+            if (optimizationConfig.logBlockedRequests) {
+              console.log(`🚫 拦截资源: ${resourceType} - ${url}`);
+            }
+            
+            // 返回空响应以节省带宽
+            route.fulfill({
+              status: 200,
+              contentType: this.getContentTypeForResource(resourceType),
+              body: this.getEmptyResponseForResource(resourceType)
+            });
+            return;
+          }
+        }
+
+        // 允许加载的资源继续请求
+        if (optimizationConfig.logBlockedRequests && 
+            optimizationConfig.allowedResourceTypes.includes(resourceType as any)) {
+          console.log(`✅ 允许资源: ${resourceType} - ${url}`);
+        }
+        
+        route.continue();
+      });
+
+      console.log('✅ 资源优化已启用 - 已拦截图片、视频等非必需资源');
+    } catch (error) {
+      console.error('设置资源优化失败:', error);
+      // 不抛出错误，继续正常执行
+    }
+  }
+
+  /**
+   * 根据资源类型获取对应的Content-Type
+   */
+  private getContentTypeForResource(resourceType: string): string {
+    switch (resourceType) {
+      case 'image':
+        return 'image/png';
+      case 'stylesheet':
+        return 'text/css';
+      case 'font':
+        return 'font/woff2';
+      case 'media':
+        return 'video/mp4';
+      default:
+        return 'text/plain';
+    }
+  }
+
+  /**
+   * 根据资源类型返回空响应体
+   */
+  private getEmptyResponseForResource(resourceType: string): string | Buffer {
+    switch (resourceType) {
+      case 'image':
+        // 返回1x1透明PNG图片的字节数据
+        return Buffer.from([
+          0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+          0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+          0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+          0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+          0x89, 0x00, 0x00, 0x00, 0x0B, 0x49, 0x44, 0x41,
+          0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+          0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
+          0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+          0x42, 0x60, 0x82
+        ]);
+      case 'stylesheet':
+        return '/* blocked stylesheet */';
+      case 'font':
+        return '';
+      case 'media':
+        return '';
+      default:
+        return '';
     }
   }
 
