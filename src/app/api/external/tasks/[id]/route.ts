@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { StorageService } from '~/server/core/data/storage';
 
+interface RouteParams {
+  params: { id: string };
+}
+
 const storageService = new StorageService();
 
 // 简单的API Key认证
@@ -14,7 +18,7 @@ function validateApiKey(request: NextRequest): boolean {
 // 获取任务详情
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
     // API Key验证
