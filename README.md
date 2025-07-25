@@ -2,6 +2,51 @@
 
 UniCatcher是一个基于T3 Stack开发的通用浏览器爬虫系统，支持代码分析爬取和视觉AI分析爬取两种模式。
 
+***
+## win直接部署（非docker）
+
+// 清理系统
+npm cache clean --force
+Remove-Item package-lock.json -ErrorAction SilentlyContinue
+Remove-Item yarn.lock -ErrorAction SilentlyContinue
+// 安装
+npm install
+//  创建.env文件
+$envContent = @'
+DATABASE_URL="file:./prisma/prisma/db.sqlite"
+AUTH_SECRET="unicatcher-2024-secret-key-change-in-production"
+NEXTAUTH_URL="http://localhost:3067"
+NODE_ENV="production"
+PORT=3067
+'@
+
+$envContent | Out-File -FilePath ".env" -Encoding UTF8
+// 生成Prisma客户端
+npx prisma generate
+// 创建数据库
+npx prisma db push
+// 安装Playwright浏览器到正确的Windows路径
+npx playwright install chromium
+// 测试配置是否正确
+node -e "
+require('dotenv').config();
+const os = require('os');
+const path = require('path');
+
+console.log('平台:', process.platform);
+console.log('用户目录:', os.homedir());
+
+if (process.platform === 'win32') {
+  const expectedPath = path.join(os.homedir(), 'AppData', 'Local', 'ms-playwright');
+  console.log('预期Playwright路径:', expectedPath);
+} else {
+  console.log('预期Playwright路径: /home/appuser/.cache/ms-playwright');
+}
+
+console.log('DATABASE_URL:', process.env.DATABASE_URL);
+
+***
+
 ## 🚀 快速开始
 
 ### 环境要求
@@ -186,3 +231,5 @@ npm run db:push
 **技术栈**: T3 Stack (Next.js + TypeScript + tRPC + Prisma)  
 **开发模式**: AI Vibe Coding  
 **当前版本**: v1.0.0-alpha
+
+
