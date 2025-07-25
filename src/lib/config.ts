@@ -5,25 +5,34 @@
  */
 
 import { env } from "~/env";
-import { join } from "path";
-import { homedir } from "os";
 
 // 获取操作系统特定的Playwright浏览器路径
 function getPlaywrightBrowserPath() {
-  if (process.platform === 'win32') {
-    // Windows路径
-    return join(homedir(), 'AppData', 'Local', 'ms-playwright');
-  } else {
-    // Linux/macOS路径
-    return '/home/appuser/.cache/ms-playwright';
+  // 在服务器端运行时才使用 Node.js 模块
+  if (typeof window === 'undefined') {
+    const { join } = require('path');
+    const { homedir } = require('os');
+    
+    if (process.platform === 'win32') {
+      // Windows路径
+      return join(homedir(), 'AppData', 'Local', 'ms-playwright');
+} else {
+      // Linux/macOS路径
+      return '/home/appuser/.cache/ms-playwright';
+    }
   }
+  
+  // Edge Runtime 环境下的默认路径
+  return process.platform === 'win32' 
+    ? 'C:\\Users\\Administrator\\AppData\\Local\\ms-playwright'
+    : '/home/appuser/.cache/ms-playwright';
 }
 
 // 动态设置Playwright浏览器路径（修复跨平台兼容性问题）
-if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+if (typeof window === 'undefined' && !process.env.PLAYWRIGHT_BROWSERS_PATH) {
   process.env.PLAYWRIGHT_BROWSERS_PATH = getPlaywrightBrowserPath();
   console.log('[CONFIG] 设置Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
-} else {
+} else if (typeof window === 'undefined') {
   console.log('[CONFIG] 使用现有Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
 }
 

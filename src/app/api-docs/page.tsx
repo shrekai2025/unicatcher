@@ -76,7 +76,7 @@ export default function APIDocsPage() {
                   <code className="text-sm">/api/external</code>
                 </div>
               </div>
-              <div>
+            <div>
                 <h3 className="font-medium text-gray-900 mb-2">tRPC 基础路径</h3>
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <code className="text-sm">/api/trpc</code>
@@ -97,8 +97,8 @@ export default function APIDocsPage() {
                   <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">API Key</span>
                   <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">Session</span>
                 </div>
-              </div>
-              <div>
+            </div>
+            <div>
                 <h3 className="font-medium text-gray-900 mb-2">Rate Limiting</h3>
                 <div className="p-3 bg-yellow-50 rounded-lg">
                   <p className="text-sm text-yellow-800">每个 List ID 建议间隔 1 分钟以上</p>
@@ -182,8 +182,8 @@ export default function APIDocsPage() {
                     <pre>{JSON.stringify({
                       listId: "string (必填)",
                       maxTweets: "number (可选, 1-100, 默认: 20)"
-                    }, null, 2)}</pre>
-                  </div>
+              }, null, 2)}</pre>
+            </div>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-800 mb-2">响应示例</h4>
@@ -191,17 +191,17 @@ export default function APIDocsPage() {
                     <pre>{JSON.stringify({
                       success: true,
                       message: "Task created successfully",
-                      data: {
+                data: {
                         taskId: "cmdih9v9d0000j7hoz84g1hir",
                         listId: "1948042550071496895",
                         maxTweets: 20,
                         status: "created"
-                      }
-                    }, null, 2)}</pre>
+                }
+              }, null, 2)}</pre>
                   </div>
-                </div>
-              </div>
-              
+            </div>
+          </div>
+
               <div className="mt-4">
                 <h4 className="font-medium text-gray-800 mb-2">cURL 示例</h4>
                 <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
@@ -237,20 +237,20 @@ export default function APIDocsPage() {
                   <div className="bg-gray-50 p-3 rounded text-sm">
                     <pre>{JSON.stringify({
                       success: true,
-                      data: {
+                data: {
                         tasks: ["Array<Task>"],
                         total: 25,
                         page: 1,
                         limit: 10,
                         hasMore: true
-                      }
-                    }, null, 2)}</pre>
+                }
+              }, null, 2)}</pre>
                   </div>
                 </div>
-              </div>
             </div>
+          </div>
 
-            {/* 获取任务详情 */}
+          {/* 获取任务详情 */}
             <div className="mb-6 border border-gray-200 rounded-lg p-4">
               <div className="flex items-center mb-3">
                 <span className="inline-block bg-green-100 text-green-800 px-3 py-1 text-sm font-semibold rounded mr-3">GET</span>
@@ -288,9 +288,9 @@ export default function APIDocsPage() {
                       page: "number (可选, 默认: 1)",
                       limit: "number (可选, 默认: 20, 最大: 100)",
                       format: "string (可选: json|csv, 默认: json)"
-                    }, null, 2)}</pre>
-                  </div>
-                </div>
+              }, null, 2)}</pre>
+            </div>
+          </div>
                 <div>
                   <h4 className="font-medium text-gray-800 mb-2">响应示例 (JSON)</h4>
                   <div className="bg-gray-50 p-3 rounded text-sm">
@@ -303,11 +303,11 @@ export default function APIDocsPage() {
                         limit: 20,
                         hasMore: true
                       }
-                    }, null, 2)}</pre>
+              }, null, 2)}</pre>
                   </div>
-                </div>
-              </div>
-              
+            </div>
+          </div>
+
               <div className="mt-4 space-y-3">
                 <div>
                   <h4 className="font-medium text-gray-800 mb-2">获取 JSON 数据</h4>
@@ -370,11 +370,11 @@ export default function APIDocsPage() {
                 <div className="flex justify-between items-center p-3 bg-red-50 rounded">
                   <code className="font-mono text-red-700">500 Internal Server Error</code>
                   <span className="text-sm text-red-700">服务器错误</span>
-                </div>
-              </div>
             </div>
           </div>
-          
+            </div>
+          </div>
+
           <div className="mt-6">
             <h3 className="font-medium text-gray-900 mb-3">错误响应格式</h3>
             <div className="bg-gray-50 p-4 rounded-lg">
@@ -413,8 +413,8 @@ createTask.mutate({
   listId: "1948042550071496895",
   maxTweets: 50
 });`}</pre>
-                </div>
-              </div>
+            </div>
+          </div>
 
               <div className="border border-gray-200 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 mb-2">
@@ -428,8 +428,8 @@ createTask.mutate({
   limit: 10,
   status: "completed"
 });`}</pre>
-                </div>
-              </div>
+            </div>
+          </div>
 
               <div className="border border-gray-200 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 mb-2">
@@ -441,8 +441,8 @@ createTask.mutate({
                   <pre>{`const { data } = api.tasks.getById.useQuery({
   id: "cmdih9v9d0000j7hoz84g1hir"
 });`}</pre>
-                </div>
-              </div>
+            </div>
+          </div>
 
               <div className="border border-gray-200 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 mb-2">
@@ -479,8 +479,8 @@ cancelTask.mutate({ id: "task_id" });`}</pre>
   page: 1,
   limit: 20
 });`}</pre>
-                </div>
-              </div>
+            </div>
+          </div>
 
               <div className="border border-gray-200 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 mb-2">
@@ -494,8 +494,8 @@ cancelTask.mutate({ id: "task_id" });`}</pre>
   page: 1,
   limit: 20
 });`}</pre>
-                </div>
-              </div>
+            </div>
+          </div>
 
               <div className="border border-gray-200 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 mb-2">
@@ -508,8 +508,8 @@ cancelTask.mutate({ id: "task_id" });`}</pre>
   limit: 10,
   sortBy: "likes"
 });`}</pre>
-                </div>
-              </div>
+          </div>
+        </div>
 
               <div className="border border-gray-200 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 mb-2">
@@ -541,7 +541,7 @@ exportMutation.mutate({
           <h2 className="text-2xl font-semibold text-gray-900 mb-6">📋 数据模型</h2>
           
           <div className="space-y-6">
-            {/* Task 模型 */}
+          {/* Task 模型 */}
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">SpiderTask (爬虫任务)</h3>
               <div className="bg-gray-50 p-4 rounded-lg">
@@ -556,11 +556,11 @@ exportMutation.mutate({
                   completedAt: "Date|null - 完成时间",
                   createdAt: "Date - 创建时间",
                   updatedAt: "Date - 最后更新时间"
-                }, null, 2)}</pre>
-              </div>
+              }, null, 2)}</pre>
             </div>
+          </div>
 
-            {/* Tweet 模型 */}
+          {/* Tweet 模型 */}
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Tweet (推文)</h3>
               <div className="bg-gray-50 p-4 rounded-lg">
@@ -605,7 +605,7 @@ exportMutation.mutate({
                     <pre>{JSON.stringify({
                       error: "错误信息",
                       details: "详细错误描述（可选）"
-                    }, null, 2)}</pre>
+              }, null, 2)}</pre>
                   </div>
                 </div>
               </div>
@@ -991,8 +991,8 @@ export default TaskManager;`}</code></pre>
                   使用 CSV 格式导出大量数据
                 </li>
               </ul>
-            </div>
-            
+          </div>
+
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">错误处理</h3>
               <ul className="space-y-2 text-gray-600">
@@ -1014,8 +1014,8 @@ export default TaskManager;`}</code></pre>
                 </li>
               </ul>
             </div>
+            </div>
           </div>
-        </div>
 
         {/* 页脚 */}
         <div className="text-center py-8 border-t border-gray-200">

@@ -106,6 +106,12 @@ model Tweet {
   listId        String   // 来源List ID
   scrapedAt     BigInt   // 爬取时间戳
   
+  // 数据分析相关字段
+  analysisStatus    String?   // 分析状态: pending, synced, analyzed, failed
+  syncedAt          DateTime? // 数据同步时间
+  analyzedAt        DateTime? // 分析完成时间
+  analysisBatchId   String?   // 分析批次ID
+  
   // 关联任务
   taskId     String
   task       SpiderTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -116,4 +122,34 @@ model Tweet {
   @@index([listId])
   @@index([publishedAt])
   @@index([taskId])
+  @@index([analysisStatus])
+  @@index([syncedAt])
+}
+
+// 数据同步记录表 - 记录外部系统的数据获取历史
+model DataSyncRecord {
+  id            String    @id @default(cuid())
+  tweetIds      String    // JSON数组，记录本次同步的推文ID
+  batchId       String    @unique // 批次ID
+  syncedAt      DateTime  @default(now()) // 同步时间
+  analyzedAt    DateTime? // 分析完成时间
+  requestSystem String?   // 请求的外部系统标识
+  tweetCount    Int       // 本次同步的推文数量
+  status        String    @default("synced") // synced, analyzed, failed, extracting
+  errorMessage  String?   // 错误信息
+  
+  // 数据提取相关字段
+  extractType   String    @default("analysis") // 提取类型: analysis, data_export
+  listId        String?   // 过滤的List ID
+  username      String?   // 过滤的用户名
+  isReExtract   Boolean   @default(false) // 是否为重复提取
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([syncedAt])
+  @@index([batchId])
+  @@index([extractType])
+  @@index([createdAt])
 }

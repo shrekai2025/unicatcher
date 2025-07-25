@@ -239,6 +239,29 @@ export class StorageService {
           orderBy: { publishedAt: 'desc' },
           skip,
           take: limit,
+          select: {
+            id: true,
+            content: true,
+            userNickname: true,
+            userUsername: true,
+            replyCount: true,
+            retweetCount: true,
+            likeCount: true,
+            viewCount: true,
+            imageUrls: true,
+            tweetUrl: true,
+            publishedAt: true,
+            listId: true,
+            scrapedAt: true,
+            // 新的分析字段 - 如果不存在则为null
+            analysisStatus: true,
+            syncedAt: true,
+            analyzedAt: true,
+            analysisBatchId: true,
+            taskId: true,
+            createdAt: true,
+            updatedAt: true,
+          },
         }),
         db.tweet.count({ where }),
       ]);
@@ -450,6 +473,163 @@ export class StorageService {
     } catch (error) {
       console.error('导出数据失败:', error);
       throw new Error('导出数据失败');
+    }
+  }
+
+  /**
+   * 根据条件提取推文数据
+   */
+  async extractTweetData(params: {
+    batchId: string;
+    maxCount: number;
+    listId?: string;
+    username?: string;
+    isExtracted: boolean;
+  }) {
+    try {
+      const { batchId, maxCount, listId, username, isExtracted } = params;
+
+      // 构建查询条件
+      const where: any = {};
+      
+      // 根据是否已提取设置状态条件
+      if (isExtracted) {
+        where.analysisStatus = 'synced';
+      } else {
+        where.OR = [
+          { analysisStatus: 'pending' },
+          { analysisStatus: null }
+        ];
+      }
+
+      // 添加可选过滤条件
+      if (listId) {
+        where.listId = listId;
+      }
+      
+      if (username) {
+        where.userUsername = username;
+      }
+
+      console.log('[DATA EXTRACT] 查询条件:', where);
+
+      // 查询符合条件的推文，按发推时间降序排列
+      const tweets = await db.tweet.findMany({
+        where,
+        orderBy: { publishedAt: 'desc' },
+        take: maxCount,
+        select: {
+          id: true,
+          content: true,
+          userNickname: true,
+          userUsername: true,
+          replyCount: true,
+          retweetCount: true,
+          likeCount: true,
+          viewCount: true,
+          imageUrls: true,
+          tweetUrl: true,
+          publishedAt: true,
+          listId: true,
+          scrapedAt: true,
+          analysisStatus: true,
+          syncedAt: true,
+          analyzedAt: true,
+          analysisBatchId: true,
+          taskId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      if (tweets.length === 0) {
+        return {
+          tweets: [],
+          extractedCount: 0,
+          batchId,
+          extractedAt: new Date().toISOString()
+        };
+      }
+
+      const tweetIds = tweets.map(tweet => tweet.id);
+
+      // 更新推文状态为已同步
+      await db.tweet.updateMany({
+        where: { id: { in: tweetIds } },
+        data: {
+          analysisStatus: 'synced',
+          syncedAt: new Date(),
+          analysisBatchId: batchId
+        }
+      });
+
+      // 创建提取记录
+      await db.dataSyncRecord.create({
+        data: {
+          batchId,
+          tweetIds: JSON.stringify(tweetIds),
+          tweetCount: tweets.length,
+          status: 'synced',
+          extractType: 'data_export',
+          listId,
+          username,
+          isReExtract: isExtracted,
+          requestSystem: 'data_extract_api'
+        }
+      });
+
+      // 解析并格式化推文数据
+      const formattedTweets = tweets.map((tweet: any) => ({
+        ...tweet,
+        imageUrls: tweet.imageUrls ? JSON.parse(tweet.imageUrls) : [],
+        publishedAt: tweet.publishedAt ? Number(tweet.publishedAt) : 0,
+        scrapedAt: tweet.scrapedAt ? Number(tweet.scrapedAt) : 0,
+      }));
+
+      console.log(`[DATA EXTRACT] 成功提取 ${tweets.length} 条推文数据`);
+
+      return {
+        tweets: formattedTweets,
+        extractedCount: tweets.length,
+        batchId,
+        extractedAt: new Date().toISOString()
+      };
+
+    } catch (error) {
+      console.error('数据提取失败:', error);
+      throw new Error(`数据提取失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  }
+
+  /**
+   * 获取数据提取记录列表
+   */
+  async getExtractRecords(page = 1, limit = 20) {
+    try {
+      const skip = (page - 1) * limit;
+
+      const [records, total] = await Promise.all([
+        db.dataSyncRecord.findMany({
+          where: { extractType: 'data_export' },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        db.dataSyncRecord.count({
+          where: { extractType: 'data_export' }
+        }),
+      ]);
+
+      return {
+        records,
+        total,
+        page,
+        limit,
+        hasMore: page * limit < total
+      };
+    } catch (error) {
+      console.error('获取提取记录失败:', error);
+      throw new Error('获取提取记录失败');
     }
   }
 } 

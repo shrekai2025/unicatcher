@@ -36,6 +36,7 @@
     "@trpc/react-query": "^11.0.0",
     "@trpc/server": "^11.0.0",
     "clsx": "^2.1.1",
+    "dotenv": "^16.4.5",
     "next": "^15.2.3",
     "next-auth": "5.0.0-beta.25",
     "playwright": "^1.54.1",

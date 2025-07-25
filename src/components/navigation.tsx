@@ -8,6 +8,7 @@ const navigation = [
   { name: '仪表板', href: '/dashboard', icon: '📊' },
   { name: '任务管理', href: '/tasks', icon: '⚙️' },
   { name: '推文数据', href: '/tweets', icon: '🐦' },
+  { name: '数据提取', href: '/extracts', icon: '📤' },
   { name: 'API文档', href: '/api-docs', icon: '📖' },
 ];
 

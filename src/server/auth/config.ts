@@ -41,6 +41,7 @@ declare module "next-auth" {
  * @see https://next-auth.js.org/configuration/options
  */
 export const authConfig = {
+  trustHost: true, // 信任所有主机，解决生产环境Host问题
   providers: [
     CredentialsProvider({
       name: "credentials",
