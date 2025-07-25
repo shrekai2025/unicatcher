@@ -85,6 +85,17 @@ RUN npx playwright install chromium
 # 验证安装
 RUN ls -la /home/appuser/.cache/ms-playwright/ || echo "Warning: Playwright directory not created properly"
 
+# 创建符号链接以兼容旧路径（在用户切换前以root身份执行）
+USER root
+RUN mkdir -p /ms-playwright && \
+    if [ -d "/home/appuser/.cache/ms-playwright" ]; then \
+      find /home/appuser/.cache/ms-playwright -name "chromium-*" -type d | head -1 | \
+      xargs -I {} ln -sf {} /ms-playwright/; \
+    fi
+
+# 切换回appuser
+USER appuser
+
 # 暴露端口
 EXPOSE 3067
 
