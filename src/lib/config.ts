@@ -54,35 +54,27 @@ export const config = {
         '--disable-web-security',
         // 无GUI环境专用参数
         '--disable-gpu',
-        '--disable-software-rasterizer',
         '--disable-background-timer-throttling',
         '--disable-backgrounding-occluded-windows',
         '--disable-renderer-backgrounding',
         '--disable-features=TranslateUI',
         '--disable-extensions',
-        '--disable-plugins',
         '--mute-audio',
         '--no-first-run',
         '--no-default-browser-check',
-        '--no-zygote',
-        '--single-process',
-        // 修复crashpad问题 - Docker环境专用
-        '--disable-breakpad',
-        '--disable-crash-reporter',
-        '--crash-dumps-dir=/tmp',
-        '--disable-crashpad',
-        '--no-crash-upload',
+        // 移除可能导致崩溃的参数
+        // '--no-zygote',
+        // '--single-process',
         '--disable-extensions-http-throttling',
-        '--disable-logging',
         '--disable-login-animations',
         '--disable-notifications',
         '--disable-permissions-api',
         '--disable-presentation-api',
         '--disable-print-preview',
-        '--disable-web-security',
         '--ignore-certificate-errors',
         '--ignore-ssl-errors',
         '--allow-running-insecure-content',
+        '--disable-blink-features=AutomationControlled',
         '--disable-features=VizDisplayCompositor',
       ],
     },
@@ -93,11 +85,11 @@ export const config = {
     resourceOptimization: {
       enabled: process.env.ENABLE_RESOURCE_OPTIMIZATION !== 'false', // 启用资源拦截优化（默认启用，设置环境变量为false可禁用）
       blockedResourceTypes: [
-        'image',      // 拦截图片（主要节省带宽）
         'media',      // 拦截视频/音频
         'font',       // 拦截字体文件
-        'other'       // 拦截其他类型文件
-        // 注意：保留stylesheet，确保页面结构正常识别
+        // 暂时不拦截图片，避免影响页面功能
+        // 'image',      // 拦截图片（主要节省带宽）
+        // 'other'       // 拦截其他类型文件
       ],
       // 允许加载的关键资源
       allowedResourceTypes: [
@@ -106,14 +98,17 @@ export const config = {
         'stylesheet', // 允许CSS样式（确保页面结构正常）
         'xhr',        // 允许AJAX请求
         'fetch',      // 允许Fetch请求
-        'websocket'   // 允许WebSocket连接
+        'websocket',  // 允许WebSocket连接
+        'image',      // 允许图片加载
+        'other'       // 允许其他资源
       ],
       // 基于URL模式的精确控制
       allowedDomains: [
         'x.com',
         'twitter.com',
         'abs.twimg.com', // Twitter API相关
-        'pbs.twimg.com', // Twitter媒体服务器（但会被image类型拦截）
+        'pbs.twimg.com', // Twitter媒体服务器
+        'abs-0.twimg.com', // Twitter emoji等静态资源
       ],
       // 调试模式下显示拦截的资源
       logBlockedRequests: process.env.NODE_ENV === 'development',

@@ -47,6 +47,33 @@ console.log('DATABASE_URL:', process.env.DATABASE_URL);
 
 ***
 
+使用Prisma Studio(5555端口数据库)
+
+// 启动Prisma Studio
+npm run db:studio
+
+// 或者直接运行
+npx prisma studio
+
+***
+
+更新项目
+// 拉取最新代码
+git pull origin main
+
+// 或者指定分支
+git pull origin master
+
+// 更新所有依赖到最新版本
+npm update
+
+// 或者删除node_modules重新安装
+Remove-Item -Recurse node_modules
+Remove-Item package-lock.json
+npm install
+
+
+
 ## 🚀 快速开始
 
 ### 环境要求

@@ -47,6 +47,12 @@ export class TaskExecutor {
       // 导航到List页面
       await this.browserManager!.navigateToUrl(listUrl);
       
+      // 检查浏览器是否在导航后仍然健康
+      const isHealthyAfterNavigation = await this.browserManager!.healthCheck();
+      if (!isHealthyAfterNavigation) {
+        throw new Error('浏览器在页面导航后变为不健康状态');
+      }
+      
       // 等待Timeline加载
       await this.twitterSelector!.waitForTimeline();
       

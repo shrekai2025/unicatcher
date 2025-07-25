@@ -71,6 +71,19 @@ export class BrowserManager {
         this.isHealthy = false;
       });
 
+      // 监听页面崩溃
+      this.page.on('crash', () => {
+        console.error('页面崩溃');
+        this.isHealthy = false;
+      });
+
+      // 监听控制台消息（可能包含有用的错误信息）
+      this.page.on('console', (msg) => {
+        if (msg.type() === 'error') {
+          console.error('页面控制台错误:', msg.text());
+        }
+      });
+
       // 监听上下文关闭事件
       this.context.on('close', () => {
         console.log('浏览器上下文已关闭');
@@ -80,6 +93,12 @@ export class BrowserManager {
       // 监听页面关闭事件
       this.page.on('close', () => {
         console.log('页面已关闭');
+        this.isHealthy = false;
+      });
+
+      // 监听浏览器进程断开连接
+      this.browser.on('disconnected', () => {
+        console.log('浏览器进程已断开连接');
         this.isHealthy = false;
       });
 
@@ -109,7 +128,17 @@ export class BrowserManager {
       throw new Error('浏览器未启动');
     }
 
+    // 检查浏览器健康状态
+    if (!this.isHealthy) {
+      throw new Error('浏览器处于不健康状态，无法导航');
+    }
+
     try {
+      // 检查页面是否仍然可用
+      if (this.page.isClosed()) {
+        throw new Error('页面已关闭');
+      }
+
       console.log(`正在导航到: ${url}`);
       
       // 使用更灵活的页面加载策略
@@ -125,11 +154,16 @@ export class BrowserManager {
     } catch (error) {
       console.error('页面导航失败:', error);
       
+      // 检查是否是页面关闭导致的错误
+      if (this.page.isClosed() || !this.isHealthy) {
+        throw new Error('浏览器页面已关闭，无法继续导航');
+      }
+      
       // 尝试备用导航策略
       try {
         console.log('尝试备用导航策略...');
         await this.page.goto(url, {
-          waitUntil: 'load', // 更宽松的等待条件
+          waitUntil: 'networkidle', // 更宽松的等待条件
           timeout: 45000, // 增加超时时间
         });
         
