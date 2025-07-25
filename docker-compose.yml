@@ -9,6 +9,8 @@ services:
     # 使用 .env 文件来管理环境变量
     env_file:
       - .env
+    environment:
+      - PLAYWRIGHT_BROWSERS_PATH=/app/data/playwright
     ports:
       - "3067:3067"
     volumes:
