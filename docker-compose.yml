@@ -10,7 +10,7 @@ services:
     env_file:
       - .env
     environment:
-      - PLAYWRIGHT_BROWSERS_PATH=/app/data/playwright
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
     ports:
       - "3067:3067"
     volumes:
