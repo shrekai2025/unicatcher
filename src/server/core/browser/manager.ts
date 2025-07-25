@@ -20,11 +20,7 @@ export class BrowserManager {
    */
   async launch(): Promise<void> {
     try {
-      // 强制设置Playwright浏览器路径（Docker环境修复）
-      if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
-        process.env.PLAYWRIGHT_BROWSERS_PATH = '/home/appuser/.cache/ms-playwright';
-        console.log('🔧 设置Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
-      }
+      // Playwright浏览器路径已在config.ts中动态设置
       
       console.log('正在启动浏览器...');
       console.log('浏览器启动参数:', {

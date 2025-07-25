@@ -5,11 +5,24 @@
  */
 
 import { env } from "~/env";
+import { join } from "path";
+import { homedir } from "os";
 
-// 强制设置Playwright浏览器路径（修复Docker环境下的路径问题）
+// 获取操作系统特定的Playwright浏览器路径
+function getPlaywrightBrowserPath() {
+  if (process.platform === 'win32') {
+    // Windows路径
+    return join(homedir(), 'AppData', 'Local', 'ms-playwright');
+  } else {
+    // Linux/macOS路径
+    return '/home/appuser/.cache/ms-playwright';
+  }
+}
+
+// 动态设置Playwright浏览器路径（修复跨平台兼容性问题）
 if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
-  process.env.PLAYWRIGHT_BROWSERS_PATH = '/home/appuser/.cache/ms-playwright';
-  console.log('[CONFIG] 强制设置Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
+  process.env.PLAYWRIGHT_BROWSERS_PATH = getPlaywrightBrowserPath();
+  console.log('[CONFIG] 设置Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
 } else {
   console.log('[CONFIG] 使用现有Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
 }
