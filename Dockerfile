@@ -59,8 +59,8 @@ COPY . .
 
 # 设置构建时的临时环境变量
 ENV AUTH_SECRET=build-time-secret
-ENV DATABASE_URL="file:./prisma/db.sqlite"
 ENV NEXTAUTH_URL=http://localhost:3067
+# 注意：DATABASE_URL将在运行时通过.env文件或环境变量设置
 
 # 构建Next.js应用
 RUN npm run build

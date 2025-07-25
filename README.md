@@ -13,7 +13,7 @@ Remove-Item yarn.lock -ErrorAction SilentlyContinue
 npm install
 //  创建.env文件
 $envContent = @'
-DATABASE_URL="file:./prisma/prisma/db.sqlite"
+DATABASE_URL="file:./prisma/db.sqlite"
 AUTH_SECRET="unicatcher-2024-secret-key-change-in-production"
 NEXTAUTH_URL="http://localhost:3067"
 NODE_ENV="production"
@@ -60,6 +60,11 @@ npx prisma studio
 更新项目
 // 拉取最新代码
 git pull origin main
+// 放弃本地的所有修改
+git fetch --all
+拉取远程仓库的最新信息，但不会修改你的本地代码。
+git reset --hard origin/main
+强制将本地分支重置为远程 main 分支的状态，丢弃所有未提交的改动和本地提交。
 
 // 或者指定分支
 git pull origin master
@@ -72,6 +77,11 @@ Remove-Item -Recurse node_modules
 Remove-Item package-lock.json
 npm install
 
+// 重装数据库
+taskkill /f /im node.exe /t
+Remove-Item -Recurse -Force node_modules\.prisma\client
+npx prisma generate
+
 
 
 ## 🚀 快速开始
@@ -80,17 +90,59 @@ npm install
 - Node.js >= 18
 - npm 或 pnpm
 
+### 预检查依赖
+在安装前，可以运行依赖检查脚本：
+```bash
+# 检查所有依赖
+npm run check-deps
+```
+
 ### 一键安装
+
+#### Linux/macOS
 ```bash
 # 克隆项目
 git clone <repository-url>
 cd unicatcher
 
-# 一键环境设置
-npm run setup-dev
+# 给安装脚本执行权限
+chmod +x scripts/install.sh
+
+# 一键安装
+./scripts/install.sh
 
 # 启动开发服务器
 npm run dev
+```
+
+#### Windows
+```powershell
+# 克隆项目
+git clone <repository-url>
+cd unicatcher
+
+# 方法1：使用PowerShell安装脚本（推荐）
+powershell -ExecutionPolicy Bypass -File scripts/install-windows.ps1
+
+# 方法2：手动安装
+npm install
+npm run setup-dev
+npm run safe-init-db
+npx playwright install chromium
+npm run dev
+```
+
+#### Docker部署
+```bash
+# 克隆项目
+git clone <repository-url>
+cd unicatcher
+
+# 复制环境配置
+cp .env.example .env
+
+# 启动Docker服务
+docker-compose up -d
 ```
 
 访问 http://localhost:3067
