@@ -20,7 +20,16 @@ docker-compose exec unicatcher npx playwright --version
 docker-compose logs -f unicatcher
 
 # 查看当前容器日志
-docker-compose logs unicatcher | tail -20
+docker-compose logs unicatcher | tail -50
+
+# 查看构建过程中的验证信息
+docker-compose logs unicatcher | grep -A5 -B5 "Playwright\|playwright"
+
+
+
+
+
+**************************
 
 
 # UniCatcher Ubuntu 部署运行指南

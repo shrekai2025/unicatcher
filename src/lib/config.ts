@@ -6,6 +6,14 @@
 
 import { env } from "~/env";
 
+// 强制设置Playwright浏览器路径（修复Docker环境下的路径问题）
+if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = '/home/appuser/.cache/ms-playwright';
+  console.log('[CONFIG] 强制设置Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
+} else {
+  console.log('[CONFIG] 使用现有Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
+}
+
 export const config = {
   // 应用配置
   app: {

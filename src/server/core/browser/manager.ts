@@ -20,12 +20,19 @@ export class BrowserManager {
    */
   async launch(): Promise<void> {
     try {
+      // 强制设置Playwright浏览器路径（Docker环境修复）
+      if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+        process.env.PLAYWRIGHT_BROWSERS_PATH = '/home/appuser/.cache/ms-playwright';
+        console.log('🔧 设置Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
+      }
+      
       console.log('正在启动浏览器...');
       console.log('浏览器启动参数:', {
         headless: this.browserConfig.headless,
         viewport: this.browserConfig.viewport,
         userAgent: this.browserConfig.userAgent,
-        args: config.playwright.launchOptions.args
+        args: config.playwright.launchOptions.args,
+        browsersPath: process.env.PLAYWRIGHT_BROWSERS_PATH
       });
       
       this.browser = await chromium.launch({
