@@ -52,6 +52,10 @@ export default function APIDocsPage() {
               <div className="font-medium text-blue-600">数据模型</div>
               <div className="text-sm text-gray-600">API 返回的数据结构</div>
             </a>
+            <a href="#data-extract" className="block p-3 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="font-medium text-blue-600">数据提取</div>
+              <div className="text-sm text-gray-600">批量提取与分析接口</div>
+            </a>
             <a href="#examples" className="block p-3 rounded-lg hover:bg-gray-50 transition-colors">
               <div className="font-medium text-blue-600">代码示例</div>
               <div className="text-sm text-gray-600">Python、JavaScript 示例</div>
@@ -323,6 +327,168 @@ export default function APIDocsPage() {
      "http://43.153.82.100:3067/api/external/data/cmdih9v9d0000j7hoz84g1hir?format=csv" \\
      -o tweets.csv`}</code></pre>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 数据提取与分析接口 */}
+          <div id="data-extract" className="mb-8">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">数据提取与分析</h3>
+            
+            {/* 批量数据提取 */}
+            <div className="mb-6 border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center mb-3">
+                <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 text-sm font-semibold rounded mr-3">POST</span>
+                <code className="text-lg font-mono">/api/external/data/extract</code>
+              </div>
+              <p className="text-gray-600 mb-4">批量提取推文数据，支持按条件筛选和状态管理</p>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">请求参数</h4>
+                  <div className="bg-gray-50 p-3 rounded text-sm">
+                    <pre>{JSON.stringify({
+                      batchId: "string (必填) - 批次标识符",
+                      maxCount: "number (必填, 1-10000) - 最大提取数量",
+                      listId: "string (可选) - 按 List ID 筛选",
+                      username: "string (可选) - 按用户名筛选",
+                      isExtracted: "boolean (可选, 默认: false) - 提取状态"
+                    }, null, 2)}</pre>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">响应示例</h4>
+                  <div className="bg-gray-50 p-3 rounded text-sm">
+                    <pre>{JSON.stringify({
+                      success: true,
+                      message: "Data extracted successfully",
+                      data: {
+                        batchId: "batch_001",
+                        extractedCount: 150,
+                        tweets: ["Array<Tweet>"],
+                        extractedAt: "2024-01-15T10:30:00Z",
+                        filters: {
+                          listId: "1234567890",
+                          username: "example_user",
+                          isExtracted: false
+                        }
+                      }
+                    }, null, 2)}</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <h4 className="font-medium text-gray-800 mb-2">cURL 示例</h4>
+                <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
+                  <pre><code>{`curl -X POST http://43.153.82.100:3067/api/external/data/extract \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: unicatcher-api-key-demo" \\
+  -d '{
+    "batchId": "batch_001",
+    "maxCount": 500,
+    "listId": "1948042550071496895",
+    "isExtracted": false
+  }'`}</code></pre>
+                </div>
+              </div>
+            </div>
+
+            {/* 获取待分析数据 */}
+            <div className="mb-6 border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center mb-3">
+                <span className="inline-block bg-green-100 text-green-800 px-3 py-1 text-sm font-semibold rounded mr-3">GET</span>
+                <code className="text-lg font-mono">/api/external/analysis/pending</code>
+              </div>
+              <p className="text-gray-600 mb-4">获取待分析的推文数据，用于外部分析系统</p>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">查询参数</h4>
+                  <div className="bg-gray-50 p-3 rounded text-sm">
+                    <pre>{JSON.stringify({
+                      limit: "number (可选, 默认: 100, 最大: 1000)",
+                      system: "string (可选) - 分析系统标识"
+                    }, null, 2)}</pre>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">响应示例</h4>
+                  <div className="bg-gray-50 p-3 rounded text-sm">
+                    <pre>{JSON.stringify({
+                      success: true,
+                      data: {
+                        tweets: ["Array<Tweet>"],
+                        batchId: "batch_1705401234567_abc123",
+                        count: 100,
+                        syncedAt: "2024-01-15T10:30:00Z"
+                      }
+                    }, null, 2)}</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <h4 className="font-medium text-gray-800 mb-2">cURL 示例</h4>
+                <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
+                  <pre><code>{`curl -H "X-API-Key: unicatcher-api-key-demo" \\
+     "http://43.153.82.100:3067/api/external/analysis/pending?limit=200&system=ai_analyzer"`}</code></pre>
+                </div>
+              </div>
+            </div>
+
+            {/* 标记分析完成 */}
+            <div className="mb-6 border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center mb-3">
+                <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 text-sm font-semibold rounded mr-3">POST</span>
+                <code className="text-lg font-mono">/api/external/analysis/complete</code>
+              </div>
+              <p className="text-gray-600 mb-4">标记分析批次完成状态，更新数据状态</p>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">请求参数</h4>
+                  <div className="bg-gray-50 p-3 rounded text-sm">
+                    <pre>{JSON.stringify({
+                      batchId: "string (必填) - 批次ID",
+                      status: "string (必填) - analyzed | failed",
+                      errorMessage: "string (可选) - 错误信息",
+                      analysisResult: "object (可选) - 分析结果"
+                    }, null, 2)}</pre>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">响应示例</h4>
+                  <div className="bg-gray-50 p-3 rounded text-sm">
+                    <pre>{JSON.stringify({
+                      success: true,
+                      message: "Analysis status marked successfully",
+                      data: {
+                        batchId: "batch_1705401234567_abc123",
+                        status: "analyzed",
+                        markedAt: "2024-01-15T10:35:00Z"
+                      }
+                    }, null, 2)}</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <h4 className="font-medium text-gray-800 mb-2">cURL 示例</h4>
+                <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
+                  <pre><code>{`curl -X POST http://43.153.82.100:3067/api/external/analysis/complete \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: unicatcher-api-key-demo" \\
+  -d '{
+    "batchId": "batch_1705401234567_abc123",
+    "status": "analyzed",
+    "analysisResult": {
+      "sentiment": "positive",
+      "topics": ["AI", "technology"],
+      "confidence": 0.85
+    }
+  }'`}</code></pre>
                 </div>
               </div>
             </div>
@@ -713,7 +879,84 @@ if __name__ == '__main__':
                 print(f"   {tweet['content'][:100]}...")
         
     except Exception as e:
-        print(f"❌ 错误: {e}")`}</code></pre>
+        print(f"❌ 错误: {e}")
+
+# 数据提取示例
+def extract_data_example():
+    """数据提取示例"""
+    client = UniCatcherClient(
+        base_url='http://43.153.82.100:3067',
+        api_key='unicatcher-api-key-demo'
+    )
+    
+    try:
+        # 批量提取数据
+        extract_result = client.extract_tweets(
+            batch_id="batch_001",
+            max_count=1000,
+            list_id="1948042550071496895"
+        )
+        print(f"📊 提取了 {extract_result['extractedCount']} 条推文")
+        
+        # 获取待分析数据
+        pending_data = client.get_pending_analysis(limit=500)
+        print(f"🔍 待分析数据: {pending_data['count']} 条")
+        
+        # 标记分析完成
+        client.mark_analysis_complete(
+            batch_id=pending_data['batchId'],
+            status='analyzed',
+            analysis_result={'sentiment': 'positive'}
+        )
+        print("✅ 分析状态已更新")
+        
+    except Exception as e:
+        print(f"❌ 错误: {e}")
+
+# 在 UniCatcherClient 类中添加以下方法:
+def extract_tweets(self, batch_id, max_count, list_id=None, username=None, is_extracted=False):
+    """批量提取推文数据"""
+    url = f"{self.base_url}/api/external/data/extract"
+    data = {
+        "batchId": batch_id,
+        "maxCount": max_count,
+        "listId": list_id,
+        "username": username,
+        "isExtracted": is_extracted
+    }
+    
+    response = requests.post(url, headers=self.headers, json=data)
+    if response.status_code == 200:
+        return response.json()['data']
+    else:
+        raise Exception(f"数据提取失败: {response.text}")
+
+def get_pending_analysis(self, limit=100, system='python_client'):
+    """获取待分析数据"""
+    url = f"{self.base_url}/api/external/analysis/pending"
+    params = {"limit": limit, "system": system}
+    
+    response = requests.get(url, headers=self.headers, params=params)
+    if response.status_code == 200:
+        return response.json()['data']
+    else:
+        raise Exception(f"获取待分析数据失败: {response.text}")
+
+def mark_analysis_complete(self, batch_id, status, error_message=None, analysis_result=None):
+    """标记分析完成"""
+    url = f"{self.base_url}/api/external/analysis/complete"
+    data = {
+        "batchId": batch_id,
+        "status": status,
+        "errorMessage": error_message,
+        "analysisResult": analysis_result
+    }
+    
+    response = requests.post(url, headers=self.headers, json=data)
+    if response.status_code == 200:
+        return response.json()['data']
+    else:
+        raise Exception(f"标记分析完成失败: {response.text}")`}</code></pre>
               </div>
             </div>
 
@@ -824,7 +1067,98 @@ async function main() {
     }
 }
 
-main();`}</code></pre>
+main();
+
+// 数据提取示例
+async function extractDataExample() {
+    const client = new UniCatcherClient(
+        'http://43.153.82.100:3067',
+        'unicatcher-api-key-demo'
+    );
+
+    try {
+        // 批量提取数据
+        const extractResult = await client.extractTweets(
+            'batch_001',
+            1000,
+            '1948042550071496895'
+        );
+        console.log(\`📊 提取了 \${extractResult.extractedCount} 条推文\`);
+
+        // 获取待分析数据
+        const pendingData = await client.getPendingAnalysis(500);
+        console.log(\`🔍 待分析数据: \${pendingData.count} 条\`);
+
+        // 标记分析完成
+        await client.markAnalysisComplete(
+            pendingData.batchId,
+            'analyzed',
+            null,
+            { sentiment: 'positive' }
+        );
+        console.log('✅ 分析状态已更新');
+
+    } catch (error) {
+        console.error('❌ 错误:', error);
+    }
+}
+
+// 在 UniCatcherClient 类中添加以下方法:
+async extractTweets(batchId, maxCount, listId = null, username = null, isExtracted = false) {
+    const response = await fetch(\`\${this.baseUrl}/api/external/data/extract\`, {
+        method: 'POST',
+        headers: this.headers,
+        body: JSON.stringify({
+            batchId,
+            maxCount,
+            listId,
+            username,
+            isExtracted
+        })
+    });
+
+    if (response.ok) {
+        const result = await response.json();
+        return result.data;
+    } else {
+        throw new Error(\`数据提取失败: \${response.statusText}\`);
+    }
+}
+
+async getPendingAnalysis(limit = 100, system = 'js_client') {
+    const url = new URL(\`\${this.baseUrl}/api/external/analysis/pending\`);
+    url.searchParams.set('limit', limit.toString());
+    url.searchParams.set('system', system);
+
+    const response = await fetch(url, { headers: this.headers });
+
+    if (response.ok) {
+        const result = await response.json();
+        return result.data;
+    } else {
+        throw new Error(\`获取待分析数据失败: \${response.statusText}\`);
+    }
+}
+
+async markAnalysisComplete(batchId, status, errorMessage = null, analysisResult = null) {
+    const response = await fetch(\`\${this.baseUrl}/api/external/analysis/complete\`, {
+        method: 'POST',
+        headers: this.headers,
+        body: JSON.stringify({
+            batchId,
+            status,
+            errorMessage,
+            analysisResult
+        })
+    });
+
+    if (response.ok) {
+        const result = await response.json();
+        return result.data;
+    } else {
+        throw new Error(\`标记分析完成失败: \${response.statusText}\`);
+    }
+}`}</code></pre>
               </div>
             </div>
 
