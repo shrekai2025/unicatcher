@@ -353,12 +353,14 @@ export default function APIDocsPage() {
                       maxCount: "number (必填, 1-10000) - 最大提取数量",
                       listId: "string (可选) - 按 List ID 筛选",
                       username: "string (可选) - 按用户名筛选",
-                      isExtracted: "boolean (可选, 默认: false) - 提取状态"
+                      isExtracted: "boolean (可选, 默认: false) - 提取状态",
+                      dryRun: "boolean (可选, 默认: false) - 预览模式，不标记为已输出",
+                      requireFullAmount: "boolean (可选, 默认: false) - 是否要求足额返回"
                     }, null, 2)}</pre>
                   </div>
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-800 mb-2">响应示例</h4>
+                  <h4 className="font-medium text-gray-800 mb-2">响应示例 (成功)</h4>
                   <div className="bg-gray-50 p-3 rounded text-sm">
                     <pre>{JSON.stringify({
                       success: true,
@@ -368,10 +370,13 @@ export default function APIDocsPage() {
                         extractedCount: 150,
                         tweets: ["Array<Tweet>"],
                         extractedAt: "2024-01-15T10:30:00Z",
+                        isDryRun: false,
                         filters: {
                           listId: "1234567890",
                           username: "example_user",
-                          isExtracted: false
+                          isExtracted: false,
+                          dryRun: false,
+                          requireFullAmount: false
                         }
                       }
                     }, null, 2)}</pre>
@@ -380,9 +385,29 @@ export default function APIDocsPage() {
               </div>
 
               <div className="mt-4">
-                <h4 className="font-medium text-gray-800 mb-2">cURL 示例</h4>
-                <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
-                  <pre><code>{`curl -X POST http://43.153.82.100:3067/api/external/data/extract \\
+                <h4 className="font-medium text-gray-800 mb-2">响应示例 (数据不足 - HTTP 409)</h4>
+                <div className="bg-red-50 p-3 rounded text-sm">
+                  <pre>{JSON.stringify({
+                    error: "可用数据不足，无法满足足额返回要求",
+                    statusCode: "INSUFFICIENT_DATA",
+                    data: {
+                      requiredCount: 1000,
+                      availableCount: 654,
+                      shortage: 346,
+                      filters: {
+                        listId: "1234567890",
+                        isExtracted: false
+                      }
+                    }
+                  }, null, 2)}</pre>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">标准提取</h4>
+                  <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
+                    <pre><code>{`curl -X POST http://43.153.82.100:3067/api/external/data/extract \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: unicatcher-api-key-demo" \\
   -d '{
@@ -391,6 +416,35 @@ export default function APIDocsPage() {
     "listId": "1948042550071496895",
     "isExtracted": false
   }'`}</code></pre>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">预览模式 (dryRun)</h4>
+                  <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
+                    <pre><code>{`curl -X POST http://43.153.82.100:3067/api/external/data/extract \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: unicatcher-api-key-demo" \\
+  -d '{
+    "batchId": "batch_preview_001",
+    "maxCount": 100,
+    "listId": "1948042550071496895",
+    "dryRun": true
+  }'`}</code></pre>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">足额返回模式</h4>
+                  <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
+                    <pre><code>{`curl -X POST http://43.153.82.100:3067/api/external/data/extract \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: unicatcher-api-key-demo" \\
+  -d '{
+    "batchId": "batch_full_001",
+    "maxCount": 1000,
+    "requireFullAmount": true,
+    "listId": "1948042550071496895"
+  }'`}</code></pre>
+                  </div>
                 </div>
               </div>
             </div>
@@ -531,7 +585,7 @@ export default function APIDocsPage() {
                 </div>
                 <div className="flex justify-between items-center p-3 bg-red-50 rounded">
                   <code className="font-mono text-red-700">409 Conflict</code>
-                  <span className="text-sm text-red-700">资源冲突</span>
+                  <span className="text-sm text-red-700">资源冲突 / 数据不足</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-red-50 rounded">
                   <code className="font-mono text-red-700">500 Internal Server Error</code>
@@ -914,20 +968,29 @@ def extract_data_example():
         print(f"❌ 错误: {e}")
 
 # 在 UniCatcherClient 类中添加以下方法:
-def extract_tweets(self, batch_id, max_count, list_id=None, username=None, is_extracted=False):
-    """批量提取推文数据"""
+def extract_tweets(self, batch_id, max_count, list_id=None, username=None, is_extracted=False, dry_run=False, require_full_amount=False):
+    """批量提取推文数据 (支持预览和足额返回)"""
     url = f"{self.base_url}/api/external/data/extract"
     data = {
         "batchId": batch_id,
         "maxCount": max_count,
         "listId": list_id,
         "username": username,
-        "isExtracted": is_extracted
+        "isExtracted": is_extracted,
+        "dryRun": dry_run,
+        "requireFullAmount": require_full_amount
     }
     
     response = requests.post(url, headers=self.headers, json=data)
     if response.status_code == 200:
         return response.json()['data']
+    elif response.status_code == 409:
+        # 处理数据不足错误
+        error_data = response.json()
+        if error_data.get('statusCode') == 'INSUFFICIENT_DATA':
+            raise Exception(f"数据不足: 需要 {error_data['data']['requiredCount']} 条，仅有 {error_data['data']['availableCount']} 条")
+        else:
+            raise Exception(f"请求冲突: {response.text}")
     else:
         raise Exception(f"数据提取失败: {response.text}")
 
@@ -1104,7 +1167,7 @@ async function extractDataExample() {
 }
 
 // 在 UniCatcherClient 类中添加以下方法:
-async extractTweets(batchId, maxCount, listId = null, username = null, isExtracted = false) {
+async extractTweets(batchId, maxCount, listId = null, username = null, isExtracted = false, dryRun = false, requireFullAmount = false) {
     const response = await fetch(\`\${this.baseUrl}/api/external/data/extract\`, {
         method: 'POST',
         headers: this.headers,
@@ -1113,13 +1176,23 @@ async extractTweets(batchId, maxCount, listId = null, username = null, isExtract
             maxCount,
             listId,
             username,
-            isExtracted
+            isExtracted,
+            dryRun,
+            requireFullAmount
         })
     });
 
     if (response.ok) {
         const result = await response.json();
         return result.data;
+    } else if (response.status === 409) {
+        // 处理数据不足错误
+        const errorData = await response.json();
+        if (errorData.statusCode === 'INSUFFICIENT_DATA') {
+            throw new Error(\`数据不足: 需要 \${errorData.data.requiredCount} 条，仅有 \${errorData.data.availableCount} 条\`);
+        } else {
+            throw new Error(\`请求冲突: \${response.statusText}\`);
+        }
     } else {
         throw new Error(\`数据提取失败: \${response.statusText}\`);
     }

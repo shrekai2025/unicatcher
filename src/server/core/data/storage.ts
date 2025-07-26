@@ -477,17 +477,15 @@ export class StorageService {
   }
 
   /**
-   * 根据条件提取推文数据
+   * 统计符合条件的可用推文数量 (高效计数)
    */
-  async extractTweetData(params: {
-    batchId: string;
-    maxCount: number;
+  async countAvailableTweets(params: {
     listId?: string;
     username?: string;
     isExtracted: boolean;
   }) {
     try {
-      const { batchId, maxCount, listId, username, isExtracted } = params;
+      const { listId, username, isExtracted } = params;
 
       // 构建查询条件
       const where: any = {};
@@ -511,91 +509,180 @@ export class StorageService {
         where.userUsername = username;
       }
 
-      console.log('[DATA EXTRACT] 查询条件:', where);
+      const count = await db.tweet.count({ where });
+      return count;
+    } catch (error) {
+      console.error('统计可用推文数量失败:', error);
+      throw new Error(`统计可用推文数量失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  }
 
-      // 查询符合条件的推文，按发推时间降序排列
-      const tweets = await db.tweet.findMany({
-        where,
-        orderBy: { publishedAt: 'desc' },
-        take: maxCount,
-        select: {
-          id: true,
-          content: true,
-          userNickname: true,
-          userUsername: true,
-          replyCount: true,
-          retweetCount: true,
-          likeCount: true,
-          viewCount: true,
-          imageUrls: true,
-          tweetUrl: true,
-          publishedAt: true,
-          listId: true,
-          scrapedAt: true,
-          analysisStatus: true,
-          syncedAt: true,
-          analyzedAt: true,
-          analysisBatchId: true,
-          taskId: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
+  /**
+   * 根据条件提取推文数据 (支持 dryRun 和 requireFullAmount)
+   */
+  async extractTweetData(params: {
+    batchId: string;
+    maxCount: number;
+    listId?: string;
+    username?: string;
+    isExtracted: boolean;
+    dryRun?: boolean;
+    requireFullAmount?: boolean;
+  }) {
+    try {
+      const { 
+        batchId, 
+        maxCount, 
+        listId, 
+        username, 
+        isExtracted,
+        dryRun = false,
+        requireFullAmount = false
+      } = params;
 
-      if (tweets.length === 0) {
-        return {
-          tweets: [],
-          extractedCount: 0,
-          batchId,
-          extractedAt: new Date().toISOString()
-        };
-      }
-
-      const tweetIds = tweets.map(tweet => tweet.id);
-
-      // 更新推文状态为已同步
-      await db.tweet.updateMany({
-        where: { id: { in: tweetIds } },
-        data: {
-          analysisStatus: 'synced',
-          syncedAt: new Date(),
-          analysisBatchId: batchId
-        }
-      });
-
-      // 创建提取记录
-      await db.dataSyncRecord.create({
-        data: {
-          batchId,
-          tweetIds: JSON.stringify(tweetIds),
-          tweetCount: tweets.length,
-          status: 'synced',
-          extractType: 'data_export',
+      // 如果需要足额返回，先检查数据量
+      if (requireFullAmount) {
+        const availableCount = await this.countAvailableTweets({
           listId,
           username,
-          isReExtract: isExtracted,
-          requestSystem: 'data_extract_api'
+          isExtracted
+        });
+
+        if (availableCount < maxCount) {
+          // 数据不足，返回特殊错误信息
+          throw {
+            code: 'INSUFFICIENT_DATA',
+            message: '可用数据不足，无法满足足额返回要求',
+            requiredCount: maxCount,
+            availableCount,
+            shortage: maxCount - availableCount
+          };
         }
+      }
+
+      // 使用事务确保原子性操作
+      const result = await db.$transaction(async (tx) => {
+        // 构建查询条件
+        const where: any = {};
+        
+        // 根据是否已提取设置状态条件
+        if (isExtracted) {
+          where.analysisStatus = 'synced';
+        } else {
+          where.OR = [
+            { analysisStatus: 'pending' },
+            { analysisStatus: null }
+          ];
+        }
+
+        // 添加可选过滤条件
+        if (listId) {
+          where.listId = listId;
+        }
+        
+        if (username) {
+          where.userUsername = username;
+        }
+
+        console.log('[DATA EXTRACT] 查询条件:', where);
+        console.log('[DATA EXTRACT] dryRun:', dryRun, 'requireFullAmount:', requireFullAmount);
+
+        // 在事务中查询符合条件的推文
+        const tweets = await tx.tweet.findMany({
+          where,
+          orderBy: { publishedAt: 'desc' },
+          take: maxCount,
+          select: {
+            id: true,
+            content: true,
+            userNickname: true,
+            userUsername: true,
+            replyCount: true,
+            retweetCount: true,
+            likeCount: true,
+            viewCount: true,
+            imageUrls: true,
+            tweetUrl: true,
+            publishedAt: true,
+            listId: true,
+            scrapedAt: true,
+            analysisStatus: true,
+            syncedAt: true,
+            analyzedAt: true,
+            analysisBatchId: true,
+            taskId: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        if (tweets.length === 0) {
+          return {
+            tweets: [],
+            extractedCount: 0,
+            batchId,
+            extractedAt: new Date().toISOString(),
+            isDryRun: dryRun
+          };
+        }
+
+        const tweetIds = tweets.map(tweet => tweet.id);
+
+        // 只有非 dryRun 模式才更新数据库状态
+        if (!dryRun) {
+          // 更新推文状态为已同步
+          await tx.tweet.updateMany({
+            where: { id: { in: tweetIds } },
+            data: {
+              analysisStatus: 'synced',
+              syncedAt: new Date(),
+              analysisBatchId: batchId
+            }
+          });
+
+          // 创建提取记录
+          await tx.dataSyncRecord.create({
+            data: {
+              batchId,
+              tweetIds: JSON.stringify(tweetIds),
+              tweetCount: tweets.length,
+              status: 'synced',
+              extractType: 'data_export',
+              listId,
+              username,
+              isReExtract: isExtracted,
+              requestSystem: 'data_extract_api'
+            }
+          });
+        }
+
+        // 解析并格式化推文数据
+        const formattedTweets = tweets.map((tweet: any) => ({
+          ...tweet,
+          imageUrls: tweet.imageUrls ? JSON.parse(tweet.imageUrls) : [],
+          publishedAt: tweet.publishedAt ? Number(tweet.publishedAt) : 0,
+          scrapedAt: tweet.scrapedAt ? Number(tweet.scrapedAt) : 0,
+        }));
+
+        console.log(`[DATA EXTRACT] ${dryRun ? '预览' : '成功提取'} ${tweets.length} 条推文数据`);
+
+        return {
+          tweets: formattedTweets,
+          extractedCount: tweets.length,
+          batchId,
+          extractedAt: new Date().toISOString(),
+          isDryRun: dryRun
+        };
       });
 
-      // 解析并格式化推文数据
-      const formattedTweets = tweets.map((tweet: any) => ({
-        ...tweet,
-        imageUrls: tweet.imageUrls ? JSON.parse(tweet.imageUrls) : [],
-        publishedAt: tweet.publishedAt ? Number(tweet.publishedAt) : 0,
-        scrapedAt: tweet.scrapedAt ? Number(tweet.scrapedAt) : 0,
-      }));
-
-      console.log(`[DATA EXTRACT] 成功提取 ${tweets.length} 条推文数据`);
-
-      return {
-        tweets: formattedTweets,
-        extractedCount: tweets.length,
-        batchId,
-        extractedAt: new Date().toISOString()
-      };
+      return result;
 
     } catch (error) {
+      // 如果是我们抛出的特殊错误，直接重新抛出
+      if (error && typeof error === 'object' && 'code' in error) {
+        throw error;
+      }
+      
       console.error('数据提取失败:', error);
       throw new Error(`数据提取失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
