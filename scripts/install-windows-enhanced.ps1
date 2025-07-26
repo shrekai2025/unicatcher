@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-Write-Host "🚀 UniCatcher Windows Enhanced Installer" -ForegroundColor Blue
+Write-Host "UniCatcher Windows Enhanced Installer" -ForegroundColor Blue
 Write-Host "Version: 2.0 (with auto-fix features)" -ForegroundColor Gray
 Write-Host ""
 
@@ -24,14 +24,14 @@ function Write-InstallLog($Level, $Message) {
     $script:InstallLog += $logEntry
     
     switch ($Level) {
-        "INFO" { Write-Host "   ℹ️  $Message" -ForegroundColor Cyan }
-        "SUCCESS" { Write-Host "   ✅ $Message" -ForegroundColor Green }
+        "INFO" { Write-Host "   [INFO]  $Message" -ForegroundColor Cyan }
+        "SUCCESS" { Write-Host "   [OK]    $Message" -ForegroundColor Green }
         "WARNING" { 
-            Write-Host "   ⚠️  $Message" -ForegroundColor Yellow
+            Write-Host "   [WARN]  $Message" -ForegroundColor Yellow
             $script:WarningCount++
         }
         "ERROR" { 
-            Write-Host "   ❌ $Message" -ForegroundColor Red
+            Write-Host "   [ERROR] $Message" -ForegroundColor Red
             $script:ErrorCount++
         }
     }
@@ -42,7 +42,7 @@ function Write-InstallLog($Level, $Message) {
 }
 
 # Step 1: Environment check and auto-fix
-Write-Host "🔍 Step 1: Environment check and auto-fix..." -ForegroundColor Magenta
+Write-Host "Step 1: Environment check and auto-fix..." -ForegroundColor Magenta
 
 if (-not $SkipChecks) {
     Write-InstallLog "INFO" "Performing environment check..."
@@ -109,7 +109,7 @@ if (-not $SkipChecks) {
 }
 
 # Step 2: Node.js environment verification
-Write-Host "`n📦 Step 2: Node.js environment verification..." -ForegroundColor Magenta
+Write-Host "`nStep 2: Node.js environment verification..." -ForegroundColor Magenta
 
 try {
     $nodeVersion = node --version
@@ -136,7 +136,7 @@ try {
 }
 
 # Step 3: Cleanup and preparation
-Write-Host "`n🧹 Step 3: Cleanup and preparation..." -ForegroundColor Magenta
+Write-Host "`nStep 3: Cleanup and preparation..." -ForegroundColor Magenta
 
 # Clean npm cache
 try {
@@ -173,7 +173,7 @@ try {
 }
 
 # Step 4: Environment variable configuration
-Write-Host "`n⚙️  Step 4: Environment variable configuration..." -ForegroundColor Magenta
+Write-Host "`nStep 4: Environment variable configuration..." -ForegroundColor Magenta
 
 # Generate strong AUTH_SECRET
 function Generate-SecureSecret {
@@ -238,7 +238,7 @@ SKIP_ENV_VALIDATION=false
 }
 
 # Step 5: Dependency installation
-Write-Host "`n📦 Step 5: Dependency installation..." -ForegroundColor Magenta
+Write-Host "`nStep 5: Dependency installation..." -ForegroundColor Magenta
 
 $installAttempts = 0
 $maxAttempts = 3
@@ -273,15 +273,30 @@ do {
 
 if (-not $installSuccess) {
     Write-InstallLog "ERROR" "Dependency installation failed, please run manual fix"
-    Write-Host "`n🔧 Manual fix steps:" -ForegroundColor Yellow
+    Write-Host "`nManual fix steps:" -ForegroundColor Yellow
     Write-Host "   1. Run PowerShell as Administrator" -ForegroundColor White
     Write-Host "   2. Run: npm run fix-permissions" -ForegroundColor White
     Write-Host "   3. Run: npm install" -ForegroundColor White
     exit 1
 }
 
-# Step 6: Database initialization
-Write-Host "`n🗄️  Step 6: Database initialization..." -ForegroundColor Magenta
+# Step 6: Build application
+Write-Host "`nStep 6: Build application..." -ForegroundColor Magenta
+
+try {
+    npm run build
+    if ($LASTEXITCODE -eq 0) {
+        Write-InstallLog "SUCCESS" "Application built successfully"
+    } else {
+        throw "Build failed"
+    }
+} catch {
+    Write-InstallLog "ERROR" "Application build failed"
+    Write-InstallLog "INFO" "This may cause runtime issues. Consider running: npm run build"
+}
+
+# Step 7: Database initialization
+Write-Host "`nStep 7: Database initialization..." -ForegroundColor Magenta
 
 try {
     npm run safe-init-db
@@ -304,8 +319,8 @@ try {
     }
 }
 
-# Step 7: Playwright browser installation
-Write-Host "`n🎭 Step 7: Playwright browser installation..." -ForegroundColor Magenta
+# Step 8: Playwright browser installation
+Write-Host "`nStep 8: Playwright browser installation..." -ForegroundColor Magenta
 
 try {
     npx playwright install chromium
@@ -319,8 +334,8 @@ try {
     Write-InstallLog "INFO" "Recommend manual installation: npx playwright install chromium"
 }
 
-# Step 8: JWT configuration verification
-Write-Host "`n🔐 Step 8: JWT configuration verification..." -ForegroundColor Magenta
+# Step 9: JWT configuration verification
+Write-Host "`nStep 9: JWT configuration verification..." -ForegroundColor Magenta
 
 try {
     Write-InstallLog "INFO" "Verifying JWT configuration..."
@@ -330,8 +345,8 @@ try {
     Write-InstallLog "WARNING" "JWT configuration verification failed, but doesn't affect installation"
 }
 
-# Step 9: Final verification
-Write-Host "`n✅ Step 9: Final verification..." -ForegroundColor Magenta
+# Step 10: Final verification
+Write-Host "`nStep 10: Final verification..." -ForegroundColor Magenta
 
 # Check critical files
 $criticalFiles = @(
@@ -365,26 +380,26 @@ try {
 }
 
 # Installation completion summary
-Write-Host "`n📊 Installation Summary:" -ForegroundColor Blue
-Write-Host "   ✅ Success: $((($script:InstallLog | Where-Object { $_ -like '*SUCCESS*' }).Count))" -ForegroundColor Green
-Write-Host "   ⚠️  Warning: $script:WarningCount" -ForegroundColor Yellow
-Write-Host "   ❌ Error: $script:ErrorCount" -ForegroundColor Red
+Write-Host "`nInstallation Summary:" -ForegroundColor Blue
+Write-Host "   Success: $((($script:InstallLog | Where-Object { $_ -like '*SUCCESS*' }).Count))" -ForegroundColor Green
+Write-Host "   Warning: $script:WarningCount" -ForegroundColor Yellow
+Write-Host "   Error: $script:ErrorCount" -ForegroundColor Red
 
 if ($script:ErrorCount -eq 0) {
-    Write-Host "`n🎉 UniCatcher installation successful!" -ForegroundColor Green
+    Write-Host "`nUniCatcher installation successful!" -ForegroundColor Green
     Write-Host ""
-    Write-Host "📋 Next steps:" -ForegroundColor Cyan
+    Write-Host "Next steps:" -ForegroundColor Cyan
     Write-Host "   1. Start development server: npm run dev" -ForegroundColor White
     Write-Host "   2. Start production server: npm run start" -ForegroundColor White
     Write-Host "   3. Access application: http://localhost:3067" -ForegroundColor White
     Write-Host "   4. Login credentials: admin / a2885828" -ForegroundColor White
     Write-Host ""
-    Write-Host "🔧 Troubleshooting tools:" -ForegroundColor Cyan
+    Write-Host "Troubleshooting tools:" -ForegroundColor Cyan
     Write-Host "   - Environment check: npm run windows-check" -ForegroundColor White
     Write-Host "   - Permission fix: npm run fix-permissions" -ForegroundColor White
     Write-Host "   - JWT fix: npm run fix-jwt-session" -ForegroundColor White
     Write-Host "   - Auth debug: npm run debug-auth" -ForegroundColor White
 } else {
-    Write-Host "`n⚠️  Installation completed with errors, please check above issues" -ForegroundColor Yellow
-    Write-Host "💡 Run troubleshooting: npm run windows-fix" -ForegroundColor Cyan
+    Write-Host "`nInstallation completed with errors, please check above issues" -ForegroundColor Yellow
+    Write-Host "Run troubleshooting: npm run windows-fix" -ForegroundColor Cyan
 } 

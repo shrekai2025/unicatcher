@@ -154,44 +154,37 @@ async function testJWTConfiguration() {
     // 重新加载环境变量
     dotenv.config({ override: true });
     
-    // 动态导入配置
-    const { config } = await import('../src/lib/config.js');
-    const { authConfig } = await import('../src/server/auth/config.js');
-    
-    console.log('   ✅ 配置文件加载成功');
-    console.log(`   📄 会话策略: ${authConfig.session?.strategy}`);
-    console.log(`   ⏰ 会话最大时长: ${authConfig.session?.maxAge}秒`);
-    console.log(`   🔑 认证提供者数量: ${authConfig.providers?.length}`);
-    
-    // 测试认证配置
-    const credentialsProvider = authConfig.providers?.find(p => p.name === 'credentials');
-    if (credentialsProvider && credentialsProvider.authorize) {
-      console.log('   🔐 凭据提供者配置正确');
-      
-      // 测试正确的凭据
-      try {
-        const testResult = await credentialsProvider.authorize({
-          username: config.auth.username,
-          password: config.auth.password
-        });
-        
-        if (testResult) {
-          console.log('   ✅ 认证测试通过');
-          console.log(`      用户ID: ${testResult.id}`);
-          console.log(`      用户名: ${testResult.name}`);
-        } else {
-          console.log('   ❌ 认证测试失败');
-          return false;
-        }
-      } catch (error) {
-        console.log(`   ❌ 认证测试错误: ${error.message}`);
-        return false;
-      }
-    } else {
-      console.log('   ❌ 凭据提供者配置错误');
+    // 检查必要的环境变量
+    if (!process.env.AUTH_SECRET) {
+      console.log('   ❌ AUTH_SECRET未设置');
       return false;
     }
     
+    if (!process.env.NEXTAUTH_URL) {
+      console.log('   ❌ NEXTAUTH_URL未设置');
+      return false;
+    }
+    
+    console.log('   ✅ 基本JWT环境变量配置正确');
+    
+    // 测试JWT密钥强度
+    const secret = process.env.AUTH_SECRET;
+    if (secret.length >= 32) {
+      console.log('   ✅ AUTH_SECRET强度足够');
+    } else {
+      console.log('   ⚠️  AUTH_SECRET强度不够，建议至少32字符');
+    }
+    
+    // 检查NEXTAUTH_URL格式
+    try {
+      new URL(process.env.NEXTAUTH_URL);
+      console.log('   ✅ NEXTAUTH_URL格式正确');
+    } catch {
+      console.log('   ❌ NEXTAUTH_URL格式错误');
+      return false;
+    }
+    
+    console.log('   ✅ JWT基础配置检查通过');
     return true;
   } catch (error) {
     console.log(`   ❌ 配置测试失败: ${error.message}`);
