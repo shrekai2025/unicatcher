@@ -5,6 +5,22 @@ UniCatcher是一个基于T3 Stack开发的通用浏览器爬虫系统，支持�
 ***
 ## win直接部署（非docker）
 
+# 克隆项目
+git clone <项目地址>
+cd unicatcher
+# 3. 清理 npm 全局缓存
+npm cache verify
+npm cache clean --force
+Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
+Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
+
+# 一键安装（自动检测和修复所有问题）
+npm run install-windows
+
+# 详细输出模式（用于调试）
+npm run install-windows-verbose
+
+***手动
 // 清理系统
 npm cache clean --force
 Remove-Item package-lock.json -ErrorAction SilentlyContinue
