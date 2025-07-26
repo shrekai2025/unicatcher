@@ -1,84 +1,45 @@
-import { redirect } from "next/navigation";
-import { auth, signIn } from "~/server/auth";
+'use client';
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>; // Next.js 15: searchParams is now a Promise
-}) {
-  const session = await auth();
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { login } from '~/lib/simple-auth';
 
-  // Resolve the searchParams Promise
-  const resolvedSearchParams = await searchParams;
+export default function LoginPage() {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  // 如果已登录，重定向到主页
-  if (session?.user) {
-    redirect("/");
-  }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
 
-  async function handleLogin(formData: FormData) {
-    "use server";
-    
-    const username = formData.get("username") as string;
-    const password = formData.get("password") as string;
-
-    console.log("[LOGIN] 开始登录流程:", {
-      username,
-      hasPassword: !!password,
-      passwordLength: password?.length,
-      timestamp: new Date().toISOString()
-    });
-
-    try {
-      console.log("[LOGIN] 调用 signIn...");
-      const result = await signIn("credentials", {
-        username,
-        password,
-        redirectTo: "/",
-      });
-      console.log("[LOGIN] signIn 结果:", result);
-    } catch (error) {
-      console.error("[LOGIN] signIn 错误:", {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        name: error instanceof Error ? error.name : undefined
-      });
-      // 重定向到登录页面并显示错误
-      redirect("/login?error=credentials");
+    if (login(username, password)) {
+      router.push('/dashboard');
+    } else {
+      setError('用户名或密码错误');
     }
-  }
+    
+    setLoading(false);
+  };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-blue-900 to-blue-950">
-      <div className="w-full max-w-md space-y-8 px-6">
-        <div className="text-center">
-          <h1 className="text-5xl font-extrabold tracking-tight text-white sm:text-6xl mb-4">
-            <span className="text-blue-300">Uni</span>Catcher
-          </h1>
-          <p className="text-xl text-blue-200 mb-8">
-            通用浏览器爬虫系统
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            UniCatcher 管理后台
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            请使用管理员账号登录
           </p>
         </div>
-
-        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 shadow-2xl">
-          <h2 className="text-2xl font-bold text-white text-center mb-6">
-            管理员登录
-          </h2>
-
-          {resolvedSearchParams.error && (
-            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
-              <p className="text-red-200 text-sm text-center">
-                {resolvedSearchParams.error === 'credentials' 
-                  ? '用户名或密码错误，请重试'
-                  : '登录失败，请重试'
-                }
-              </p>
-            </div>
-          )}
-
-          <form action={handleLogin} className="space-y-6">
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="rounded-md shadow-sm space-y-4">
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-blue-100 mb-2">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
                 用户名
               </label>
               <input
@@ -86,14 +47,14 @@ export default async function LoginPage({
                 name="username"
                 type="text"
                 required
-                defaultValue="admin"
-                className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
-                placeholder="请输入用户名"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                placeholder="admin"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
               />
             </div>
-
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-blue-100 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 密码
               </label>
               <input
@@ -101,31 +62,34 @@ export default async function LoginPage({
                 name="password"
                 type="password"
                 required
-                className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 placeholder="请输入密码"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-
-            <div className="text-center">
-              <button
-                type="submit"
-                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-semibold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              >
-                登录
-              </button>
-            </div>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-blue-200">
-              默认账号: <span className="font-mono">admin</span>
-            </p>
-            <p className="text-sm text-blue-200">
-              默认密码: <span className="font-mono">a2885828</span>
-            </p>
           </div>
+
+          {error && (
+            <div className="text-red-600 text-sm text-center">{error}</div>
+          )}
+
+          <div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              {loading ? '登录中...' : '登录'}
+            </button>
+          </div>
+        </form>
+        
+        <div className="text-center text-sm text-gray-500">
+          <p>默认账号: admin</p>
+          <p>默认密码: a2885828</p>
         </div>
       </div>
-    </main>
+    </div>
   );
 } 

@@ -11,7 +11,6 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
-import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 
 /**
@@ -27,7 +26,29 @@ import { db } from "~/server/db";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-  const session = await auth();
+  // 从 cookie 中获取认证状态
+  const cookieHeader = opts.headers.get('cookie') ?? '';
+  const cookies = new Map(
+    cookieHeader.split(';').map((c) => {
+      const [key, ...v] = c.trim().split('=');
+      return [key, v.join('=')];
+    }),
+  );
+
+  const authCookie = cookies.get('unicatcher-auth');
+  
+  let session = null;
+  if (authCookie) {
+    try {
+      // 使用 decodeURIComponent 解码
+      const auth = JSON.parse(decodeURIComponent(authCookie));
+      if (auth.isAuthenticated) {
+        session = { user: { name: auth.username, id: 'admin-user' } };
+      }
+    } catch {
+      // 忽略解析错误
+    }
+  }
 
   return {
     db,

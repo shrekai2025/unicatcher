@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '~/lib/utils';
+import { logout } from '~/lib/simple-auth';
 
 const navigation = [
   { name: '仪表板', href: '/dashboard', icon: '📊' },
@@ -14,6 +15,12 @@ const navigation = [
 
 export function Navigation() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
 
   return (
     <nav className="bg-white shadow-sm border-b">
@@ -44,12 +51,12 @@ export function Navigation() {
             </div>
           </div>
           <div className="flex items-center">
-            <Link
-              href="/api/auth/signout"
+            <button
+              onClick={handleLogout}
               className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
             >
               退出登录
-            </Link>
+            </button>
           </div>
         </div>
       </div>

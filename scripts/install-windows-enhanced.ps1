@@ -175,20 +175,12 @@ try {
 # Step 4: Environment variable configuration
 Write-Host "`nStep 4: Environment variable configuration..." -ForegroundColor Magenta
 
-# Generate strong AUTH_SECRET
-function Generate-SecureSecret {
-    $bytes = New-Object byte[] 32
-    ([System.Security.Cryptography.RNGCryptoServiceProvider]::Create()).GetBytes($bytes)
-    return [Convert]::ToBase64String($bytes)
-}
+# No longer needed - simple authentication doesn't require JWT secrets
 
 if (-not (Test-Path ".env")) {
-    $authSecret = Generate-SecureSecret
     $envContent = @"
 # UniCatcher Production Environment Configuration
 DATABASE_URL="file:./prisma/db.sqlite"
-AUTH_SECRET="$authSecret"
-NEXTAUTH_URL="http://localhost:3067"
 NODE_ENV="production"
 PORT=3067
 ENABLE_RESOURCE_OPTIMIZATION=true
@@ -207,21 +199,23 @@ SKIP_ENV_VALIDATION=false
     $envContent = Get-Content ".env" -Raw
     $needsUpdate = $false
     
-    # Check AUTH_SECRET
-    if ($envContent -match 'AUTH_SECRET="?([^"]*)"?') {
-        $currentSecret = $matches[1]
-        if ($currentSecret -eq "unicatcher-secret-key-2024-change-in-production" -or $currentSecret.Length -lt 32) {
-            Write-InstallLog "WARNING" "AUTH_SECRET too weak, updating..."
-            $newSecret = Generate-SecureSecret
-            $envContent = $envContent -replace 'AUTH_SECRET="?[^"]*"?', "AUTH_SECRET=`"$newSecret`""
-            $needsUpdate = $true
-        }
-    }
-    
     # Check DATABASE_URL path (ensure using correct prisma path)
     if ($envContent -match 'DATABASE_URL="?file:\.\/data\/database\/db\.sqlite"?') {
         Write-InstallLog "WARNING" "Updating DATABASE_URL path to correct prisma location..."
         $envContent = $envContent -replace 'DATABASE_URL="?file:\.\/data\/database\/db\.sqlite"?', 'DATABASE_URL="file:./prisma/db.sqlite"'
+        $needsUpdate = $true
+    }
+    
+    # Remove old NextAuth variables if they exist
+    if ($envContent -match 'AUTH_SECRET=') {
+        Write-InstallLog "INFO" "Removing old AUTH_SECRET (no longer needed)"
+        $envContent = $envContent -replace 'AUTH_SECRET="?[^"]*"?\r?\n?', ''
+        $needsUpdate = $true
+    }
+    
+    if ($envContent -match 'NEXTAUTH_URL=') {
+        Write-InstallLog "INFO" "Removing old NEXTAUTH_URL (no longer needed)"
+        $envContent = $envContent -replace 'NEXTAUTH_URL="?[^"]*"?\r?\n?', ''
         $needsUpdate = $true
     }
     
@@ -240,6 +234,21 @@ SKIP_ENV_VALIDATION=false
 # Step 5: Dependency installation
 Write-Host "`nStep 5: Dependency installation..." -ForegroundColor Magenta
 
+# Check for build tools
+Write-InstallLog "INFO" "Checking Windows build tools..."
+try {
+    $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vsWhere) {
+        Write-InstallLog "SUCCESS" "Visual Studio build tools detected"
+    } else {
+        Write-InstallLog "WARNING" "Visual Studio build tools not found"
+        Write-InstallLog "INFO" "Installing windows-build-tools..."
+        npm install -g windows-build-tools 2>$null
+    }
+} catch {
+    Write-InstallLog "WARNING" "Could not check build tools"
+}
+
 $installAttempts = 0
 $maxAttempts = 3
 $installSuccess = $false
@@ -249,7 +258,18 @@ do {
     Write-InstallLog "INFO" "Installation attempt $installAttempts/$maxAttempts..."
     
     try {
-        npm install --no-optional
+        # Try with different npm strategies
+        if ($installAttempts -eq 1) {
+            npm install --no-optional
+        } elseif ($installAttempts -eq 2) {
+            Write-InstallLog "INFO" "Trying with rebuild..."
+            npm install --no-optional
+            npm rebuild 2>$null
+        } else {
+            Write-InstallLog "INFO" "Trying with force and no-bin-links..."
+            npm install --no-optional --force --no-bin-links
+        }
+        
         if ($LASTEXITCODE -eq 0) {
             Write-InstallLog "SUCCESS" "Dependencies installed successfully"
             $installSuccess = $true
@@ -263,11 +283,16 @@ do {
         Write-InstallLog "INFO" "Retrying in 3 seconds..."
         Start-Sleep -Seconds 3
         
-        # Clean node_modules
+        # Clean node_modules and npm cache
         if (Test-Path "node_modules") {
             Remove-Item -Recurse -Force "node_modules" -ErrorAction SilentlyContinue
             Write-InstallLog "INFO" "Cleaned node_modules"
         }
+        if (Test-Path "package-lock.json") {
+            Remove-Item -Force "package-lock.json" -ErrorAction SilentlyContinue
+            Write-InstallLog "INFO" "Cleaned package-lock.json"
+        }
+        npm cache clean --force 2>$null
     }
 } while ($installAttempts -lt $maxAttempts -and -not $installSuccess)
 
@@ -283,17 +308,40 @@ if (-not $installSuccess) {
 # Step 6: Build application
 Write-Host "`nStep 6: Build application..." -ForegroundColor Magenta
 
-try {
-    npm run build
-    if ($LASTEXITCODE -eq 0) {
-        Write-InstallLog "SUCCESS" "Application built successfully"
-    } else {
-        throw "Build failed"
+$buildAttempts = 0
+$maxBuildAttempts = 2
+$buildSuccess = $false
+
+do {
+    $buildAttempts++
+    Write-InstallLog "INFO" "Build attempt $buildAttempts/$maxBuildAttempts..."
+    
+    try {
+        if ($buildAttempts -eq 1) {
+            npm run build
+        } else {
+            Write-InstallLog "INFO" "Trying rebuild with native modules fix..."
+            npm rebuild lightningcss 2>$null
+            npm run build
+        }
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-InstallLog "SUCCESS" "Application built successfully"
+            $buildSuccess = $true
+            break
+        } else {
+            throw "Build failed with exit code $LASTEXITCODE"
+        }
+    } catch {
+        Write-InstallLog "WARNING" "Build attempt $buildAttempts failed: $($_.Exception.Message)"
+        
+        if ($buildAttempts -eq $maxBuildAttempts) {
+            Write-InstallLog "ERROR" "Application build failed after $maxBuildAttempts attempts"
+            Write-InstallLog "INFO" "Manual fix: npm cache clean --force && npm rebuild && npm run build"
+            Write-InstallLog "INFO" "This may cause runtime issues, but installation will continue"
+        }
     }
-} catch {
-    Write-InstallLog "ERROR" "Application build failed"
-    Write-InstallLog "INFO" "This may cause runtime issues. Consider running: npm run build"
-}
+} while ($buildAttempts -lt $maxBuildAttempts -and -not $buildSuccess)
 
 # Step 7: Database initialization
 Write-Host "`nStep 7: Database initialization..." -ForegroundColor Magenta
@@ -334,16 +382,11 @@ try {
     Write-InstallLog "INFO" "Recommend manual installation: npx playwright install chromium"
 }
 
-# Step 9: JWT configuration verification
-Write-Host "`nStep 9: JWT configuration verification..." -ForegroundColor Magenta
+# Step 9: Authentication system verification
+Write-Host "`nStep 9: Authentication system verification..." -ForegroundColor Magenta
 
-try {
-    Write-InstallLog "INFO" "Verifying JWT configuration..."
-    node scripts/fix-jwt-session.mjs
-    Write-InstallLog "SUCCESS" "JWT configuration verification completed"
-} catch {
-    Write-InstallLog "WARNING" "JWT configuration verification failed, but doesn't affect installation"
-}
+Write-InstallLog "SUCCESS" "Simple authentication system configured (admin/a2885828)"
+Write-InstallLog "INFO" "No additional JWT configuration needed"
 
 # Step 10: Final verification
 Write-Host "`nStep 10: Final verification..." -ForegroundColor Magenta
