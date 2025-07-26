@@ -10,7 +10,11 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
 Write-Host "UniCatcher Windows Enhanced Installer" -ForegroundColor Blue
-Write-Host "Version: 2.0 (with auto-fix features)" -ForegroundColor Gray
+Write-Host "Version: 2.1 (with build tools auto-detection)" -ForegroundColor Gray
+Write-Host ""
+Write-Host "Prerequisites:" -ForegroundColor Yellow
+Write-Host "  - Node.js 18+ installed" -ForegroundColor Gray
+Write-Host "  - Visual Studio Build Tools (will prompt if missing)" -ForegroundColor Gray
 Write-Host ""
 
 # Global variables
@@ -238,15 +242,30 @@ Write-Host "`nStep 5: Dependency installation..." -ForegroundColor Magenta
 Write-InstallLog "INFO" "Checking Windows build tools..."
 try {
     $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    $buildToolsFound = $false
+    
     if (Test-Path $vsWhere) {
-        Write-InstallLog "SUCCESS" "Visual Studio build tools detected"
-    } else {
-        Write-InstallLog "WARNING" "Visual Studio build tools not found"
-        Write-InstallLog "INFO" "Installing windows-build-tools..."
-        npm install -g windows-build-tools 2>$null
+        # Check if build tools are actually installed
+        $output = & $vsWhere -products "*" -requires Microsoft.VisualStudio.Workload.MSBuildTools -format json 2>$null
+        if ($output -and $output.Length -gt 2) {
+            Write-InstallLog "SUCCESS" "Visual Studio build tools detected and available"
+            $buildToolsFound = $true
+        }
+    }
+    
+    if (-not $buildToolsFound) {
+        Write-InstallLog "WARNING" "Visual Studio build tools not found or not properly configured"
+        Write-Host ""
+        Write-Host "   IMPORTANT: Windows build tools are required for native modules!" -ForegroundColor Yellow
+        Write-Host "   Please run the following command in an administrator PowerShell:" -ForegroundColor Yellow
+        Write-Host "   winget install Microsoft.VisualStudio.2022.BuildTools" -ForegroundColor White -BackgroundColor DarkBlue
+        Write-Host ""
+        Write-Host "   After installation, press Enter to continue..." -ForegroundColor Yellow
+        Read-Host
+        Write-InstallLog "INFO" "Continuing installation (assuming build tools will be available)"
     }
 } catch {
-    Write-InstallLog "WARNING" "Could not check build tools"
+    Write-InstallLog "WARNING" "Could not check build tools - continuing anyway"
 }
 
 $installAttempts = 0
@@ -440,8 +459,10 @@ if ($script:ErrorCount -eq 0) {
     Write-Host "Troubleshooting tools:" -ForegroundColor Cyan
     Write-Host "   - Environment check: npm run windows-check" -ForegroundColor White
     Write-Host "   - Permission fix: npm run fix-permissions" -ForegroundColor White
-    Write-Host "   - JWT fix: npm run fix-jwt-session" -ForegroundColor White
-    Write-Host "   - Auth debug: npm run debug-auth" -ForegroundColor White
+    Write-Host "   - Auth system check: npm run debug-auth" -ForegroundColor White
+    Write-Host ""
+    Write-Host "If build errors occur:" -ForegroundColor Yellow
+    Write-Host "   - Install build tools: winget install Microsoft.VisualStudio.2022.BuildTools" -ForegroundColor White
 } else {
     Write-Host "`nInstallation completed with errors, please check above issues" -ForegroundColor Yellow
     Write-Host "Run troubleshooting: npm run windows-fix" -ForegroundColor Cyan
