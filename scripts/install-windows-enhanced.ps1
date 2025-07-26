@@ -1,5 +1,5 @@
-# UniCatcher Windows 增强安装脚本
-# 集成所有修复功能，自动检测和解决常见问题
+# UniCatcher Windows Enhanced Installation Script
+# Integrated auto-fix features and common issue detection
 
 param(
     [switch]$SkipChecks = $false,
@@ -9,11 +9,11 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-Write-Host "🚀 UniCatcher Windows 增强安装程序" -ForegroundColor Blue
-Write-Host "版本: 2.0 (集成自动修复功能)" -ForegroundColor Gray
+Write-Host "🚀 UniCatcher Windows Enhanced Installer" -ForegroundColor Blue
+Write-Host "Version: 2.0 (with auto-fix features)" -ForegroundColor Gray
 Write-Host ""
 
-# 全局变量
+# Global variables
 $script:InstallLog = @()
 $script:ErrorCount = 0
 $script:WarningCount = 0
@@ -41,54 +41,54 @@ function Write-InstallLog($Level, $Message) {
     }
 }
 
-# 第一步：环境检查和自动修复
-Write-Host "🔍 第一步：环境检查和自动修复..." -ForegroundColor Magenta
+# Step 1: Environment check and auto-fix
+Write-Host "🔍 Step 1: Environment check and auto-fix..." -ForegroundColor Magenta
 
 if (-not $SkipChecks) {
-    Write-InstallLog "INFO" "执行环境检查..."
+    Write-InstallLog "INFO" "Performing environment check..."
     
-    # 检查管理员权限
+    # Check admin privileges
     $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent()
     $isAdmin = ([System.Security.Principal.WindowsPrincipal]$currentUser).IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
     
     if ($isAdmin) {
-        Write-InstallLog "SUCCESS" "检测到管理员权限"
+        Write-InstallLog "SUCCESS" "Admin privileges detected"
     } else {
-        Write-InstallLog "WARNING" "建议使用管理员权限运行以避免权限问题"
+        Write-InstallLog "WARNING" "Recommend running with admin privileges to avoid permission issues"
     }
     
-    # 检查PowerShell版本
+    # Check PowerShell version
     $psVersion = $PSVersionTable.PSVersion
     if ($psVersion.Major -ge 5) {
-        Write-InstallLog "SUCCESS" "PowerShell版本: $($psVersion.ToString())"
+        Write-InstallLog "SUCCESS" "PowerShell version: $($psVersion.ToString())"
     } else {
-        Write-InstallLog "ERROR" "PowerShell版本过低，需要5.0+"
+        Write-InstallLog "ERROR" "PowerShell version too low, requires 5.0+"
         exit 1
     }
     
-    # 自动权限修复
-    Write-InstallLog "INFO" "执行权限预检查和修复..."
+    # Auto permission fix
+    Write-InstallLog "INFO" "Performing permission precheck and fix..."
     
-    # 停止可能冲突的进程
+    # Stop potentially conflicting processes
     Get-Process -Name "node","npm" -ErrorAction SilentlyContinue | ForEach-Object {
-        Write-InstallLog "INFO" "停止进程: $($_.Name) (PID: $($_.Id))"
+        Write-InstallLog "INFO" "Stopping process: $($_.Name) (PID: $($_.Id))"
         $_ | Stop-Process -Force -ErrorAction SilentlyContinue
     }
     
-    # 创建必要目录
+    # Create necessary directories
     $directories = @("data", "data\logs", "data\browser-data", "prisma")
     foreach ($dir in $directories) {
         if (-not (Test-Path $dir)) {
             try {
                 New-Item -ItemType Directory -Path $dir -Force | Out-Null
-                Write-InstallLog "SUCCESS" "创建目录: $dir"
+                Write-InstallLog "SUCCESS" "Created directory: $dir"
             } catch {
-                Write-InstallLog "ERROR" "无法创建目录: $dir"
+                Write-InstallLog "ERROR" "Cannot create directory: $dir"
             }
         }
     }
     
-    # 设置目录权限
+    # Set directory permissions
     foreach ($dir in $directories) {
         if (Test-Path $dir) {
             try {
@@ -96,67 +96,67 @@ if (-not $SkipChecks) {
                 $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($currentUser.Name, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
                 $acl.SetAccessRule($accessRule)
                 Set-Acl -Path $dir -AclObject $acl
-                Write-InstallLog "SUCCESS" "设置权限: $dir"
+                Write-InstallLog "SUCCESS" "Set permissions for: $dir"
             } catch {
-                Write-InstallLog "WARNING" "无法设置权限: $dir (将继续安装)"
+                Write-InstallLog "WARNING" "Cannot set permissions for: $dir (will continue installation)"
             }
         }
     }
     
-    Write-InstallLog "SUCCESS" "环境检查和修复完成"
+    Write-InstallLog "SUCCESS" "Environment check and fix completed"
 } else {
-    Write-InstallLog "INFO" "跳过环境检查 (-SkipChecks)"
+    Write-InstallLog "INFO" "Skipping environment check (-SkipChecks)"
 }
 
-# 第二步：Node.js环境验证
-Write-Host "`n📦 第二步：Node.js环境验证..." -ForegroundColor Magenta
+# Step 2: Node.js environment verification
+Write-Host "`n📦 Step 2: Node.js environment verification..." -ForegroundColor Magenta
 
 try {
     $nodeVersion = node --version
     $majorVersion = [int]($nodeVersion -replace 'v(\d+)\..*', '$1')
     if ($majorVersion -ge 18) {
-        Write-InstallLog "SUCCESS" "Node.js版本: $nodeVersion"
+        Write-InstallLog "SUCCESS" "Node.js version: $nodeVersion"
     } else {
-        Write-InstallLog "ERROR" "Node.js版本过低: $nodeVersion (需要18+)"
-        Write-Host "`n请从 https://nodejs.org/ 下载安装Node.js 18+" -ForegroundColor Yellow
+        Write-InstallLog "ERROR" "Node.js version too low: $nodeVersion (requires 18+)"
+        Write-Host "`nPlease download and install Node.js 18+ from https://nodejs.org/" -ForegroundColor Yellow
         exit 1
     }
 } catch {
-    Write-InstallLog "ERROR" "Node.js未安装或不在PATH中"
-    Write-Host "`n请从 https://nodejs.org/ 下载安装Node.js 18+" -ForegroundColor Yellow
+    Write-InstallLog "ERROR" "Node.js not installed or not in PATH"
+    Write-Host "`nPlease download and install Node.js 18+ from https://nodejs.org/" -ForegroundColor Yellow
     exit 1
 }
 
 try {
     $npmVersion = npm --version
-    Write-InstallLog "SUCCESS" "npm版本: $npmVersion"
+    Write-InstallLog "SUCCESS" "npm version: $npmVersion"
 } catch {
-    Write-InstallLog "ERROR" "npm未安装或不可用"
+    Write-InstallLog "ERROR" "npm not installed or unavailable"
     exit 1
 }
 
-# 第三步：清理和准备
-Write-Host "`n🧹 第三步：清理和准备..." -ForegroundColor Magenta
+# Step 3: Cleanup and preparation
+Write-Host "`n🧹 Step 3: Cleanup and preparation..." -ForegroundColor Magenta
 
-# 清理npm缓存
+# Clean npm cache
 try {
     npm cache clean --force 2>$null
-    Write-InstallLog "SUCCESS" "npm缓存已清理"
+    Write-InstallLog "SUCCESS" "npm cache cleaned"
 } catch {
-    Write-InstallLog "WARNING" "npm缓存清理失败"
+    Write-InstallLog "WARNING" "npm cache clean failed"
 }
 
-# 清理可能的文件锁
+# Clean possible file locks
 if (Test-Path "node_modules\.prisma") {
     try {
         Remove-Item -Recurse -Force "node_modules\.prisma"
-        Write-InstallLog "SUCCESS" "清理Prisma缓存"
+        Write-InstallLog "SUCCESS" "Prisma cache cleaned"
     } catch {
-        Write-InstallLog "WARNING" "无法清理Prisma缓存"
+        Write-InstallLog "WARNING" "Cannot clean Prisma cache"
     }
 }
 
-# 设置npm配置
+# Set npm configuration
 try {
     $npmCache = "$env:USERPROFILE\.npm-cache"
     $npmPrefix = "$env:USERPROFILE\.npm-global"
@@ -167,15 +167,15 @@ try {
     if (-not (Test-Path $npmCache)) { New-Item -ItemType Directory -Path $npmCache -Force | Out-Null }
     if (-not (Test-Path $npmPrefix)) { New-Item -ItemType Directory -Path $npmPrefix -Force | Out-Null }
     
-    Write-InstallLog "SUCCESS" "npm配置已优化"
+    Write-InstallLog "SUCCESS" "npm configuration optimized"
 } catch {
-    Write-InstallLog "WARNING" "npm配置优化失败"
+    Write-InstallLog "WARNING" "npm configuration optimization failed"
 }
 
-# 第四步：环境变量配置
-Write-Host "`n⚙️  第四步：环境变量配置..." -ForegroundColor Magenta
+# Step 4: Environment variable configuration
+Write-Host "`n⚙️  Step 4: Environment variable configuration..." -ForegroundColor Magenta
 
-# 生成强AUTH_SECRET
+# Generate strong AUTH_SECRET
 function Generate-SecureSecret {
     $bytes = New-Object byte[] 32
     ([System.Security.Cryptography.RNGCryptoServiceProvider]::Create()).GetBytes($bytes)
@@ -185,7 +185,7 @@ function Generate-SecureSecret {
 if (-not (Test-Path ".env")) {
     $authSecret = Generate-SecureSecret
     $envContent = @"
-# UniCatcher 生产环境配置
+# UniCatcher Production Environment Configuration
 DATABASE_URL="file:./prisma/db.sqlite"
 AUTH_SECRET="$authSecret"
 NEXTAUTH_URL="http://localhost:3067"
@@ -196,31 +196,31 @@ SKIP_ENV_VALIDATION=false
 "@
     try {
         $envContent | Out-File -FilePath ".env" -Encoding UTF8
-        Write-InstallLog "SUCCESS" "创建.env文件 (使用强密码)"
+        Write-InstallLog "SUCCESS" "Created .env file (with strong password)"
     } catch {
-        Write-InstallLog "ERROR" "无法创建.env文件"
+        Write-InstallLog "ERROR" "Cannot create .env file"
         exit 1
     }
 } else {
-    Write-InstallLog "INFO" "检查现有.env文件..."
+    Write-InstallLog "INFO" "Checking existing .env file..."
     
     $envContent = Get-Content ".env" -Raw
     $needsUpdate = $false
     
-    # 检查AUTH_SECRET
+    # Check AUTH_SECRET
     if ($envContent -match 'AUTH_SECRET="?([^"]*)"?') {
         $currentSecret = $matches[1]
         if ($currentSecret -eq "unicatcher-secret-key-2024-change-in-production" -or $currentSecret.Length -lt 32) {
-            Write-InstallLog "WARNING" "AUTH_SECRET太弱，正在更新..."
+            Write-InstallLog "WARNING" "AUTH_SECRET too weak, updating..."
             $newSecret = Generate-SecureSecret
             $envContent = $envContent -replace 'AUTH_SECRET="?[^"]*"?', "AUTH_SECRET=`"$newSecret`""
             $needsUpdate = $true
         }
     }
     
-    # 检查DATABASE_URL路径（确保使用正确的prisma路径）
+    # Check DATABASE_URL path (ensure using correct prisma path)
     if ($envContent -match 'DATABASE_URL="?file:\.\/data\/database\/db\.sqlite"?') {
-        Write-InstallLog "WARNING" "更新DATABASE_URL路径到正确的prisma位置..."
+        Write-InstallLog "WARNING" "Updating DATABASE_URL path to correct prisma location..."
         $envContent = $envContent -replace 'DATABASE_URL="?file:\.\/data\/database\/db\.sqlite"?', 'DATABASE_URL="file:./prisma/db.sqlite"'
         $needsUpdate = $true
     }
@@ -228,17 +228,17 @@ SKIP_ENV_VALIDATION=false
     if ($needsUpdate) {
         try {
             $envContent | Out-File -FilePath ".env" -Encoding UTF8
-            Write-InstallLog "SUCCESS" ".env文件已更新"
+            Write-InstallLog "SUCCESS" ".env file updated"
         } catch {
-            Write-InstallLog "ERROR" "无法更新.env文件"
+            Write-InstallLog "ERROR" "Cannot update .env file"
         }
     } else {
-        Write-InstallLog "SUCCESS" ".env文件配置正确"
+        Write-InstallLog "SUCCESS" ".env file configuration correct"
     }
 }
 
-# 第五步：依赖安装
-Write-Host "`n📦 第五步：依赖安装..." -ForegroundColor Magenta
+# Step 5: Dependency installation
+Write-Host "`n📦 Step 5: Dependency installation..." -ForegroundColor Magenta
 
 $installAttempts = 0
 $maxAttempts = 3
@@ -246,94 +246,94 @@ $installSuccess = $false
 
 do {
     $installAttempts++
-    Write-InstallLog "INFO" "安装尝试 $installAttempts/$maxAttempts..."
+    Write-InstallLog "INFO" "Installation attempt $installAttempts/$maxAttempts..."
     
     try {
         npm install --no-optional
         if ($LASTEXITCODE -eq 0) {
-            Write-InstallLog "SUCCESS" "依赖安装成功"
+            Write-InstallLog "SUCCESS" "Dependencies installed successfully"
             $installSuccess = $true
             break
         }
     } catch {
-        Write-InstallLog "WARNING" "安装失败: $($_.Exception.Message)"
+        Write-InstallLog "WARNING" "Installation failed: $($_.Exception.Message)"
     }
     
     if ($installAttempts -lt $maxAttempts) {
-        Write-InstallLog "INFO" "3秒后重试..."
+        Write-InstallLog "INFO" "Retrying in 3 seconds..."
         Start-Sleep -Seconds 3
         
-        # 清理node_modules
+        # Clean node_modules
         if (Test-Path "node_modules") {
             Remove-Item -Recurse -Force "node_modules" -ErrorAction SilentlyContinue
-            Write-InstallLog "INFO" "清理node_modules"
+            Write-InstallLog "INFO" "Cleaned node_modules"
         }
     }
 } while ($installAttempts -lt $maxAttempts -and -not $installSuccess)
 
 if (-not $installSuccess) {
-    Write-InstallLog "ERROR" "依赖安装失败，请手动执行修复"
-    Write-Host "`n🔧 手动修复步骤:" -ForegroundColor Yellow
-    Write-Host "   1. 以管理员身份运行PowerShell" -ForegroundColor White
-    Write-Host "   2. 运行: npm run fix-permissions" -ForegroundColor White
-    Write-Host "   3. 运行: npm install" -ForegroundColor White
+    Write-InstallLog "ERROR" "Dependency installation failed, please run manual fix"
+    Write-Host "`n🔧 Manual fix steps:" -ForegroundColor Yellow
+    Write-Host "   1. Run PowerShell as Administrator" -ForegroundColor White
+    Write-Host "   2. Run: npm run fix-permissions" -ForegroundColor White
+    Write-Host "   3. Run: npm install" -ForegroundColor White
     exit 1
 }
 
-# 第六步：数据库初始化
-Write-Host "`n🗄️  第六步：数据库初始化..." -ForegroundColor Magenta
+# Step 6: Database initialization
+Write-Host "`n🗄️  Step 6: Database initialization..." -ForegroundColor Magenta
 
 try {
     npm run safe-init-db
     if ($LASTEXITCODE -eq 0) {
-        Write-InstallLog "SUCCESS" "数据库初始化成功"
+        Write-InstallLog "SUCCESS" "Database initialized successfully"
     } else {
-        throw "数据库初始化失败"
+        throw "Database initialization failed"
     }
 } catch {
-    Write-InstallLog "ERROR" "数据库初始化失败"
-    Write-InstallLog "INFO" "尝试手动初始化..."
+    Write-InstallLog "ERROR" "Database initialization failed"
+    Write-InstallLog "INFO" "Attempting manual initialization..."
     
     try {
         npx prisma db push
         npx prisma generate
-        Write-InstallLog "SUCCESS" "手动数据库初始化成功"
+        Write-InstallLog "SUCCESS" "Manual database initialization successful"
     } catch {
-        Write-InstallLog "ERROR" "数据库初始化彻底失败"
+        Write-InstallLog "ERROR" "Database initialization completely failed"
         exit 1
     }
 }
 
-# 第七步：Playwright浏览器安装
-Write-Host "`n🎭 第七步：Playwright浏览器安装..." -ForegroundColor Magenta
+# Step 7: Playwright browser installation
+Write-Host "`n🎭 Step 7: Playwright browser installation..." -ForegroundColor Magenta
 
 try {
     npx playwright install chromium
     if ($LASTEXITCODE -eq 0) {
-        Write-InstallLog "SUCCESS" "Playwright浏览器安装成功"
+        Write-InstallLog "SUCCESS" "Playwright browser installed successfully"
     } else {
-        throw "Playwright安装失败"
+        throw "Playwright installation failed"
     }
 } catch {
-    Write-InstallLog "ERROR" "Playwright浏览器安装失败"
-    Write-InstallLog "INFO" "建议手动安装: npx playwright install chromium"
+    Write-InstallLog "ERROR" "Playwright browser installation failed"
+    Write-InstallLog "INFO" "Recommend manual installation: npx playwright install chromium"
 }
 
-# 第八步：JWT配置验证
-Write-Host "`n🔐 第八步：JWT配置验证..." -ForegroundColor Magenta
+# Step 8: JWT configuration verification
+Write-Host "`n🔐 Step 8: JWT configuration verification..." -ForegroundColor Magenta
 
 try {
-    Write-InstallLog "INFO" "验证JWT配置..."
+    Write-InstallLog "INFO" "Verifying JWT configuration..."
     node scripts/fix-jwt-session.mjs
-    Write-InstallLog "SUCCESS" "JWT配置验证完成"
+    Write-InstallLog "SUCCESS" "JWT configuration verification completed"
 } catch {
-    Write-InstallLog "WARNING" "JWT配置验证失败，但不影响安装"
+    Write-InstallLog "WARNING" "JWT configuration verification failed, but doesn't affect installation"
 }
 
-# 第九步：最终验证
-Write-Host "`n✅ 第九步：最终验证..." -ForegroundColor Magenta
+# Step 9: Final verification
+Write-Host "`n✅ Step 9: Final verification..." -ForegroundColor Magenta
 
-# 检查关键文件
+# Check critical files
 $criticalFiles = @(
     ".env",
     "node_modules\next",
@@ -343,13 +343,13 @@ $criticalFiles = @(
 
 foreach ($file in $criticalFiles) {
     if (Test-Path $file) {
-        Write-InstallLog "SUCCESS" "文件检查通过: $file"
+        Write-InstallLog "SUCCESS" "File check passed: $file"
     } else {
-        Write-InstallLog "WARNING" "文件缺失: $file"
+        Write-InstallLog "WARNING" "File missing: $file"
     }
 }
 
-# 保存安装日志
+# Save installation log
 try {
     $logContent = $script:InstallLog -join "`n"
     $logPath = ".\data\logs\install-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
@@ -359,32 +359,32 @@ try {
     }
     
     $logContent | Out-File -FilePath $logPath -Encoding UTF8
-    Write-InstallLog "SUCCESS" "安装日志保存到: $logPath"
+    Write-InstallLog "SUCCESS" "Installation log saved to: $logPath"
 } catch {
-    Write-InstallLog "WARNING" "无法保存安装日志"
+    Write-InstallLog "WARNING" "Cannot save installation log"
 }
 
-# 安装完成总结
-Write-Host "`n📊 安装完成总结:" -ForegroundColor Blue
-Write-Host "   ✅ 成功: $((($script:InstallLog | Where-Object { $_ -like '*SUCCESS*' }).Count))" -ForegroundColor Green
-Write-Host "   ⚠️  警告: $script:WarningCount" -ForegroundColor Yellow
-Write-Host "   ❌ 错误: $script:ErrorCount" -ForegroundColor Red
+# Installation completion summary
+Write-Host "`n📊 Installation Summary:" -ForegroundColor Blue
+Write-Host "   ✅ Success: $((($script:InstallLog | Where-Object { $_ -like '*SUCCESS*' }).Count))" -ForegroundColor Green
+Write-Host "   ⚠️  Warning: $script:WarningCount" -ForegroundColor Yellow
+Write-Host "   ❌ Error: $script:ErrorCount" -ForegroundColor Red
 
 if ($script:ErrorCount -eq 0) {
-    Write-Host "`n🎉 UniCatcher安装成功！" -ForegroundColor Green
+    Write-Host "`n🎉 UniCatcher installation successful!" -ForegroundColor Green
     Write-Host ""
-    Write-Host "📋 接下来的步骤:" -ForegroundColor Cyan
-    Write-Host "   1. 启动开发服务器: npm run dev" -ForegroundColor White
-    Write-Host "   2. 启动生产服务器: npm run start" -ForegroundColor White
-    Write-Host "   3. 访问应用: http://localhost:3067" -ForegroundColor White
-    Write-Host "   4. 登录账号: admin / a2885828" -ForegroundColor White
+    Write-Host "📋 Next steps:" -ForegroundColor Cyan
+    Write-Host "   1. Start development server: npm run dev" -ForegroundColor White
+    Write-Host "   2. Start production server: npm run start" -ForegroundColor White
+    Write-Host "   3. Access application: http://localhost:3067" -ForegroundColor White
+    Write-Host "   4. Login credentials: admin / a2885828" -ForegroundColor White
     Write-Host ""
-    Write-Host "🔧 故障排除工具:" -ForegroundColor Cyan
-    Write-Host "   - 环境检查: npm run windows-check" -ForegroundColor White
-    Write-Host "   - 权限修复: npm run fix-permissions" -ForegroundColor White
-    Write-Host "   - JWT修复: npm run fix-jwt-session" -ForegroundColor White
-    Write-Host "   - 认证调试: npm run debug-auth" -ForegroundColor White
+    Write-Host "🔧 Troubleshooting tools:" -ForegroundColor Cyan
+    Write-Host "   - Environment check: npm run windows-check" -ForegroundColor White
+    Write-Host "   - Permission fix: npm run fix-permissions" -ForegroundColor White
+    Write-Host "   - JWT fix: npm run fix-jwt-session" -ForegroundColor White
+    Write-Host "   - Auth debug: npm run debug-auth" -ForegroundColor White
 } else {
-    Write-Host "`n⚠️  安装完成但存在错误，请检查上述问题" -ForegroundColor Yellow
-    Write-Host "💡 运行故障排除: npm run windows-fix" -ForegroundColor Cyan
+    Write-Host "`n⚠️  Installation completed with errors, please check above issues" -ForegroundColor Yellow
+    Write-Host "💡 Run troubleshooting: npm run windows-fix" -ForegroundColor Cyan
 } 
