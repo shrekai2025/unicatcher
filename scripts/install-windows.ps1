@@ -1,6 +1,19 @@
-# UniCatcher Windows安装脚本
+# UniCatcher Windows安装脚本 (重定向到增强版本)
 
-Write-Host "Starting UniCatcher installation..." -ForegroundColor Blue
+Write-Host "🔄 重定向到增强版安装脚本..." -ForegroundColor Blue
+Write-Host "使用新的增强版安装程序，包含自动问题检测和修复功能" -ForegroundColor Yellow
+Write-Host ""
+
+# 检查增强版脚本是否存在
+if (Test-Path "scripts\install-windows-enhanced.ps1") {
+    Write-Host "✅ 启动增强版安装程序..." -ForegroundColor Green
+    & "scripts\install-windows-enhanced.ps1" @args
+    exit $LASTEXITCODE
+} else {
+    Write-Host "⚠️  增强版脚本不存在，使用传统安装流程..." -ForegroundColor Yellow
+}
+
+Write-Host "🚀 UniCatcher 传统安装程序" -ForegroundColor Blue
 
 # 检查Node.js
 Write-Host "Checking Node.js..." -ForegroundColor Yellow

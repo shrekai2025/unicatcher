@@ -66,7 +66,7 @@ ENV NEXTAUTH_URL=http://localhost:3067
 RUN npm run build
 
 # 创建数据目录并设置权限
-RUN mkdir -p /app/data/database /app/data/logs /app/data/browser-data && \
+RUN mkdir -p /app/data/logs /app/data/browser-data && \
     chown -R appuser:appgroup /app/data /app/prisma && \
     chmod -R 755 /app/data /app/prisma
 

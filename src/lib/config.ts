@@ -129,6 +129,7 @@ export const config = {
     url: env.DATABASE_URL,
     maxConnections: 10,
     connectionTimeout: 5000,
+    path: './prisma/db.sqlite', // SQLite数据库文件路径
   },
 
   // 认证配置
@@ -199,7 +200,7 @@ export const config = {
   // 数据目录配置
   directories: {
     data: './data',
-    database: './data/database',
+    database: './prisma', // 数据库文件存储在prisma目录
     logs: './data/logs',
     browserData: './data/browser-data',
   },

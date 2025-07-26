@@ -38,6 +38,11 @@ fi
 
 echo -e "${GREEN}✅ npm版本: $(npm -v)${NC}"
 
+# 创建必要目录
+echo -e "${BLUE}📁 创建项目目录结构...${NC}"
+mkdir -p data/logs data/browser-data prisma
+echo -e "${GREEN}✅ 目录结构已创建${NC}"
+
 # 安装依赖
 echo -e "${BLUE}📦 安装依赖...${NC}"
 npm install
@@ -45,14 +50,18 @@ npm install
 # 创建.env文件（如果不存在）
 if [ ! -f ".env" ]; then
     echo -e "${BLUE}📝 创建.env文件...${NC}"
-    cat > .env << 'EOF'
+    # 生成强AUTH_SECRET
+    AUTH_SECRET=$(openssl rand -base64 32 2>/dev/null || head -c 32 /dev/urandom | base64)
+    
+    cat > .env << EOF
 # UniCatcher 环境配置
 DATABASE_URL="file:./prisma/db.sqlite"
-AUTH_SECRET="unicatcher-secret-key-2024-change-in-production"
+AUTH_SECRET="$AUTH_SECRET"
 NEXTAUTH_URL="http://localhost:3067"
-NODE_ENV="development"
+NODE_ENV="production"
 PORT=3067
 ENABLE_RESOURCE_OPTIMIZATION=true
+SKIP_ENV_VALIDATION=false
 EOF
     echo -e "${GREEN}✅ .env文件已创建${NC}"
 else
