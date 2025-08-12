@@ -104,6 +104,5 @@ ENV PORT=3067
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3067/api/health || exit 1
 
-# 启动命令：先尝试生成 Prisma 客户端（忽略权限错误），再安全初始化数据库并启动
-# 说明：某些情况下首次运行可能缺少 client，提前尝试生成；失败不影响继续
-CMD ["sh", "-lc", "(npx prisma generate || true) && npm run safe-init-db && npm run start"]
+# 启动命令：安全初始化数据库并启动（客户端生成由脚本内部按需处理）
+CMD ["sh", "-lc", "npm run safe-init-db && npm run start"]

@@ -67,14 +67,18 @@ try {
   process.exit(1);
 }
 
-// 5. 生成Prisma客户端
+// 5. 生成Prisma客户端（若已存在则跳过；若失败则仅告警不退出）
 try {
-  console.log('🔄 生成Prisma客户端...');
-  execSync('npx prisma generate', { stdio: 'inherit' });
-  console.log('✅ Prisma客户端已生成');
+  const clientIndexPath = './node_modules/.prisma/client/index.js';
+  if (fs.existsSync(clientIndexPath)) {
+    console.log('✅ 检测到已存在的 Prisma 客户端，跳过生成');
+  } else {
+    console.log('🔄 生成Prisma客户端...');
+    execSync('npx prisma generate', { stdio: 'inherit' });
+    console.log('✅ Prisma客户端已生成');
+  }
 } catch (error) {
-  console.error('❌ Prisma客户端生成失败:', error instanceof Error ? error.message : String(error));
-  process.exit(1);
+  console.warn('⚠️ Prisma客户端生成失败（已忽略）：', error instanceof Error ? error.message : String(error));
 }
 
 // 6. 创建初始数据（可选）
