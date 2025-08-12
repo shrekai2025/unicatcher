@@ -46,6 +46,29 @@ export default function XLoginPage() {
     }
   };
 
+  const handleStep = async (target: 'username'|'confirm'|'password') => {
+    setLoading(true);
+    setMsg(null);
+    try {
+      if (target === 'username') {
+        await callLogin({ phase: 'username', username });
+        setMsg('第一步完成');
+        setPhase('confirm');
+      } else if (target === 'confirm') {
+        await callLogin({ phase: 'confirm', username });
+        setMsg('第二步完成');
+        setPhase('password');
+      } else {
+        await callLogin({ phase: 'password', username, password, twoFA: twoFA || undefined });
+        setMsg('第三步完成，已保存会话');
+      }
+    } catch (err: any) {
+      setMsg(err.message || '登录失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
       <div className="w-full max-w-md bg-white rounded-lg shadow p-6">
@@ -71,13 +94,10 @@ export default function XLoginPage() {
             </>
           )}
           <div className="grid grid-cols-3 gap-2">
-            <button type="button" onClick={() => { setPhase('username'); setMsg(null); }} className={`px-3 py-2 rounded ${phase==='username'?'bg-blue-100 text-blue-700':'bg-gray-100 text-gray-700'}`}>第一步</button>
-            <button type="button" onClick={() => { setPhase('confirm'); setMsg(null); }} className={`px-3 py-2 rounded ${phase==='confirm'?'bg-blue-100 text-blue-700':'bg-gray-100 text-gray-700'}`}>第二步</button>
-            <button type="button" onClick={() => { setPhase('password'); setMsg(null); }} className={`px-3 py-2 rounded ${phase==='password'?'bg-blue-100 text-blue-700':'bg-gray-100 text-gray-700'}`}>第三步</button>
+            <button type="button" disabled={loading} onClick={() => handleStep('username')} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50">提交第一步</button>
+            <button type="button" disabled={loading} onClick={() => handleStep('confirm')} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50">提交第二步</button>
+            <button type="button" disabled={loading} onClick={() => handleStep('password')} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50">提交第三步</button>
           </div>
-          <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded py-2 disabled:opacity-50">
-            {loading ? '提交中...' : phase==='username' ? '提交第一步' : phase==='confirm' ? '提交第二步' : '提交第三步'}
-          </button>
         </form>
         {msg && <p className="mt-4 text-sm text-gray-700">{msg}</p>}
         <p className="mt-2 text-xs text-gray-500">登录成功后将把会话写入服务器的浏览器状态，供爬虫任务使用。</p>
