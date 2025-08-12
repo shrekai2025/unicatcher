@@ -74,12 +74,12 @@ RUN mkdir -p /app/data/logs /app/data/browser-data && \
     chmod -R 755 /app/data /app/prisma
 
 # 设置Playwright环境变量（在用户切换前设置）
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 ENV HOME=/home/appuser
 
-# 预创建 home 及浏览器目录并授权（root 权限）
-RUN mkdir -p /home/appuser/.cache/ms-playwright && \
-    chown -R appuser:appgroup /home/appuser
+# 预创建浏览器目录并授权（root 权限），避免在 /home 下写入
+RUN mkdir -p /ms-playwright && \
+    chown -R appuser:appgroup /ms-playwright /home/appuser
 
 # 切换到非 root 用户
 USER appuser
@@ -88,18 +88,7 @@ USER appuser
 RUN npx playwright install chromium
 
 # 验证安装
-RUN ls -la /home/appuser/.cache/ms-playwright/ || echo "Warning: Playwright directory not created properly"
-
-# 创建符号链接以兼容旧路径（在用户切换前以root身份执行）
-USER root
-RUN mkdir -p /ms-playwright && \
-    if [ -d "/home/appuser/.cache/ms-playwright" ]; then \
-      find /home/appuser/.cache/ms-playwright -name "chromium-*" -type d | head -1 | \
-      xargs -I {} ln -sf {} /ms-playwright/; \
-    fi
-
-# 切换回appuser
-USER appuser
+RUN ls -la /ms-playwright || echo "Warning: Playwright directory not created properly"
 
 # 暴露端口
 EXPOSE 3067
