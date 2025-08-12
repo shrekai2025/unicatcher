@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // 需要认证的路径
-const protectedPaths = ['/dashboard', '/tasks', '/tweets', '/extracts'];
+const protectedPaths = ['/dashboard', '/tasks', '/tweets', '/extracts', '/x-login'];
 
 // 公开路径（不需要认证）
 const publicPaths = ['/login', '/api/health', '/api/external'];

@@ -71,7 +71,7 @@ export default function APIDocsPage() {
               <div>
                 <h3 className="font-medium text-gray-900 mb-2">服务器地址</h3>
                 <div className="p-3 bg-gray-50 rounded-lg">
-                  <code className="text-sm">http://43.153.82.100:3067</code>
+                  <code className="text-sm">http://43.153.84.145:3067</code>
                 </div>
               </div>
               <div>
@@ -126,7 +126,7 @@ export default function APIDocsPage() {
                   <h4 className="font-medium text-gray-800 mb-2">方式 1: X-API-Key 请求头</h4>
                   <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
                                          <pre className="text-sm"><code>{`curl -H "X-API-Key: unicatcher-api-key-demo" \\
-     http://43.153.82.100:3067/api/external/tasks`}</code></pre>
+     http://43.153.84.145:3067/api/external/tasks`}</code></pre>
                   </div>
                 </div>
                 
@@ -134,7 +134,7 @@ export default function APIDocsPage() {
                   <h4 className="font-medium text-gray-800 mb-2">方式 2: Authorization Bearer</h4>
                   <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
                                          <pre className="text-sm"><code>{`curl -H "Authorization: Bearer unicatcher-api-key-demo" \\
-     http://43.153.82.100:3067/api/external/tasks`}</code></pre>
+     http://43.153.84.145:3067/api/external/tasks`}</code></pre>
                   </div>
                 </div>
               </div>
@@ -209,7 +209,7 @@ export default function APIDocsPage() {
               <div className="mt-4">
                 <h4 className="font-medium text-gray-800 mb-2">cURL 示例</h4>
                 <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
-                                     <pre><code>{`curl -X POST http://43.153.82.100:3067/api/external/tasks \\
+                                     <pre><code>{`curl -X POST http://43.153.84.145:3067/api/external/tasks \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: unicatcher-api-key-demo" \\
   -d '{"listId": "1948042550071496895", "maxTweets": 30}'`}</code></pre>
@@ -266,7 +266,7 @@ export default function APIDocsPage() {
                 <h4 className="font-medium text-gray-800 mb-2">cURL 示例</h4>
                 <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
                                      <pre><code>{`curl -H "X-API-Key: unicatcher-api-key-demo" \\
-     http://43.153.82.100:3067/api/external/tasks/cmdih9v9d0000j7hoz84g1hir`}</code></pre>
+     http://43.153.84.145:3067/api/external/tasks/cmdih9v9d0000j7hoz84g1hir`}</code></pre>
                 </div>
               </div>
             </div>
@@ -317,14 +317,14 @@ export default function APIDocsPage() {
                   <h4 className="font-medium text-gray-800 mb-2">获取 JSON 数据</h4>
                   <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
                                          <pre><code>{`curl -H "X-API-Key: unicatcher-api-key-demo" \\
-     "http://43.153.82.100:3067/api/external/data/cmdih9v9d0000j7hoz84g1hir?page=1&limit=50"`}</code></pre>
+     "http://43.153.84.145:3067/api/external/data/cmdih9v9d0000j7hoz84g1hir?page=1&limit=50"`}</code></pre>
                   </div>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-800 mb-2">下载 CSV 文件</h4>
                   <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
                                          <pre><code>{`curl -H "X-API-Key: unicatcher-api-key-demo" \\
-     "http://43.153.82.100:3067/api/external/data/cmdih9v9d0000j7hoz84g1hir?format=csv" \\
+     "http://43.153.84.145:3067/api/external/data/cmdih9v9d0000j7hoz84g1hir?format=csv" \\
      -o tweets.csv`}</code></pre>
                   </div>
                 </div>
@@ -407,7 +407,7 @@ export default function APIDocsPage() {
                 <div>
                   <h4 className="font-medium text-gray-800 mb-2">标准提取</h4>
                   <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
-                    <pre><code>{`curl -X POST http://43.153.82.100:3067/api/external/data/extract \\
+                    <pre><code>{`curl -X POST http://43.153.84.145:3067/api/external/data/extract \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: unicatcher-api-key-demo" \\
   -d '{
@@ -421,7 +421,7 @@ export default function APIDocsPage() {
                 <div>
                   <h4 className="font-medium text-gray-800 mb-2">预览模式 (dryRun)</h4>
                   <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
-                    <pre><code>{`curl -X POST http://43.153.82.100:3067/api/external/data/extract \\
+                    <pre><code>{`curl -X POST http://43.153.84.145:3067/api/external/data/extract \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: unicatcher-api-key-demo" \\
   -d '{
@@ -435,7 +435,7 @@ export default function APIDocsPage() {
                 <div>
                   <h4 className="font-medium text-gray-800 mb-2">足额返回模式</h4>
                   <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
-                    <pre><code>{`curl -X POST http://43.153.82.100:3067/api/external/data/extract \\
+                    <pre><code>{`curl -X POST http://43.153.84.145:3067/api/external/data/extract \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: unicatcher-api-key-demo" \\
   -d '{
@@ -487,7 +487,7 @@ export default function APIDocsPage() {
                 <h4 className="font-medium text-gray-800 mb-2">cURL 示例</h4>
                 <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
                   <pre><code>{`curl -H "X-API-Key: unicatcher-api-key-demo" \\
-     "http://43.153.82.100:3067/api/external/analysis/pending?limit=200&system=ai_analyzer"`}</code></pre>
+     "http://43.153.84.145:3067/api/external/analysis/pending?limit=200&system=ai_analyzer"`}</code></pre>
                 </div>
               </div>
             </div>
@@ -531,7 +531,7 @@ export default function APIDocsPage() {
               <div className="mt-4">
                 <h4 className="font-medium text-gray-800 mb-2">cURL 示例</h4>
                 <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
-                  <pre><code>{`curl -X POST http://43.153.82.100:3067/api/external/analysis/complete \\
+                  <pre><code>{`curl -X POST http://43.153.84.145:3067/api/external/analysis/complete \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: unicatcher-api-key-demo" \\
   -d '{
@@ -912,7 +912,7 @@ class UniCatcherClient:
 # 使用示例
 if __name__ == '__main__':
          client = UniCatcherClient(
-         base_url='http://43.153.82.100:3067',
+         base_url='http://43.153.84.145:3067',
          api_key='unicatcher-api-key-demo'
      )
     
@@ -939,7 +939,7 @@ if __name__ == '__main__':
 def extract_data_example():
     """数据提取示例"""
     client = UniCatcherClient(
-        base_url='http://43.153.82.100:3067',
+        base_url='http://43.153.84.145:3067',
         api_key='unicatcher-api-key-demo'
     )
     
@@ -1104,7 +1104,7 @@ def mark_analysis_complete(self, batch_id, status, error_message=None, analysis_
 // 使用示例
 async function main() {
          const client = new UniCatcherClient(
-         'http://43.153.82.100:3067',
+         'http://43.153.84.145:3067',
          'unicatcher-api-key-demo'
      );
 
@@ -1135,7 +1135,7 @@ main();
 // 数据提取示例
 async function extractDataExample() {
     const client = new UniCatcherClient(
-        'http://43.153.82.100:3067',
+        'http://43.153.84.145:3067',
         'unicatcher-api-key-demo'
     );
 
