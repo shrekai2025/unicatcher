@@ -11,10 +11,9 @@ export const maxDuration = 120;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { username, password, twoFA } = body as { username: string; password: string; twoFA?: string };
-    if (!username || !password) {
-      return NextResponse.json({ error: '用户名和密码必填' }, { status: 400 });
-    }
+    const { username, password, twoFA, phase } = body as { username: string; password?: string; twoFA?: string; phase?: 'username'|'confirm'|'password' };
+    if (!username) return NextResponse.json({ error: '用户名必填' }, { status: 400 });
+    if ((phase === 'password' || !phase) && !password) return NextResponse.json({ error: '密码必填' }, { status: 400 });
 
     const headless = true;
     const storagePath = '/app/data/browser-state.json';
@@ -46,6 +45,12 @@ export async function POST(req: NextRequest) {
     ]).catch(() => {});
     log('CLICK_NEXT_AFTER_USERNAME');
 
+    if (phase === 'username') {
+      log('STEP1_DONE');
+      await browser.close();
+      return NextResponse.json({ success: true, message: '第一步完成' });
+    }
+
     // 2) 若再次询问用户名
     try {
       await page.waitForSelector('input[name="text"]', { timeout: 3000 });
@@ -57,10 +62,16 @@ export async function POST(req: NextRequest) {
       log('RECONFIRM_USERNAME');
     } catch {}
 
+    if (phase === 'confirm') {
+      log('STEP2_DONE');
+      await browser.close();
+      return NextResponse.json({ success: true, message: '第二步完成' });
+    }
+
     // 3) 密码
     log('FILL_PASSWORD_WAIT');
     await page.waitForSelector('input[name="password"]', { timeout: 60000 });
-    await page.fill('input[name="password"]', password);
+    await page.fill('input[name="password"]', password!);
     log('FILL_PASSWORD_DONE');
     await Promise.any([
       page.click('div[role="button"][data-testid="LoginForm_Login_Button"]'),
