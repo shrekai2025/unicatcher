@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Navigation } from '~/components/navigation';
 import { api } from '~/trpc/react';
 
@@ -44,13 +45,24 @@ export default function DashboardPage() {
       
       <div className="py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold leading-tight text-gray-900">
-              系统仪表板
-            </h1>
-            <p className="mt-2 text-gray-600">
-              UniCatcher 系统运行状况总览
-            </p>
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold leading-tight text-gray-900">
+                系统仪表板
+              </h1>
+              <p className="mt-2 text-gray-600">
+                UniCatcher 系统运行状况总览
+              </p>
+            </div>
+            <div className="shrink-0">
+              <Link
+                href="/x-login"
+                className="inline-flex items-center px-4 py-2 rounded-md bg-black text-white hover:bg-gray-900"
+              >
+                <span className="mr-2">🐦</span>
+                X 无头登录
+              </Link>
+            </div>
           </div>
 
           {/* 统计卡片 */}
