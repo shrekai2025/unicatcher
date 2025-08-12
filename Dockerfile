@@ -43,9 +43,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# 创建一个无特权的专用用户
+# 创建一个无特权的专用用户并指定 home 目录
 RUN addgroup --system --gid 1001 appgroup && \
-    adduser --system --uid 1001 --ingroup appgroup appuser
+    adduser --system --uid 1001 --ingroup appgroup --home /home/appuser --disabled-login appuser
 
 # 复制package文件和prisma配置
 COPY package*.json ./
@@ -75,12 +75,14 @@ RUN mkdir -p /app/data/logs /app/data/browser-data && \
 
 # 设置Playwright环境变量（在用户切换前设置）
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright
+ENV HOME=/home/appuser
+
+# 预创建 home 及浏览器目录并授权（root 权限）
+RUN mkdir -p /home/appuser/.cache/ms-playwright && \
+    chown -R appuser:appgroup /home/appuser
 
 # 切换到非 root 用户
 USER appuser
-
-# 创建Playwright浏览器目录
-RUN mkdir -p /home/appuser/.cache/ms-playwright
 
 # 安装Playwright浏览器（在用户切换后执行，确保权限正确）
 RUN npx playwright install chromium

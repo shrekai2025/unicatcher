@@ -1,29 +1,70 @@
-# 重装命令
-# 停止容器
-docker-compose down
+# 重装命令（仅影响本项目，适用于多项目服务器）
+# 提示：在项目目录内执行或显式指定项目名 -p unicatcher，可避免影响其他 compose 项目。
 
-# 清理构建缓存
-docker system prune -f
-# 清理旧的镜像
-docker-compose down --rmi all
+# 停止并清理本项目容器（不影响其他项目）
+docker-compose -p unicatcher down
+
+# 可选：仅删除本项目构建的镜像（不删除共享镜像）
+docker-compose -p unicatcher down --rmi local
 
 # 重新构建（确保包含所有修复）
-docker-compose build --no-cache --pull
+docker-compose -p unicatcher build --no-cache --pull
 
 # 启动容器
-docker-compose up -d
+docker-compose -p unicatcher up -d
 
-# 测试Playwright浏览器
-docker-compose exec unicatcher npx playwright --version
+# 测试 Playwright 浏览器
+docker-compose -p unicatcher exec unicatcher npx playwright --version
 
 # 开启实时日志监控
-docker-compose logs -f unicatcher
+docker-compose -p unicatcher logs -f unicatcher
 
 # 查看当前容器日志
-docker-compose logs unicatcher | tail -50
+docker-compose -p unicatcher logs unicatcher | tail -50
 
 # 查看构建过程中的验证信息
-docker-compose logs unicatcher | grep -A5 -B5 "Playwright\|playwright"
+docker-compose -p unicatcher logs unicatcher | grep -A5 -B5 "Playwright\|playwright"
+
+注意：请勿在多项目服务器执行 `docker system prune -f` 等全局清理命令，会影响宿主机上其他业务容器与镜像。
+
+---
+
+## 从 Git 开始的安全部署（不会影响其他项目）
+
+```bash
+# 1) 获取代码
+git clone <your-repo-url>
+cd unicatcher
+
+# 2) 准备 .env（docker-compose 将读取）
+cat > .env << 'EOF'
+NODE_ENV=production
+PORT=3067                 # 如端口冲突，可改为 8080 等
+AUTH_SECRET=change-me-in-production
+NEXTAUTH_URL=http://localhost:3067
+DATABASE_URL=file:./prisma/db.sqlite
+ENABLE_RESOURCE_OPTIMIZATION=true
+EOF
+
+# 如宿主机已有服务占用 3067 端口，可在 docker-compose.yml 中改端口映射，如：
+#   ports:
+#     - "8080:3067"
+# 或仅在 .env 改 PORT=8080，但仍需在浏览器以 http://<IP>:8080 访问
+
+# 3) 构建并启动（仅作用于本项目）
+docker-compose -p unicatcher up -d --build
+
+# 4) 验证健康状态
+curl -f http://localhost:${PORT:-3067}/api/health || echo "unhealthy"
+
+# 5) 查看日志
+docker-compose -p unicatcher logs -f unicatcher
+```
+
+说明：
+- `-p unicatcher` 显式指定 compose 工程名，保证与其他项目隔离；在项目目录内执行也会自动隔离，但显式指定更稳妥。
+- 数据卷使用 `unicatcher-data` 与 `unicatcher-db`，仅属于本项目，不会影响他项目。
+- 若你使用的是新版 Compose 插件（`docker compose`），将以上命令中的 `docker-compose` 替换为 `docker compose` 即可。
 
 
 
