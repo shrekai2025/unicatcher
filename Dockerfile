@@ -54,6 +54,9 @@ COPY prisma ./prisma
 # 安装依赖
 RUN npm install
 
+# 授权 node_modules 给非 root 用户，便于运行时 prisma generate 更新客户端
+RUN chown -R appuser:appgroup /app/node_modules
+
 # 复制剩余源代码
 COPY . .
 
@@ -101,6 +104,6 @@ ENV PORT=3067
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3067/api/health || exit 1
 
-# 启动命令：先安全初始化数据库，再启动服务
-# 注意：需要运行时提供有效的 DATABASE_URL（通过 .env 或 environment）
-CMD ["sh", "-lc", "npm run safe-init-db && npm run start"]
+# 启动命令：先尝试生成 Prisma 客户端（忽略权限错误），再安全初始化数据库并启动
+# 说明：某些情况下首次运行可能缺少 client，提前尝试生成；失败不影响继续
+CMD ["sh", "-lc", "(npx prisma generate || true) && npm run safe-init-db && npm run start"]
