@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { chromium } from 'playwright';
 
+// 确保在 Node.js 运行时执行（Playwright 不支持 Edge Runtime）
+export const runtime = 'nodejs';
+// 强制动态（避免被静态化）
+export const dynamic = 'force-dynamic';
+// 允许更长执行时间（部分平台生效）
+export const maxDuration = 120;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -66,7 +73,26 @@ export async function POST(req: NextRequest) {
 
     // 5) 兜底跳转主页并保存状态
     try { await page.goto('https://x.com/home', { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch {}
+
+    // 保存登录状态
     await context.storageState({ path: storagePath });
+
+    // 将 twitter.com 的通用 Cookie 克隆到 x.com，增强兼容
+    try {
+      const fs = await import('fs');
+      const raw = fs.readFileSync(storagePath, 'utf8');
+      const state = JSON.parse(raw);
+      const seen = new Set(state.cookies.map((c: any) => `${c.domain}|${c.name}`));
+      const add = (c: any, domain: string) => {
+        const k = `${domain}|${c.name}`;
+        if (!seen.has(k)) { state.cookies.push({ ...c, domain }); seen.add(k); }
+      };
+      for (const c of [...state.cookies]) {
+        if (/^(?:\.?)twitter\.com$/.test(c.domain)) { add(c, '.x.com'); add(c, 'x.com'); }
+        if (/^(?:\.?)x\.com$/.test(c.domain))       { add(c, '.twitter.com'); add(c, 'twitter.com'); }
+      }
+      fs.writeFileSync(storagePath, JSON.stringify(state, null, 2));
+    } catch {}
     await browser.close();
 
     return NextResponse.json({ success: true, message: '登录流程已执行，状态已保存' });

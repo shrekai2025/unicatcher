@@ -87,6 +87,32 @@ docker-compose up -d --build
 npm run docker:health
 ```
 
+### Docker 更新
+git fetch --all
+git reset --hard origin/main
+
+常规更新（保留缓存，快）
+docker compose -p unicatcher build --pull
+docker compose -p unicatcher up -d
+
+变更较大（Dockerfile/依赖/Playwright 环境改动），建议全量重建
+docker compose -p unicatcher build --no-cache --pull
+docker compose -p unicatcher up -d --force-recreate --remove-orphans
+验证与测试
+docker compose -p unicatcher ps
+docker compose -p unicatcher logs -f unicatcher
+
+### 清理缓存
+清理全部构建缓存（不删镜像/容器）:
+docker builder prune -a -f
+删除未使用的镜像:
+docker image prune -a -f
+删除已停止容器:
+docker container prune -f
+只清理未使用的卷:
+docker volume prune -f
+
+
 如服务器已有其它业务：
 - 如 3067 端口冲突，可在 `.env` 中改 `PORT=8080`，或在 `docker-compose.yml` 中改映射 `8080:3067`
 - 如需统一入口，建议置于现有反向代理（Nginx/Caddy/Traefik）后，仅暴露代理端口
