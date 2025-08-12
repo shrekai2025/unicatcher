@@ -20,6 +20,8 @@ services:
       - unicatcher-data:/app/data
       # 数据库持久化
       - unicatcher-db:/app/prisma
+      # 将主机上的 .env 挂载到容器内，满足 safe-init-db 对文件存在性的检查
+      - ./.env:/app/.env:ro
     restart: unless-stopped
     # 添加健康检查
     healthcheck:

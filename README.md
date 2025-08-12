@@ -90,6 +90,7 @@ npm run docker:health
 如服务器已有其它业务：
 - 如 3067 端口冲突，可在 `.env` 中改 `PORT=8080`，或在 `docker-compose.yml` 中改映射 `8080:3067`
 - 如需统一入口，建议置于现有反向代理（Nginx/Caddy/Traefik）后，仅暴露代理端口
+ - 注意：容器启动前请在项目根目录创建 `.env` 文件；compose 已将 `./.env` 只读挂载到容器的 `/app/.env`，以满足初始化脚本的存在性检查。
 
 Docker 会映射数据卷以持久化：
 - `/app/data`（日志、浏览器数据） → `unicatcher-data`
