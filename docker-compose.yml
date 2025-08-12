@@ -11,6 +11,8 @@ services:
       - .env
     environment:
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      # 如目标主机端口 3067 已被占用，可在此覆盖端口
+      # - PORT=8080
     ports:
       - "3067:3067"
     volumes:
@@ -26,6 +28,19 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+
+  # 可选：仅用于在多业务环境中反代与 TLS 终止（示例，默认注释）
+  # nginx:
+  #   image: nginx:stable-alpine
+  #   container_name: unicatcher-nginx
+  #   depends_on:
+  #     - unicatcher
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx:/etc/nginx/conf.d:ro
+  #   restart: unless-stopped
 
 volumes:
   unicatcher-data:

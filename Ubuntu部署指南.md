@@ -32,7 +32,7 @@ docker-compose logs unicatcher | grep -A5 -B5 "Playwright\|playwright"
 **************************
 
 
-# UniCatcher Ubuntu 部署运行指南
+# UniCatcher Ubuntu 部署运行指南（已与当前代码同步）
 
 本指南详细说明如何在Ubuntu环境下成功部署和运行UniCatcher项目。
 
@@ -62,8 +62,8 @@ UniCatcher项目**可以在Ubuntu环境下正常运行**，但需要根据不同
 # 更新系统包
 sudo apt update && sudo apt upgrade -y
 
-# 安装Node.js (推荐使用NodeSource)
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+# 安装 Node.js（推荐 20 LTS）
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # 验证安装
@@ -96,7 +96,7 @@ sudo apt-get install -y \
     xauth
 ```
 
-### 2. 项目部署
+### 2. 项目部署（本机运行，非 Docker）
 
 ```bash
 # 克隆项目
@@ -109,10 +109,10 @@ npm install
 # 初始化开发环境
 npm run setup-dev
 
-# 安装Playwright浏览器
+# 安装 Playwright 浏览器
 npx playwright install chromium
 
-# 安装Playwright系统依赖
+# 安装 Playwright 系统依赖
 npx playwright install-deps chromium
 ```
 
@@ -158,28 +158,12 @@ Xvfb :99 -screen 0 1280x720x24 &
 npm run login
 ```
 
-#### **方案C: 修改配置为headless模式**
-编辑登录脚本，使其在服务器环境下工作：
-
+#### **方案C: 使用已内置的服务器登录脚本（推荐）**
+仓库已提供 `scripts/server-login.js`，无需复制修改：
 ```bash
-# 创建服务器专用的登录脚本
-cp scripts/manual-login.js scripts/server-login.js
+npm run server-login
 ```
-
-然后修改 `scripts/server-login.js`:
-```javascript
-// 第20行左右，修改为：
-headless: false, // 改为 headless: true (无界面模式)
-
-// 添加服务器环境检测
-const isServer = !process.env.DISPLAY || process.env.NODE_ENV === 'production';
-const browserConfig = {
-  headless: isServer, // 服务器环境自动使用headless模式
-  timeout: 30000,
-  viewport: { width: 1280, height: 720 },
-  userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
-};
-```
+该脚本会按服务器环境以 headless 模式运行并保存登录状态至 `data/browser-state.json`。
 
 ## 🚨 常见问题和解决方案
 
@@ -236,41 +220,37 @@ echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf
 sudo ufw status
 ```
 
-## 🐳 Docker部署 (推荐)
+## 🐳 Docker 部署（推荐）
 
-为了简化Ubuntu服务器部署，建议使用Docker：
-
-```dockerfile
-# Dockerfile
-FROM node:18-slim
-
-# 安装系统依赖
-RUN apt-get update && apt-get install -y \
-    libnss3 \
-    libatk-bridge2.0-0 \
-    libdrm2 \
-    libgbm1 \
-    libxss1 \
-    libasound2 \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-
-COPY . .
-RUN npx playwright install chromium
-RUN npx playwright install-deps chromium
-
-EXPOSE 3067
-CMD ["npm", "run", "dev"]
-```
+本仓库已内置生产可用的 `Dockerfile`（基于 `node:20-slim`，包含 Playwright 依赖、非 root 用户、健康检查等）与 `docker-compose.yml`（持久化卷与健康检查）。建议直接使用：
 
 ```bash
-# 构建和运行
-docker build -t unicatcher .
-docker run -p 3067:3067 -v $(pwd)/data:/app/data unicatcher
+# 1) 准备 .env（compose 会读取）
+cat > .env << 'EOF'
+NODE_ENV=production
+PORT=3067
+AUTH_SECRET=change-me-in-production
+NEXTAUTH_URL=http://localhost:3067
+DATABASE_URL=file:./prisma/db.sqlite
+ENABLE_RESOURCE_OPTIMIZATION=true
+EOF
+
+# 2) 构建并启动
+docker-compose up -d --build
+
+# 3) 查看日志与健康状态
+docker-compose logs -f unicatcher
+curl -f http://localhost:3067/api/health || echo "unhealthy"
+
+# 或使用已封装脚本
+bash scripts/docker-deploy.sh
 ```
+
+说明：
+- 数据卷：`unicatcher-data` → `/app/data`，`unicatcher-db` → `/app/prisma`
+- Playwright 浏览器路径已在容器中自动配置，无需手工设置
+- 健康检查端点：`/api/health`
+- 常用 NPM 命令（便于 CI/脚本）：`npm run docker:build | docker:up | docker:logs | docker:health`
 
 ## 📊 性能对比
 
@@ -309,6 +289,9 @@ npm run login-state
 
 # 启动开发服务器
 npm run dev
+
+# Docker 健康检查
+npm run docker:health
 ```
 
 ## 🎯 最佳实践

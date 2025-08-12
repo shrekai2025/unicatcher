@@ -60,7 +60,10 @@ COPY . .
 # 设置构建时的临时环境变量
 ENV AUTH_SECRET=build-time-secret
 ENV NEXTAUTH_URL=http://localhost:3067
-# 注意：DATABASE_URL将在运行时通过.env文件或环境变量设置
+# 为避免 Next.js 构建期 env 校验失败（未提供 DATABASE_URL），跳过校验
+ENV SKIP_ENV_VALIDATION=1
+# 也可提供一个构建期的占位 DATABASE_URL（运行时会被 .env 覆盖）
+ENV DATABASE_URL=file:./prisma/db.sqlite
 
 # 构建Next.js应用
 RUN npm run build
@@ -107,5 +110,6 @@ ENV PORT=3067
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3067/api/health || exit 1
 
-# 启动命令
-CMD ["npm", "run", "start"] 
+# 启动命令：先安全初始化数据库，再启动服务
+# 注意：需要运行时提供有效的 DATABASE_URL（通过 .env 或 environment）
+CMD ["sh", "-lc", "npm run safe-init-db && npm run start"]

@@ -1,330 +1,230 @@
 # UniCatcher 通用浏览器爬虫系统
 
-UniCatcher是一个基于T3 Stack开发的通用浏览器爬虫系统，支持代码分析爬取和视觉AI分析爬取两种模式。
+UniCatcher 是一个基于 Next.js + tRPC + Prisma 的通用浏览器爬虫系统，主打 Twitter List 数据采集与管理，内置任务调度、数据导出与简单认证。
 
-***
-## win直接部署（非docker）
+本 README 已与代码库对齐，修正了认证方式、技术栈版本、.env、部署与 API 可用性等差异。
 
-# 克隆项目
-git clone <项目地址>
-cd unicatcher
-# 3. 清理 npm 全局缓存
-npm cache verify
-npm cache clean --force
-Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
-Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
+### 关键特性
+- Twitter List 爬取：Playwright 无头浏览器，滚动加载、去重、跳过转推与被回复推文
+- 数据存储：SQLite + Prisma，支持导出 JSON/CSV
+- 任务管理：异步调度、状态更新、限并发、重试机制
+- 管理后台：仪表板、任务、推文与提取记录页面
+- 外部 REST API：创建任务、查询任务、拉取数据、数据提取（批量/预览/足额）
+- 健康检查：`/api/health` 端点，Docker 健康探针
 
-# 一键安装（自动检测和修复所有问题）
-npm run install-windows
+访问管理后台：`http://localhost:3067`
 
-# 详细输出模式（用于调试）
-npm run install-windows-verbose
+---
 
-***手动
-// 清理系统
-npm cache clean --force
-Remove-Item package-lock.json -ErrorAction SilentlyContinue
-Remove-Item yarn.lock -ErrorAction SilentlyContinue
-// 安装
-npm install
-//  创建.env文件
-$envContent = @'
-DATABASE_URL="file:./prisma/db.sqlite"
-AUTH_SECRET="unicatcher-2024-secret-key-change-in-production"
-NEXTAUTH_URL="http://localhost:3067"
-NODE_ENV="production"
-PORT=3067
-'@
+## ⚠ 与旧文档不符处（重要）
+- 认证方式：当前使用「极简固定账号 + cookie/localStorage」方案，不使用 NextAuth.js。
+- 技术栈版本：Next.js 15 + React 19 + tRPC v11 + Tailwind CSS v4（README 旧文档标注 Next 14/NextAuth/Zustand 已过时）。
+- 状态管理：使用 TanStack Query（未使用 Zustand）。
+- .env 模板：仓库无 `.env.example`，需手动创建或使用脚本生成。
+- 数据库文件：实际为 `prisma/db.sqlite`（不是 `data/database/unicatcher.db`）。
+- 分析接口：`/api/external/analysis/*` 为占位实现（pending/complete），供后续扩展。
 
-$envContent | Out-File -FilePath ".env" -Encoding UTF8
-// 生成Prisma客户端
-npx prisma generate
-// 创建数据库
-npx prisma db push
-// 安装Playwright浏览器到正确的Windows路径
-npx playwright install chromium
-// 测试配置是否正确
-node -e "
-require('dotenv').config();
-const os = require('os');
-const path = require('path');
-
-console.log('平台:', process.platform);
-console.log('用户目录:', os.homedir());
-
-if (process.platform === 'win32') {
-  const expectedPath = path.join(os.homedir(), 'AppData', 'Local', 'ms-playwright');
-  console.log('预期Playwright路径:', expectedPath);
-} else {
-  console.log('预期Playwright路径: /home/appuser/.cache/ms-playwright');
-}
-
-console.log('DATABASE_URL:', process.env.DATABASE_URL);
-
-***
-
-使用Prisma Studio(5555端口数据库)
-
-// 启动Prisma Studio
-npm run db:studio
-
-// 或者直接运行
-npx prisma studio
-
-***
-
-更新项目
-// 拉取最新代码
-git pull origin main
-// 放弃本地的所有修改
-git fetch --all
-拉取远程仓库的最新信息，但不会修改你的本地代码。
-git reset --hard origin/main
-强制将本地分支重置为远程 main 分支的状态，丢弃所有未提交的改动和本地提交。
-
-// 或者指定分支
-git pull origin master
-
-// 更新所有依赖到最新版本
-npm update
-
-// 或者删除node_modules重新安装
-Remove-Item -Recurse node_modules
-Remove-Item package-lock.json
-npm install
-
-// 重装数据库
-taskkill /f /im node.exe /t
-Remove-Item -Recurse -Force node_modules\.prisma\client
-npx prisma generate
-
-
+---
 
 ## 🚀 快速开始
 
 ### 环境要求
-- Node.js >= 18
-- npm 或 pnpm
+- Node.js >= 18（Docker 镜像使用 Node 20-slim）
 
-### 预检查依赖
-在安装前，可以运行依赖检查脚本：
+### 依赖检查（可选）
 ```bash
-# 检查所有依赖
 npm run check-deps
 ```
 
-### 一键安装
-
-#### Linux/macOS
+### 本地开发（macOS/Linux）
 ```bash
-# 克隆项目
 git clone <repository-url>
 cd unicatcher
 
-# 给安装脚本执行权限
-chmod +x scripts/install.sh
+npm install
+npm run setup-dev       # 生成 .env（DATABASE_URL 指向 prisma/db.sqlite），推送 schema，生成 Prisma Client
+npm run safe-init-db    # 二次校验/生成，必要时写入示例数据
+npx playwright install chromium
 
-# 一键安装
-./scripts/install.sh
-
-# 启动开发服务器
-npm run dev
+npm run dev             # 启动开发服务（默认端口 3067）
 ```
 
-#### Windows
+### 本地开发（Windows）
+优先使用 NPM 脚本（已封装 PowerShell 安装脚本）：
 ```powershell
-# 克隆项目
 git clone <repository-url>
 cd unicatcher
 
-# 方法1：使用PowerShell安装脚本（推荐）
-powershell -ExecutionPolicy Bypass -File scripts/install-windows.ps1
-
-# 方法2：手动安装
 npm install
 npm run setup-dev
 npm run safe-init-db
 npx playwright install chromium
+
 npm run dev
+
+# 或者使用增强安装脚本
+npm run install-windows           # 简化安装
+npm run install-windows-verbose   # 详细日志
 ```
 
-#### Docker部署
+### Docker 部署
 ```bash
-# 克隆项目
 git clone <repository-url>
 cd unicatcher
 
-# 复制环境配置
-cp .env.example .env
+# 创建 .env（示例见下）
+cat > .env << 'EOF'
+NODE_ENV=production
+PORT=3067
+AUTH_SECRET=change-me-in-production
+NEXTAUTH_URL=http://localhost:3067
+DATABASE_URL=file:./prisma/db.sqlite
+ENABLE_RESOURCE_OPTIMIZATION=true
+EOF
 
-# 启动Docker服务
-docker-compose up -d
+docker-compose up -d --build
+# 查看健康状态
+npm run docker:health
 ```
 
-访问 http://localhost:3067
+如服务器已有其它业务：
+- 如 3067 端口冲突，可在 `.env` 中改 `PORT=8080`，或在 `docker-compose.yml` 中改映射 `8080:3067`
+- 如需统一入口，建议置于现有反向代理（Nginx/Caddy/Traefik）后，仅暴露代理端口
 
-### 默认登录信息
+Docker 会映射数据卷以持久化：
+- `/app/data`（日志、浏览器数据） → `unicatcher-data`
+- `/app/prisma`（SQLite 文件） → `unicatcher-db`
+
+### 默认登录
 - 用户名：`admin`
 - 密码：`a2885828`
 
-## 🛠 技术栈
+---
 
-### 核心框架
-- **框架**: T3 Stack (Next.js 14 + TypeScript + App Router)
-- **API层**: tRPC (类型安全的API)
-- **数据库**: SQLite + Prisma ORM
-- **认证**: NextAuth.js
-- **样式**: Tailwind CSS
-- **状态管理**: Zustand
-
-### 爬虫引擎
-- **代码分析爬虫**: Playwright + TypeScript (第一阶段)
-- **视觉分析爬虫**: Playwright + Midscene.js (第二阶段，当前预留接口)
-- **任务调度**: 内置异步任务队列
-- **浏览器**: 仅支持Chromium，headless模式可配置
-
-## 📁 项目结构
-
-```
-unicatcher/
-├── src/
-│   ├── app/                    # Next.js App Router
-│   ├── components/             # React组件
-│   ├── lib/
-│   │   └── config.ts          # 全局配置文件
-│   ├── server/                # tRPC服务端
-│   │   ├── api/               # API路由
-│   │   └── core/              # 核心业务逻辑
-│   │       ├── spider/        # 爬虫引擎
-│   │       ├── browser/       # 浏览器管理
-│   │       └── tasks/         # 任务调度
-│   └── types/                 # TypeScript类型定义
-├── prisma/                    # 数据库配置
-├── data/                      # 数据存储
-│   ├── database/              # SQLite数据库
-│   ├── logs/                  # 日志文件
-│   └── browser-data/          # 浏览器用户数据
-├── scripts/
-│   └── setup-dev.js          # 开发环境设置脚本
-└── .vscode/                   # VS Code配置
-```
-
-## ⚙ 配置选项
-
-### 全局配置 (`src/lib/config.ts`)
-```typescript
-export const config = {
-  app: {
-    port: 3067,                      // 开发服务器端口
-  },
-  playwright: {
-    browser: 'chromium',             // 浏览器类型
-    headless: true,                  // 无头模式 (可切换为false调试)
-    userDataDir: './data/browser-data',
-  },
-  auth: {
-    username: 'admin',               // 管理后台用户名
-    password: 'a2885828',            // 管理后台密码
-  },
-  spider: {
-    maxConcurrentTasks: 3,           // 最大并发任务
-    taskTimeout: 300000,             // 任务超时(5分钟)
-  },
-};
-```
-
-## 📝 开发命令
-
-```bash
-# 开发环境
-npm run dev          # 启动开发服务器 (端口3067)
-npm run setup-dev    # 一键环境设置
-
-# 数据库
-npm run db:push      # 推送数据库更改
-npm run db:studio    # 打开数据库管理界面
-npm run db:generate  # 生成Prisma客户端
-
-# 构建部署
-npm run build        # 构建生产版本
-npm run start        # 启动生产服务器
-npm run preview      # 预览构建结果
-
-# 代码质量
-npm run typecheck    # TypeScript类型检查
-
-# Playwright
-npx playwright install chromium  # 安装浏览器依赖
-```
-
-## 🎯 功能特性
-
-### 第一阶段 (当前开发)
-- ✅ T3 Stack基础架构
-- ✅ 端口3067配置 (优化：使用cross-env设置环境变量)
-- ✅ 全局配置文件 (优化：从环境变量读取配置)
-- ✅ 开发环境自动化
-- ✅ 配置优化 (统一配置来源，清理T3默认代码)
-- 🔄 固定账号认证系统 (Phase 1.3)
-- 🔄 Playwright代码分析爬虫
-- 🔄 简约管理后台界面
-
-### 第二阶段 (预留接口)
-- 📋 视觉分析爬虫 (Playwright + Midscene)
-- 📋 高级数据管理
-- 📋 外部API接口
-
-## 📊 管理界面
-
-访问 http://localhost:3067 查看管理后台，包含：
-
-1. **模板管理**: 查看采集规则模板（仅展示，不可编辑）
-2. **任务管理**: 提交和监控爬取任务
-3. **数据查看**: 查看和导出爬取数据
-4. **系统配置**: 基础配置选项
-
-## 🔧 开发指南
-
-### VS Code推荐扩展
-- ESLint
-- Prettier - Code formatter  
-- Prisma
-- Tailwind CSS IntelliSense
-- Playwright Test for VSCode
-
-### 调试配置
-项目已配置VS Code调试，按F5启动调试模式。
-
-### 数据库管理
-```bash
-# 查看数据库
-npm run db:studio
-
-# 重置数据库
-rm data/database/unicatcher.db
-npm run db:push
-```
-
-## 📋 开发计划
-
-当前处于 **Phase 1.2: 基础架构配置** 阶段
-
-- [x] Phase 1.1: T3项目初始化
-- [ ] Phase 1.2: 基础架构配置
-- [ ] Phase 2: Playwright爬虫引擎
-- [ ] Phase 3: Web管理界面
-- [ ] Phase 4: 高级功能完善
-- [ ] Phase 5: 视觉分析爬虫预留
-
-## 🤝 贡献
-
-本项目基于AI vibe coding开发模式，采用增量式迭代开发。
+## 🛠 技术栈（现状）
+- 应用：Next.js 15（App Router）+ TypeScript
+- API：tRPC v11（服务端在 `src/server/api`）
+- ORM/DB：Prisma + SQLite（`prisma/db.sqlite`）
+- 样式：Tailwind CSS v4
+- 数据获取：TanStack Query（React Query v5）
+- 认证：极简本地认证（`src/lib/simple-auth.ts` + `src/middleware.ts`），通过 cookie `unicatcher-auth`
+- 爬虫：Playwright（Chromium，无头可配）
 
 ---
 
-**项目代号**: UniCatcher  
-**技术栈**: T3 Stack (Next.js + TypeScript + tRPC + Prisma)  
-**开发模式**: AI Vibe Coding  
-**当前版本**: v1.0.0-alpha
+## 📁 目录与数据
+- 代码关键位置：
+  - tRPC 路由：`src/server/api/routers/{tasks,tweets,system,extracts}.ts`
+  - REST 外部 API：`src/app/api/external/*`
+  - 健康检查：`src/app/api/health/route.ts`
+  - 爬虫核心：
+    - 浏览器：`src/server/core/browser/manager.ts`
+    - 选择器：`src/server/core/spider/selectors/twitter.ts`
+    - 任务执行：`src/server/core/tasks/executor.ts`
+    - 数据存储：`src/server/core/data/storage.ts`
+  - Web 页面：`/dashboard`、`/tasks`、`/tweets`、`/extracts`、`/api-docs`
+- 数据持久化：
+  - 数据库文件：`prisma/db.sqlite`
+  - 浏览器会话：`data/browser-state.json`（自动读写）
+  - 日志目录：`data/logs`
+
+---
+
+## ⚙ 配置与环境变量
+必需/常用环境变量：
+```bash
+AUTH_SECRET=change-me-in-production
+DATABASE_URL=file:./prisma/db.sqlite
+NODE_ENV=development
+PORT=3067
+NEXTAUTH_URL=http://localhost:3067   # 仅用于生成 baseUrl（并未启用 NextAuth）
+ENABLE_RESOURCE_OPTIMIZATION=true     # 资源拦截优化（节流图片/媒体请求）
+```
+
+Playwright 浏览器路径会自动在服务端启动时设置：
+- Windows：`%USERPROFILE%/AppData/Local/ms-playwright`
+- Linux/macOS（容器用户）：`/home/appuser/.cache/ms-playwright`
+
+---
+
+## 🧭 管理与 API
+
+### 管理后台
+`/dashboard`、`/tasks`、`/tweets`、`/extracts` 四大模块已可用。
+
+### tRPC（内部 API）
+命名空间：`tasks.*`、`tweets.*`、`system.*`、`extracts.*`。页面均已对接（详见 `src/app/*`）。
+
+### REST（外部 API）
+- 任务管理：`/api/external/tasks`（POST 创建、GET 列表、GET /[id] 详情）
+- 数据获取：`/api/external/data/[taskId]`（JSON/CSV）
+- 批量提取：`/api/external/data/extract`（支持 dryRun 与足额返回）
+- 分析占位：`/api/external/analysis/pending`、`/api/external/analysis/complete`（占位，需二次实现）
+
+API Key 认证（演示用）：在请求头使用 `X-API-Key: unicatcher-api-key-demo` 或 `Authorization: Bearer unicatcher-api-key-demo`。
+
+完整示例与 cURL 请访问页面文档：`/api-docs`
+
+---
+
+## 🧑‍💻 常用命令
+```bash
+# 开发
+npm run dev
+
+# 构建/启动
+npm run build && npm run start
+
+# 数据库
+npm run db:push
+npm run db:generate
+npm run db:studio           # 端口 5555
+
+# Docker
+npm run docker:build
+npm run docker:up
+npm run docker:logs
+
+# 健康检查
+npm run docker:health
+```
+
+---
+
+## 🔒 认证说明（当前实现）
+- 登录页：`/login`，固定账号密码（见上）。
+- 会话存储：浏览器 `localStorage` + cookie `unicatcher-auth`。
+- 中间件：`src/middleware.ts` 拦截受保护路由并重定向到 `/login`。
+- tRPC 保护：`protectedProcedure` 通过 cookie 解析会话。
+
+如需替换为 NextAuth/OAuth，请在未来迭代替换 `simple-auth.ts` 与相关中间件。
+
+---
+
+## 🧪 爬虫说明（Twitter List）
+- 入口：`TaskExecutor.executeTwitterListTask` → `TwitterSelector` → `StorageService`
+- 去重策略：数据库重复、任务内重复（跨滚动）分离统计
+- 结束条件：目标数量、连续数据库重复、无更多内容、错误、超时等
+- 可调参数：`src/lib/config.ts` 中 `spider.twitterList.*` 与资源优化配置
+
+---
+
+## ✅ 维护与升级建议
+- 将 API Key 移至环境变量并替换默认演示值
+- 若部署在服务器，建议启用 Docker 并使用健康检查与日志采集
+- 定期运行 `db:studio` 检查数据，或通过 `extracts` 页面导出/审计
+
+---
+
+## 版本与计划（简）
+- 当前：基础采集、后台与外部接口已就绪；分析相关接口为占位
+- 后续：
+  - 接入真实分析管道，完善 `/api/external/analysis/*`
+  - 替换极简认证为 NextAuth/OAuth（如需）
+  - 丰富 UI 与数据可视化
+
+---
+
+© UniCatcher | 技术栈：Next.js + tRPC + Prisma + Playwright
 
 
