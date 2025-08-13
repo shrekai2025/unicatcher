@@ -28,6 +28,7 @@ export interface TweetData {
   retweetCount: number;          // 转发数  
   likeCount: number;             // 点赞数
   viewCount: number;             // 浏览数
+  isRT: boolean;                 // 是否为被转推的推文
   imageUrls?: string[];          // 配图URL数组
   tweetUrl: string;              // 推文链接
   publishedAt: number;           // 发推时间戳 (JavaScript number，存储时转为bigint)

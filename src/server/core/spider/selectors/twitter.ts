@@ -114,11 +114,44 @@ export class TwitterSelector {
   }
 
   /**
-   * 获取当前页面的所有推文元素
+   * 获取当前页面Timeline: List容器内的推文元素
+   * 🔧 修复：限制搜索范围，避免抓取侧边栏、弹窗等区域的推文
    */
   async getTweetElements(): Promise<any[]> {
     try {
-      return await this.page.$$(this.selectors.tweetContainer);
+      // 首先尝试定位List时间线容器
+      const timelineContainer = await this.page.$(this.selectors.timelineContainer);
+      
+      if (timelineContainer) {
+        // 在时间线容器内搜索推文元素
+        console.log('✅ 在List时间线容器内搜索推文...');
+        const tweets = await timelineContainer.$$(this.selectors.tweetContainer);
+        console.log(`📊 在List容器内找到 ${tweets.length} 个推文元素`);
+        return tweets;
+      } else {
+        // 回退方案：如果找不到特定容器，尝试其他容器选择器
+        const fallbackSelectors = [
+          '[data-testid="primaryColumn"]',
+          'main[role="main"]',
+          '[aria-label*="Timeline"]'
+        ];
+        
+        for (const selector of fallbackSelectors) {
+          console.log(`⚠️ List容器未找到，尝试回退选择器: ${selector}`);
+          const container = await this.page.$(selector);
+          if (container) {
+            const tweets = await container.$$(this.selectors.tweetContainer);
+            console.log(`📊 在回退容器内找到 ${tweets.length} 个推文元素`);
+            return tweets;
+          }
+        }
+        
+        // 最后的回退：全局搜索（保持原有行为但记录警告）
+        console.warn('⚠️ 警告：未找到合适的时间线容器，使用全局搜索（可能包含非List推文）');
+        const tweets = await this.page.$$(this.selectors.tweetContainer);
+        console.log(`📊 全局搜索找到 ${tweets.length} 个推文元素`);
+        return tweets;
+      }
     } catch (error) {
       console.error('获取推文元素失败:', error);
       return [];
@@ -160,64 +193,82 @@ export class TwitterSelector {
   }
 
   /**
-   * 检查推文是否为被回复的推文（不是最新的）
-   * 判断依据：Tweet-User-Avatar元素下面有同级别的空div
+   * 检查推文是否为回复推文（使用多种稳定特征）
+   * 🔧 修复：不再依赖动态CSS类名，使用更稳定的特征
    */
   async isReplyTweet(tweetElement: any): Promise<boolean> {
     try {
-      // 查找Tweet-User-Avatar元素
-      const avatarElement = await tweetElement.$('[data-testid="Tweet-User-Avatar"]');
-      if (!avatarElement) {
-        return false; // 没有头像元素，可能是其他类型的内容
+      // 特征1: 检查是否有"Replying to"文本
+      const replyingToElement = await tweetElement.$('[aria-label*="Replying to"], [data-testid="reply-context"]');
+      if (replyingToElement) {
+        const replyText = await replyingToElement.textContent();
+        if (replyText && (replyText.includes('Replying to') || replyText.includes('回复'))) {
+          console.log('🔍 通过"Replying to"文本识别为回复推文');
+          return true;
+        }
       }
 
-      // 获取头像元素的父级容器
-      const avatarParent = await avatarElement.evaluateHandle((el: Element) => el.parentElement);
-      if (!avatarParent) {
+      // 特征2: 检查推文内容是否以@用户名开头（强回复特征）
+      const tweetTextElement = await tweetElement.$(this.selectors.tweetText);
+      if (tweetTextElement) {
+        const content = await tweetTextElement.textContent();
+        if (content && content.trim().startsWith('@')) {
+          console.log('🔍 通过@用户名开头识别为回复推文');
+          return true;
+        }
+      }
+
+      // 特征3: 检查推文结构中是否有回复指示符
+      const replyIndicators = await tweetElement.$$('[aria-label*="reply"], [data-testid*="reply"], .r-reply, .reply-indicator');
+      for (const indicator of replyIndicators) {
+        try {
+          const ariaLabel = await indicator.getAttribute('aria-label');
+          const testId = await indicator.getAttribute('data-testid');
+          
+          if (ariaLabel && (ariaLabel.includes('reply') || ariaLabel.includes('回复'))) {
+            console.log('🔍 通过aria-label识别为回复推文');
+            return true;
+          }
+          
+          if (testId && testId.includes('reply')) {
+            console.log('🔍 通过data-testid识别为回复推文');
+            return true;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      // 特征4: 检查推文在时间线中的位置和上下文（回复通常有特定的缩进或连接线）
+      const hasReplyThread = await tweetElement.evaluate((el: Element) => {
+        // 查找回复线程的视觉指示符
+        const parent = el.parentElement;
+        if (parent) {
+          // 检查是否有连接线或缩进结构
+          const hasThreadLine = parent.querySelector('[class*="thread"], [class*="reply"], [class*="connect"]');
+          if (hasThreadLine) {
+            return true;
+          }
+          
+          // 检查是否在回复容器中
+          const isInReplyContainer = parent.closest('[aria-label*="reply"], [data-testid*="reply"]');
+          if (isInReplyContainer) {
+            return true;
+          }
+        }
         return false;
-      }
-
-      // 检查父级容器的下一个同级元素
-      const nextSibling = await avatarParent.evaluateHandle((el: Element) => el.nextElementSibling);
-      if (!nextSibling) {
-        return false;
-      }
-
-      // 检查下一个同级元素是否为空div且包含特定的class模式
-      const isReplyIndicator = await nextSibling.evaluate((el: Element) => {
-        if (!el || el.tagName !== 'DIV') {
-          return false;
-        }
-
-        // 检查是否为空元素（没有文本内容）
-        const hasText = el.textContent && el.textContent.trim().length > 0;
-        if (hasText) {
-          return false;
-        }
-
-        // 检查是否有子元素（如果有子元素，说明不是我们要找的空div）
-        const hasChildren = el.children && el.children.length > 0;
-        if (hasChildren) {
-          return false;
-        }
-
-        // 检查class是否包含特定模式（用于识别回复指示符）
-        const className = el.className || '';
-        const hasReplyClasses = className.includes('css-175oi2r') && 
-                               className.includes('r-1bnu78o') && 
-                               className.includes('r-f8sm7e');
-        
-        return hasReplyClasses;
       });
 
-      if (isReplyIndicator) {
-        console.log('🔍 检测到被回复的推文，将跳过采集');
+      if (hasReplyThread) {
+        console.log('🔍 通过回复线程结构识别为回复推文');
         return true;
       }
 
+      // 如果所有特征都不匹配，则不是回复
       return false;
+      
     } catch (error) {
-      console.error('检查被回复推文失败:', error);
+      console.error('检查回复推文失败:', error);
       return false; // 出错时默认不跳过
     }
   }
@@ -596,10 +647,8 @@ export class TwitterSelector {
    */
   async extractTweetData(tweetElement: any, listId: string): Promise<TweetData | null> {
     try {
-      // 检查是否为Retweet，如果是则跳过
-      if (await this.isRetweet(tweetElement)) {
-        return null;
-      }
+      // 检查是否为Retweet，用于标记 isRT（不再跳过）
+      const isRetweet = await this.isRetweet(tweetElement);
 
       // 提取推文ID
       const tweetId = await this.extractTweetId(tweetElement);
@@ -627,6 +676,7 @@ export class TwitterSelector {
         retweetCount,
         likeCount,
         viewCount,
+        isRT: isRetweet,
         imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
         tweetUrl,
         publishedAt,
@@ -666,10 +716,9 @@ export class TwitterSelector {
 
       for (const tweetElement of tweetElements) {
         try {
-          // 检查是否为Retweet
+          // 不再跳过Retweet，只统计数量以便日志观察
           if (await this.isRetweet(tweetElement)) {
             retweetSkipCount++;
-            continue;
           }
 
           // 检查是否为被回复的推文
@@ -712,7 +761,16 @@ export class TwitterSelector {
 
       const shouldContinue = duplicateCount < config.spider.twitterList.duplicateStopCount;
 
-      console.log(`页面处理完成: 新推文 ${newTweets.length}, 数据库重复 ${duplicateCount}, 任务内重复 ${taskInternalDuplicates}, 跳过转推 ${retweetSkipCount}, 跳过被回复 ${replySkipCount}`);
+      // 统计转推被采集的数量
+      const collectedRetweets = newTweets.filter(tweet => tweet.isRT).length;
+      
+      console.log(`📊 页面处理完成统计:`);
+      console.log(`  ├─ 新推文: ${newTweets.length} (含转推: ${collectedRetweets})`);
+      console.log(`  ├─ 数据库重复: ${duplicateCount}`);
+      console.log(`  ├─ 任务内重复: ${taskInternalDuplicates}`);
+      console.log(`  ├─ 检测到转推: ${retweetSkipCount} (已全部采集)`);
+      console.log(`  ├─ 跳过回复: ${replySkipCount}`);
+      console.log(`  └─ 总处理数: ${newTweets.length + duplicateCount + taskInternalDuplicates + replySkipCount}`);
 
       return {
         newTweets,

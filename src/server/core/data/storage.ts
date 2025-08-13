@@ -173,6 +173,7 @@ export class StorageService {
           retweetCount: tweetData.retweetCount,
           likeCount: tweetData.likeCount,
           viewCount: tweetData.viewCount,
+          isRT: tweetData.isRT,
           imageUrls: tweetData.imageUrls ? JSON.stringify(tweetData.imageUrls) : null,
           tweetUrl: tweetData.tweetUrl,
           publishedAt: BigInt(tweetData.publishedAt),
@@ -446,7 +447,7 @@ export class StorageService {
         const headers = [
           'id', 'content', 'userNickname', 'userUsername',
           'replyCount', 'retweetCount', 'likeCount', 'viewCount',
-          'imageUrls', 'tweetUrl', 'publishedAt', 'listId', 'scrapedAt'
+          'isRT', 'imageUrls', 'tweetUrl', 'publishedAt', 'listId', 'scrapedAt'
         ];
 
         const csvRows = [
@@ -460,6 +461,7 @@ export class StorageService {
             tweet.retweetCount,
             tweet.likeCount,
             tweet.viewCount,
+            tweet.isRT ? 'true' : 'false',
             `"${tweet.imageUrls.join(';')}"`,
             tweet.tweetUrl,
             new Date(tweet.publishedAt).toISOString(),

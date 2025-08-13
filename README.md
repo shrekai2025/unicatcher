@@ -87,6 +87,66 @@ docker-compose up -d --build
 npm run docker:health
 ```
 
+### PM2 部署（Ubuntu 服务器推荐）
+```bash
+git clone <repository-url>
+cd unicatcher
+
+# 安装依赖和 Playwright
+npm install
+npm run setup-dev
+npx playwright install chromium
+npx playwright install-deps chromium
+
+# env文件放进来
+···
+
+# 安装 PM2（如果还没有）
+npm install -g pm2
+
+# 创建 PM2 配置文件
+cat > ecosystem.config.cjs << 'EOF'
+module.exports = {
+  apps: [{
+    name: 'unicatcher',
+    script: 'npm',
+    args: 'start',
+    cwd: '/home/ubuntu/unicatcher',
+    exec_mode: 'fork',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '1G',
+    env: { NODE_ENV: 'production', PORT: 3067, DISPLAY: ':100' },
+    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+    error_file: './logs/unicatcher-error.log',
+    out_file: './logs/unicatcher-out.log',
+    log_file: './logs/unicatcher-combined.log'
+  }]
+}
+EOF
+
+# 创建日志目录
+mkdir -p logs
+
+# 启动虚拟显示（避免与其他项目冲突，使用 :100）
+export DISPLAY=:100
+nohup Xvfb :100 -screen 0 1280x720x24 > logs/xvfb.log 2>&1 &
+
+# 构建与初始化（首次/更新后建议执行）
+npm ci || npm install
+npm run build
+npm run safe-init-db
+
+# 启动服务
+pm2 delete unicatcher || true
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 status
+pm2 logs unicatcher --lines 100
+pm2 startup  # 设置开机自启
+```
+
 ### Docker 更新
 git fetch --all
 git reset --hard origin/main
@@ -195,25 +255,119 @@ API Key 认证（演示用）：在请求头使用 `X-API-Key: unicatcher-api-ke
 ---
 
 ## 🧑‍💻 常用命令
+
+### 本地开发
 ```bash
 # 开发
 npm run dev
 
 # 构建/启动
 npm run build && npm run start
+```
 
-# 数据库
+### 数据库管理
+```bash
+# 推送 Schema 变更到数据库
 npm run db:push
+
+# 生成 Prisma 客户端
 npm run db:generate
+
+# 重建数据库（清空所有数据）
+npm run db:reset
+
+# 打开数据库管理界面
 npm run db:studio           # 端口 5555
 
-# Docker
+# 安全初始化数据库（推荐）
+npm run safe-init-db
+
+# 手动重建数据库和初始化
+rm -f prisma/db.sqlite
+npm run db:push
+npm run safe-init-db
+```
+
+### PM2 服务管理
+```bash
+# 启动服务
+pm2 start ecosystem.config.js
+
+# 查看服务状态
+pm2 status
+pm2 list
+
+# 重启服务
+pm2 restart unicatcher
+
+# 停止服务
+pm2 stop unicatcher
+
+# 删除服务
+pm2 delete unicatcher
+
+# 查看日志
+pm2 logs unicatcher                    # 实时日志
+pm2 logs unicatcher --lines 100       # 显示最近 100 行
+pm2 logs unicatcher --err             # 只看错误日志
+pm2 logs unicatcher --out             # 只看输出日志
+
+# 清空日志
+pm2 flush unicatcher
+
+# 监控面板
+pm2 monit
+
+# 重新加载配置
+pm2 reload ecosystem.config.js
+
+# 保存当前 PM2 配置
+pm2 save
+
+# 设置开机自启
+pm2 startup
+pm2 unstartup                          # 取消开机自启
+
+# 更新应用
+git pull
+npm install                            # 如有依赖更新
+pm2 restart unicatcher
+
+# 查看详细信息
+pm2 describe unicatcher
+```
+
+### Docker 管理
+```bash
+# 构建和启动
 npm run docker:build
 npm run docker:up
+
+# 查看日志
 npm run docker:logs
 
 # 健康检查
 npm run docker:health
+
+# 完整重建（清除缓存）
+docker compose -p unicatcher down --volumes
+docker compose -p unicatcher build --no-cache --pull
+docker compose -p unicatcher up -d
+```
+
+### X.com 登录管理
+```bash
+# 服务器登录（推荐，内置脚本）
+npm run server-login
+
+# 手动登录（需要图形界面或远程调试）
+npm run login
+
+# 检查登录状态
+ls -la data/browser-state.json
+
+# 清除登录状态（重新登录）
+rm -f data/browser-state.json
 ```
 
 ---
