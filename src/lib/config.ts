@@ -143,7 +143,7 @@ export const config = {
   // 爬虫任务配置
   spider: {
     maxConcurrentTasks: 3, // 最大并发任务数，可配置
-    taskTimeout: 300000, // 5分钟（300秒）
+    taskTimeout: 600000, // 10分钟（600秒）- 防止僵尸任务
     retryAttempts: 5, // 重试5次
     retryDelay: 5000, // 延迟重试时间，可配置
     enableRetry: true, // 重试机制开关，可配置

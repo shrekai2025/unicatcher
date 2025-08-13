@@ -243,6 +243,27 @@ export const tasksRouter = createTRPCRouter({
     }),
 
   /**
+   * 强制清理僵尸任务
+   */
+  cleanupZombies: protectedProcedure
+    .mutation(async () => {
+      try {
+        // 获取任务管理器实例
+        const result = await taskManager.forceCleanupZombieTasks();
+
+        return {
+          success: true,
+          message: `成功清理 ${result.total} 个僵尸任务`,
+          data: result,
+        };
+      } catch (error) {
+        throw new Error(
+          error instanceof Error ? error.message : "清理僵尸任务失败"
+        );
+      }
+    }),
+
+  /**
    * 删除任务及其数据
    */
   delete: protectedProcedure

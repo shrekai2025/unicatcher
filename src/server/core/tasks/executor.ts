@@ -14,6 +14,8 @@ export class TaskExecutor {
   private twitterSelector: TwitterSelector | null = null;
   private storageService: StorageService;
   private isRunning = false;
+  private timeoutId: NodeJS.Timeout | null = null;
+  private isTimedOut = false;
 
   constructor() {
     this.storageService = new StorageService();
@@ -37,6 +39,14 @@ export class TaskExecutor {
       await this.storageService.updateTaskStatus(actualTaskId, 'running');
 
       this.isRunning = true;
+      this.isTimedOut = false;
+
+      // 🔧 设置任务超时机制（10分钟）
+      this.timeoutId = setTimeout(() => {
+        console.warn(`⏰ 任务超时警告: ${actualTaskId} 已运行超过 ${config.spider.taskTimeout / 1000} 秒`);
+        this.isTimedOut = true;
+        this.forceCleanupTimeout(actualTaskId);
+      }, config.spider.taskTimeout);
 
       // 初始化浏览器和选择器
       await this.initializeBrowser();
@@ -60,8 +70,18 @@ export class TaskExecutor {
       const existingTweetIds = await this.storageService.getExistingTweetIds(taskConfig.listId);
       console.log(`已存在 ${existingTweetIds.size} 条推文记录`);
 
+      // 检查是否已超时
+      if (this.isTimedOut) {
+        throw new Error('任务执行超时，已被强制终止');
+      }
+
       // 执行爬取逻辑
       const result = await this.executeCrawling(taskConfig, actualTaskId, existingTweetIds);
+
+      // 检查是否在执行过程中超时
+      if (this.isTimedOut) {
+        throw new Error('任务在执行过程中超时，已被强制终止');
+      }
 
       // 完成任务
       const executionTime = Date.now() - startTime;
@@ -87,12 +107,16 @@ export class TaskExecutor {
       console.error('任务执行失败:', error);
       
       const executionTime = Date.now() - startTime;
+      const isTimeoutError = this.isTimedOut || (error instanceof Error && error.message.includes('超时'));
+      
       const taskResult: TaskResult = {
         success: false,
-        message: `爬取失败: ${error instanceof Error ? error.message : '未知错误'}`,
-        endReason: 'ERROR_OCCURRED',
+        message: isTimeoutError ? 
+          `任务执行超时: 超过 ${config.spider.taskTimeout / 1000} 秒限制，已强制终止` :
+          `爬取失败: ${error instanceof Error ? error.message : '未知错误'}`,
+        endReason: isTimeoutError ? 'TIMEOUT' : 'ERROR_OCCURRED',
         error: {
-          code: 'EXECUTION_ERROR',
+          code: isTimeoutError ? 'TASK_TIMEOUT' : 'EXECUTION_ERROR',
           message: error instanceof Error ? error.message : '未知错误',
           stack: error instanceof Error ? error.stack : undefined,
         },
@@ -111,7 +135,14 @@ export class TaskExecutor {
 
       return taskResult;
     } finally {
+      // 清理超时定时器
+      if (this.timeoutId) {
+        clearTimeout(this.timeoutId);
+        this.timeoutId = null;
+      }
+      
       this.isRunning = false;
+      this.isTimedOut = false;
       await this.cleanup();
     }
   }
@@ -189,6 +220,13 @@ export class TaskExecutor {
 
     while (totalNewTweets < maxTweets && scrollAttempts < maxScrollAttempts) {
       try {
+        // 🔧 检查任务是否超时
+        if (this.isTimedOut) {
+          console.warn('⏰ 任务已超时，终止爬取循环');
+          endReason = 'TIMEOUT';
+          break;
+        }
+
         // 添加随机延迟
         await this.addRandomDelay();
 
@@ -355,9 +393,59 @@ export class TaskExecutor {
   }
 
   /**
+   * 强制清理超时任务
+   */
+  private async forceCleanupTimeout(taskId: string): Promise<void> {
+    try {
+      console.error(`🚨 强制终止超时任务: ${taskId}`);
+      
+      this.isRunning = false;
+      this.isTimedOut = true;
+      
+      // 强制关闭浏览器
+      if (this.browserManager) {
+        try {
+          await this.browserManager.close();
+        } catch (error) {
+          console.error('强制关闭浏览器失败:', error);
+        }
+      }
+      
+      // 更新任务状态为失败
+      await this.storageService.updateTaskStatus(taskId, 'failed', {
+        success: false,
+        message: `任务执行超时: 超过 ${config.spider.taskTimeout / 1000} 秒限制，已强制终止`,
+        endReason: 'TIMEOUT',
+        error: {
+          code: 'TASK_TIMEOUT',
+          message: '任务执行时间超过限制，系统自动终止',
+        },
+        data: {
+          tweetCount: 0,
+          duplicateCount: 0,
+          skippedRetweetCount: 0,
+          skippedReplyCount: 0,
+          executionTime: config.spider.taskTimeout,
+        },
+      });
+      
+      await this.cleanup();
+      console.log(`✅ 超时任务已强制清理: ${taskId}`);
+    } catch (error) {
+      console.error('强制清理超时任务失败:', error);
+    }
+  }
+
+  /**
    * 取消任务
    */
   async cancelTask(): Promise<void> {
+    // 清理超时定时器
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = null;
+    }
+    
     this.isRunning = false;
     await this.cleanup();
     console.log('任务已取消');
@@ -504,6 +592,58 @@ export class TaskExecutorManager {
       runningTasks: this.runningTasks.size,
       maxConcurrentTasks: config.spider.maxConcurrentTasks,
       runningTaskIds: Array.from(this.runningTasks),
+    };
+  }
+
+  /**
+   * 强制清理所有僵尸任务 - 用于命令行调用
+   */
+  async forceCleanupZombieTasks(): Promise<{
+    cleaned: string[];
+    total: number;
+  }> {
+    console.log('🧹 开始清理僵尸任务...');
+    
+    const cleanedTasks: string[] = [];
+    const taskIds = Array.from(this.runningTasks);
+    
+    for (const taskId of taskIds) {
+      try {
+        console.log(`清理任务: ${taskId}`);
+        const executor = this.executors.get(taskId);
+        
+        if (executor) {
+          await executor.cancelTask();
+        }
+        
+        // 强制从管理器中移除
+        this.runningTasks.delete(taskId);
+        this.executors.delete(taskId);
+        
+        // 更新数据库任务状态为失败
+        const storageService = new StorageService();
+        await storageService.updateTaskStatus(taskId, 'failed', {
+          success: false,
+          message: '任务被管理员强制清理（可能为僵尸任务）',
+          endReason: 'USER_CANCELLED',
+          error: {
+            code: 'ADMIN_CLEANUP',
+            message: '任务被管理员强制清理',
+          },
+        });
+        
+        cleanedTasks.push(taskId);
+        console.log(`✅ 已清理任务: ${taskId}`);
+      } catch (error) {
+        console.error(`清理任务 ${taskId} 失败:`, error);
+      }
+    }
+    
+    console.log(`🎉 僵尸任务清理完成，共清理 ${cleanedTasks.length} 个任务`);
+    
+    return {
+      cleaned: cleanedTasks,
+      total: cleanedTasks.length,
     };
   }
 } 

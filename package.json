@@ -31,6 +31,7 @@
     "install-windows": "powershell -ExecutionPolicy Bypass -File scripts/install-windows-enhanced.ps1",
     "install-windows-verbose": "powershell -ExecutionPolicy Bypass -File scripts/install-windows-enhanced.ps1 -Verbose",
     "test-optimization": "node scripts/test-resource-optimization.mjs",
+    "cleanup-zombie": "node scripts/cleanup-zombie-tasks.mjs",
     "docker:build": "docker-compose build",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
