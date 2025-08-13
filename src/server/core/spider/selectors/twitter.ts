@@ -718,6 +718,8 @@ export class TwitterSelector {
     try {
       // 检查是否为Retweet，用于标记 isRT（不再跳过）
       const isRetweet = await this.isRetweet(tweetElement);
+      // 检查是否为回复推文（仅用于标记，不跳过）
+      const isReply = await this.isReplyByContext(tweetElement);
 
       // 提取推文ID
       const tweetId = await this.extractTweetId(tweetElement);
@@ -746,6 +748,7 @@ export class TwitterSelector {
         likeCount,
         viewCount,
         isRT: isRetweet,
+        isReply,
         imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
         tweetUrl,
         publishedAt,
@@ -757,6 +760,45 @@ export class TwitterSelector {
     } catch (error) {
       console.error('提取推文数据失败:', error);
       return null;
+    }
+  }
+
+  /**
+   * 通过上下文精确识别回复推文（仅标记，不用于过滤）
+   * 规则：
+   *  - 优先检测“Replying to …”多语言文本区域
+   *  - 可选结合正文是否以@开头进行补强
+   */
+  private async isReplyByContext(tweetElement: any): Promise<boolean> {
+    try {
+      // 1) 查找含有“Replying to …”的文本区域（多语言）
+      const hintTexts = [
+        'Replying to', '正在回复', '回复给', '回覆給', '返信先'
+      ];
+
+      // 遍历 div/span/a 文本，避免误扫操作栏按钮
+      const candidateNodes = await tweetElement.$$('div, span, a');
+      for (const node of candidateNodes) {
+        try {
+          const text = (await node.textContent())?.trim() || '';
+          if (!text) continue;
+          if (hintTexts.some(h => text.includes(h))) {
+            // 命中上下文文案，进一步可选校验：正文是否以 @ 开头
+            const textEl = await tweetElement.$(this.selectors.tweetText);
+            if (textEl) {
+              const content = (await textEl.textContent())?.trim() || '';
+              if (content.startsWith('@')) {
+                return true; // A+B 同时命中
+              }
+            }
+            // 即便正文不以@开头，也判定为回复（依赖强文案）
+            return true;
+          }
+        } catch {}
+      }
+      return false;
+    } catch (e) {
+      return false;
     }
   }
 
@@ -790,10 +832,9 @@ export class TwitterSelector {
             retweetSkipCount++;
           }
 
-          // 检查是否为被回复的推文
+          // 不再跳过回复，仅统计并继续采集
           if (await this.isReplyTweet(tweetElement)) {
-            replySkipCount++; // 单独计数被回复的推文
-            continue;
+            replySkipCount++;
           }
 
           // 提取推文ID检查重复

@@ -101,6 +101,7 @@ model Tweet {
   likeCount     Int      @default(0) // 点赞数
   viewCount     Int      @default(0) // 浏览数
   isRT          Boolean  @default(false) // 是否为被转推的推文
+  isReply       Boolean  @default(false) // 是否为回复推文
   imageUrls     String?  // 配图URLs（JSON数组格式）
   tweetUrl      String   // 推文完整链接
   publishedAt   BigInt   // 发推时间戳
