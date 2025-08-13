@@ -530,6 +530,8 @@ export class StorageService {
     listId?: string;
     username?: string;
     isExtracted: boolean;
+    isRT?: boolean;
+    isReply?: boolean;
     dryRun?: boolean;
     requireFullAmount?: boolean;
   }) {
@@ -540,6 +542,8 @@ export class StorageService {
         listId, 
         username, 
         isExtracted,
+        isRT,
+        isReply,
         dryRun = false,
         requireFullAmount = false
       } = params;
@@ -586,6 +590,14 @@ export class StorageService {
         
         if (username) {
           where.userUsername = username;
+        }
+
+        // 可选条件筛选：isRT / isReply
+        if (typeof isRT === 'boolean') {
+          where.isRT = isRT;
+        }
+        if (typeof isReply === 'boolean') {
+          where.isReply = isReply;
         }
 
         console.log('[DATA EXTRACT] 查询条件:', where);

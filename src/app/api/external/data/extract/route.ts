@@ -34,6 +34,8 @@ export async function POST(request: NextRequest) {
       listId: z.string().optional(),
       username: z.string().optional(),
       isExtracted: z.boolean().optional().default(false), // false=未提取(pending), true=已提取(synced)
+      isRT: z.boolean().optional(),      // 是否仅筛选转推
+      isReply: z.boolean().optional(),   // 是否仅筛选回复
       dryRun: z.boolean().optional().default(false), // 获取数据但不标记为已输出
       requireFullAmount: z.boolean().optional().default(false) // 是否要求足额返回
     }).refine(
@@ -55,6 +57,8 @@ export async function POST(request: NextRequest) {
       listId: validatedData.listId,
       username: validatedData.username,
       isExtracted: validatedData.isExtracted,
+      isRT: validatedData.isRT,
+      isReply: validatedData.isReply,
       dryRun: validatedData.dryRun,
       requireFullAmount: validatedData.requireFullAmount,
       timestamp: new Date().toISOString()
@@ -67,6 +71,8 @@ export async function POST(request: NextRequest) {
       listId: validatedData.listId,
       username: validatedData.username,
       isExtracted: validatedData.isExtracted,
+      isRT: validatedData.isRT,
+      isReply: validatedData.isReply,
       dryRun: validatedData.dryRun,
       requireFullAmount: validatedData.requireFullAmount
     });
@@ -91,6 +97,8 @@ export async function POST(request: NextRequest) {
           listId: validatedData.listId,
           username: validatedData.username,
           isExtracted: validatedData.isExtracted,
+          isRT: validatedData.isRT,
+          isReply: validatedData.isReply,
           dryRun: validatedData.dryRun,
           requireFullAmount: validatedData.requireFullAmount
         }
@@ -122,6 +130,8 @@ export async function POST(request: NextRequest) {
               listId: validatedData.listId,
               username: validatedData.username,
               isExtracted: validatedData.isExtracted,
+              isRT: validatedData.isRT,
+              isReply: validatedData.isReply,
               dryRun: validatedData.dryRun,
               requireFullAmount: validatedData.requireFullAmount,
               maxCount: validatedData.maxCount
