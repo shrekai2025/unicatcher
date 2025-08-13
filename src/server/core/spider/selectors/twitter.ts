@@ -114,22 +114,53 @@ export class TwitterSelector {
   }
 
   /**
-   * 获取当前页面Timeline: List容器内的推文元素
-   * 🔧 修复：限制搜索范围，避免抓取侧边栏、弹窗等区域的推文
+   * 获取List时间线中的推文元素
+   * 🎯 正确逻辑：Timeline: List > cellInnerDiv (跳过第一个) > 推文
+   * 🔧 修复：避免抓取展开详情页的评论
    */
   async getTweetElements(): Promise<any[]> {
     try {
-      // 首先尝试定位List时间线容器
+      // 首先定位List时间线容器
       const timelineContainer = await this.page.$(this.selectors.timelineContainer);
       
       if (timelineContainer) {
-        // 在时间线容器内搜索推文元素
-        console.log('✅ 在List时间线容器内搜索推文...');
-        const tweets = await timelineContainer.$$(this.selectors.tweetContainer);
-        console.log(`📊 在List容器内找到 ${tweets.length} 个推文元素`);
-        return tweets;
+        console.log('✅ 找到List时间线容器，开始按cellInnerDiv逻辑搜索...');
+        
+        // 在时间线容器内找所有cellInnerDiv
+        const cellElements = await timelineContainer.$$('[data-testid="cellInnerDiv"]');
+        console.log(`📊 找到 ${cellElements.length} 个cellInnerDiv`);
+        
+        if (cellElements.length === 0) {
+          console.warn('⚠️ 未找到cellInnerDiv，使用备用方案');
+          const tweets = await timelineContainer.$$(this.selectors.tweetContainer);
+          console.log(`📊 备用方案找到 ${tweets.length} 个推文`);
+          return tweets;
+        }
+        
+        // 跳过第一个cellInnerDiv（List信息），处理剩余的
+        const tweetCells = cellElements.slice(1);
+        console.log(`📊 跳过第一个List信息，处理 ${tweetCells.length} 个推文单元格`);
+        
+        const allTweets: any[] = [];
+        for (const cell of tweetCells) {
+          try {
+            // 在每个cellInnerDiv内查找推文
+            const tweetsInCell = await cell.$$(this.selectors.tweetContainer);
+            if (tweetsInCell.length > 0) {
+              allTweets.push(...tweetsInCell);
+            }
+          } catch (error) {
+            console.warn('处理单个cellInnerDiv失败:', error);
+            continue;
+          }
+        }
+        
+        console.log(`📊 从 ${tweetCells.length} 个单元格中提取到 ${allTweets.length} 个推文`);
+        return allTweets;
+        
       } else {
         // 回退方案：如果找不到特定容器，尝试其他容器选择器
+        console.warn('⚠️ 未找到List时间线容器，尝试回退方案...');
         const fallbackSelectors = [
           '[data-testid="primaryColumn"]',
           'main[role="main"]',
@@ -137,17 +168,31 @@ export class TwitterSelector {
         ];
         
         for (const selector of fallbackSelectors) {
-          console.log(`⚠️ List容器未找到，尝试回退选择器: ${selector}`);
+          console.log(`⚠️ 尝试回退选择器: ${selector}`);
           const container = await this.page.$(selector);
           if (container) {
-            const tweets = await container.$$(this.selectors.tweetContainer);
-            console.log(`📊 在回退容器内找到 ${tweets.length} 个推文元素`);
-            return tweets;
+            // 尝试在回退容器中也使用cellInnerDiv逻辑
+            const cellElements = await container.$$('[data-testid="cellInnerDiv"]');
+            if (cellElements.length > 1) {
+              const tweetCells = cellElements.slice(1);
+              const allTweets: any[] = [];
+              for (const cell of tweetCells) {
+                const tweetsInCell = await cell.$$(this.selectors.tweetContainer);
+                allTweets.push(...tweetsInCell);
+              }
+              console.log(`📊 回退方案找到 ${allTweets.length} 个推文`);
+              return allTweets;
+            } else {
+              // 如果没有cellInnerDiv，直接搜索推文
+              const tweets = await container.$$(this.selectors.tweetContainer);
+              console.log(`📊 回退方案找到 ${tweets.length} 个推文`);
+              return tweets;
+            }
           }
         }
         
         // 最后的回退：全局搜索（保持原有行为但记录警告）
-        console.warn('⚠️ 警告：未找到合适的时间线容器，使用全局搜索（可能包含非List推文）');
+        console.warn('⚠️ 警告：所有回退方案失败，使用全局搜索（可能包含非List推文）');
         const tweets = await this.page.$$(this.selectors.tweetContainer);
         console.log(`📊 全局搜索找到 ${tweets.length} 个推文元素`);
         return tweets;
@@ -159,15 +204,39 @@ export class TwitterSelector {
   }
 
   /**
-   * 跳过第一个推文（List信息头部）
+   * 跳过第一个推文（List信息头部）- 已在getTweetElements中处理cellInnerDiv层面
+   * 🔧 现在主要用于双重保险，防止List信息推文混入
    */
   async skipFirstTweet(tweetElements: any[]): Promise<any[]> {
     if (tweetElements.length === 0) {
       return [];
     }
     
-    console.log(`总共找到 ${tweetElements.length} 个推文，跳过第一个List信息`);
-    return tweetElements.slice(1);
+    // 由于已经在cellInnerDiv层面跳过了第一个，这里主要做最后检查
+    // 检查第一个推文是否是List相关信息
+    if (tweetElements.length > 0) {
+      try {
+        const firstTweet = tweetElements[0];
+        const tweetText = await firstTweet.$(this.selectors.tweetText);
+        if (tweetText) {
+          const content = await tweetText.textContent();
+          if (content && (
+            content.includes('List') || 
+            content.includes('列表') ||
+            content.includes('Members') ||
+            content.includes('成员')
+          )) {
+            console.log(`🔍 检测到第一个推文疑似List信息，跳过: ${content.slice(0, 50)}...`);
+            return tweetElements.slice(1);
+          }
+        }
+      } catch (error) {
+        console.warn('检查第一个推文内容失败:', error);
+      }
+    }
+    
+    console.log(`📊 cellInnerDiv逻辑已处理，直接返回 ${tweetElements.length} 个推文`);
+    return tweetElements;
   }
 
   /**
