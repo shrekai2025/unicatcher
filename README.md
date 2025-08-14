@@ -145,6 +145,23 @@ pm2 save
 pm2 status
 pm2 logs unicatcher --lines 100
 pm2 startup  # 设置开机自启
+
+# 轻量更新
+git pull
+npm install
+npm run db:push    # 同步isRT字段
+# 4) 重新生成 Prisma Client（可选但推荐）
+npx prisma generate
+npm run build
+pm2 restart unicatcher 
+```
+```
+Ubuntu服务器清理僵尸任务
+# 方法3: 如果是PM2部署，先进入项目目录
+cd /path/to/unicatcher
+pm2 stop unicatcher  # 可选：先停止服务
+npm run cleanup-zombie
+pm2 start unicatcher  # 重启服务
 ```
 
 ### Docker 更新
