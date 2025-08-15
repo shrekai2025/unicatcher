@@ -5,7 +5,7 @@
       "value": "v1%3A175334063137680436",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1788046745.149816,
+      "expires": 1789827050.05072,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
@@ -15,7 +15,7 @@
       "value": "v1%3A175334063137680436",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1788046745.149793,
+      "expires": 1789827050.050631,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
@@ -125,37 +125,47 @@
       "value": "u%3D1097029752966266880",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1785022745.149823,
+      "expires": 1786803050.050735,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
     },
     {
-      "name": "id",
-      "value": "2249396ff7fd0038||t=1753340679|et=730|cs=002213fd486d022afd9e0e3ac8",
-      "domain": ".doubleclick.net",
-      "path": "/",
-      "expires": 1788046745.248751,
-      "httpOnly": true,
-      "secure": true,
-      "sameSite": "None"
-    },
-    {
-      "name": "__cf_bm",
-      "value": "isxmOAkGy1nHmi0tVEIAsQwf7ny4FXWoSPjbfT5Uj3E-1753486746-1.0.1.1-ezCcJofjj7yzoISNw9tUD.KCMKNXDnsNi2fXNyl02oPm7k0PUBtxfDc4kxLzSp5m5fRGgCw7DKRzMVNxjZJZ_kfM6KHd.au7xCQtPrP6no4",
-      "domain": ".twitter.com",
-      "path": "/",
-      "expires": 1753488545.806277,
-      "httpOnly": true,
-      "secure": true,
-      "sameSite": "None"
-    },
-    {
-      "name": "__cf_bm",
-      "value": "Gy3TbXZz7lcVftGTDhZ_ph4PiTX2.gVfLn87bG5HKKo-1753486746-1.0.1.1-BlUcyfrAqNsYZccvcb9PIW3tEDCa9LE3PfSLNp8ZmGICqKx1zZNiqzQRxBhI0gO0vLz1U7Rb1X0UzF8qlTVBn7nlM9JOITXaT1BGlVNgUC8",
+      "name": "__cuid",
+      "value": "fd7381e13e9646e6aa4adedc74324a07",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1753488546.414158,
+      "expires": 1789827046,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "IDE",
+      "value": "AHWqTUlPenOplBTXMcFXnqFa1AeObUb5jJkqKURqLop31E1ArOjSlEXZF_M7HDxRhXk",
+      "domain": ".doubleclick.net",
+      "path": "/",
+      "expires": 1789815842.284613,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "XA5MTgpinPs_MfAyjiT.ImExM4EfpF_R2R9oW6DUwTw-1755267050-1.0.1.1-54wIVoFjgFPjBtDD.96sgwAEKFSSm_0aZmoPitaU4mxoJykaFBX03sfS.UZIjJ7n33wO60CKAlTVnFHwSSxAsWp6po6TsiyXlw1xfaTBPcs",
+      "domain": ".x.com",
+      "path": "/",
+      "expires": 1755268850.161485,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "aAfV3TYWJCjWUbW4emHNlMtZPLVVrRWASarr2NdEgMQ-1755267052-1.0.1.1-1nkWRnzN1HzdesNWtrcTCAz6BhxC3p2jYc4tnSM1IOdOLqYMilg9Az8m8LyuZjrd.1zr0BPDz2rJEpvSqICoRDW5X0G8asYWQdvgI2pvlgA",
+      "domain": ".twitter.com",
+      "path": "/",
+      "expires": 1755268852.313528,
       "httpOnly": true,
       "secure": true,
       "sameSite": "None"
@@ -165,6 +175,10 @@
     {
       "origin": "https://x.com",
       "localStorage": [
+        {
+          "name": "__cuid",
+          "value": "fd7381e13e9646e6aa4adedc74324a07"
+        },
         {
           "name": "volume",
           "value": "1"

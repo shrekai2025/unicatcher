@@ -17,6 +17,7 @@ export const env = createEnv({
       .default("development"),
     PORT: z.string().optional(),
     NEXTAUTH_URL: z.string().optional(),
+    PLAYWRIGHT_BROWSERS_PATH: z.string().optional(),
   },
 
   /**
@@ -38,6 +39,7 @@ export const env = createEnv({
     NODE_ENV: process.env.NODE_ENV,
     PORT: process.env.PORT,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+    PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
@@ -58,6 +60,7 @@ console.log("[ENV] 环境变量加载情况:", {
   hasDATABASE_URL: !!process.env.DATABASE_URL,
   hasNEXTAUTH_URL: !!process.env.NEXTAUTH_URL,
   hasPORT: !!process.env.PORT,
+  hasPLAYWRIGHT_BROWSERS_PATH: !!process.env.PLAYWRIGHT_BROWSERS_PATH,
   SKIP_ENV_VALIDATION: !!process.env.SKIP_ENV_VALIDATION,
   timestamp: new Date().toISOString()
 });

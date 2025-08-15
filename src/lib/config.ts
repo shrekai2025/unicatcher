@@ -8,7 +8,12 @@ import { env } from "~/env";
 
 // 获取操作系统特定的Playwright浏览器路径
 function getPlaywrightBrowserPath() {
-  // 在服务器端运行时才使用 Node.js 模块
+  // 优先使用环境变量
+  if (env.PLAYWRIGHT_BROWSERS_PATH) {
+    return env.PLAYWRIGHT_BROWSERS_PATH;
+  }
+  
+  // 在服务器端运行时才使用 Node.js 模块进行自动检测
   if (typeof window === 'undefined') {
     const { join } = require('path');
     const { homedir } = require('os');
@@ -16,24 +21,33 @@ function getPlaywrightBrowserPath() {
     if (process.platform === 'win32') {
       // Windows路径
       return join(homedir(), 'AppData', 'Local', 'ms-playwright');
-} else {
-      // Linux/macOS路径
-      return '/home/appuser/.cache/ms-playwright';
+    } else if (process.platform === 'darwin') {
+      // macOS路径
+      return join(homedir(), 'Library', 'Caches', 'ms-playwright');
+    } else {
+      // Linux路径
+      return join(homedir(), '.cache', 'ms-playwright');
     }
   }
   
   // Edge Runtime 环境下的默认路径
-  return process.platform === 'win32' 
-    ? 'C:\\Users\\Administrator\\AppData\\Local\\ms-playwright'
-    : '/home/appuser/.cache/ms-playwright';
+  if (process.platform === 'win32') {
+    return 'C:\\Users\\Administrator\\AppData\\Local\\ms-playwright';
+  } else if (process.platform === 'darwin') {
+    return '/Users/Administrator/Library/Caches/ms-playwright';
+  } else {
+    return '/home/appuser/.cache/ms-playwright';
+  }
 }
 
 // 动态设置Playwright浏览器路径（修复跨平台兼容性问题）
-if (typeof window === 'undefined' && !process.env.PLAYWRIGHT_BROWSERS_PATH) {
-  process.env.PLAYWRIGHT_BROWSERS_PATH = getPlaywrightBrowserPath();
-  console.log('[CONFIG] 设置Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
-} else if (typeof window === 'undefined') {
-  console.log('[CONFIG] 使用现有Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
+if (typeof window === 'undefined') {
+  if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+    process.env.PLAYWRIGHT_BROWSERS_PATH = getPlaywrightBrowserPath();
+    console.log('[CONFIG] 自动设置Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
+  } else {
+    console.log('[CONFIG] 使用用户指定的Playwright浏览器路径:', process.env.PLAYWRIGHT_BROWSERS_PATH);
+  }
 }
 
 export const config = {
@@ -94,11 +108,11 @@ export const config = {
     resourceOptimization: {
       enabled: process.env.ENABLE_RESOURCE_OPTIMIZATION !== 'false', // 启用资源拦截优化（默认启用，设置环境变量为false可禁用）
       blockedResourceTypes: [
-        'media',      // 拦截视频/音频
-        'font',       // 拦截字体文件
-        // 暂时不拦截图片，避免影响页面功能
-        // 'image',      // 拦截图片（主要节省带宽）
-        // 'other'       // 拦截其他类型文件
+        // 临时移除所有拦截，确保视频相关请求不被阻止
+        // 'media',      // 移除：允许视频/音频加载
+        // 'font',       // 移除：允许字体文件
+        // 'image',      // 移除：允许图片加载
+        // 'other'       // 移除：允许其他类型文件
       ],
       // 允许加载的关键资源
       allowedResourceTypes: [
@@ -117,10 +131,11 @@ export const config = {
         'twitter.com',
         'abs.twimg.com', // Twitter API相关
         'pbs.twimg.com', // Twitter媒体服务器
+        'video.twimg.com', // Twitter视频媒体服务器
         'abs-0.twimg.com', // Twitter emoji等静态资源
       ],
-      // 调试模式下显示拦截的资源
-      logBlockedRequests: process.env.NODE_ENV === 'development',
+      // 启用详细的资源请求日志（便于视频URL调试）
+      logBlockedRequests: true, // 强制启用，便于调试视频采集
     },
   },
 

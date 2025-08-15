@@ -511,7 +511,11 @@ export class BrowserManager {
         route.continue();
       });
 
-      console.log('✅ 资源优化已启用 - 已拦截图片、视频等非必需资源');
+      console.log('✅ 资源优化已启用 - 当前拦截规则:', {
+        blockedTypes: optimizationConfig.blockedResourceTypes,
+        allowedDomains: optimizationConfig.allowedDomains,
+        logEnabled: optimizationConfig.logBlockedRequests
+      });
     } catch (error) {
       console.error('设置资源优化失败:', error);
       // 不抛出错误，继续正常执行

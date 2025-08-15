@@ -176,6 +176,8 @@ export class StorageService {
           isReply: tweetData.isReply,
           isRT: tweetData.isRT,
           imageUrls: tweetData.imageUrls ? JSON.stringify(tweetData.imageUrls) : null,
+          profileImageUrl: tweetData.profileImageUrl || null,
+          videoUrls: tweetData.videoUrls ? JSON.stringify(tweetData.videoUrls) : null,
           tweetUrl: tweetData.tweetUrl,
           publishedAt: BigInt(tweetData.publishedAt),
           listId: tweetData.listId,
@@ -251,6 +253,8 @@ export class StorageService {
             likeCount: true,
             viewCount: true,
             imageUrls: true,
+            profileImageUrl: true,
+            videoUrls: true,
             tweetUrl: true,
             publishedAt: true,
             listId: true,
@@ -268,10 +272,11 @@ export class StorageService {
         db.tweet.count({ where }),
       ]);
 
-      // 解析图片URLs并转换BigInt为数字
+      // 解析媒体URLs并转换BigInt为数字
       const parsedTweets = tweets.map((tweet: any) => ({
         ...tweet,
         imageUrls: tweet.imageUrls ? JSON.parse(tweet.imageUrls) : [],
+        videoUrls: tweet.videoUrls ? JSON.parse(tweet.videoUrls) : null,
         publishedAt: tweet.publishedAt ? Number(tweet.publishedAt) : 0,
         scrapedAt: tweet.scrapedAt ? Number(tweet.scrapedAt) : 0,
       }));
@@ -431,10 +436,11 @@ export class StorageService {
         orderBy: { publishedAt: 'desc' },
       });
 
-      // 解析图片URLs
+      // 解析媒体URLs
       const parsedTweets = tweets.map((tweet: any) => ({
         ...tweet,
         imageUrls: tweet.imageUrls ? JSON.parse(tweet.imageUrls) : [],
+        videoUrls: tweet.videoUrls ? JSON.parse(tweet.videoUrls) : null,
       }));
 
       if (format === 'json') {
@@ -618,6 +624,8 @@ export class StorageService {
             likeCount: true,
             viewCount: true,
             imageUrls: true,
+            profileImageUrl: true,
+            videoUrls: true,
             tweetUrl: true,
             publishedAt: true,
             listId: true,
@@ -676,6 +684,7 @@ export class StorageService {
         const formattedTweets = tweets.map((tweet: any) => ({
           ...tweet,
           imageUrls: tweet.imageUrls ? JSON.parse(tweet.imageUrls) : [],
+          videoUrls: tweet.videoUrls ? JSON.parse(tweet.videoUrls) : null,
           publishedAt: tweet.publishedAt ? Number(tweet.publishedAt) : 0,
           scrapedAt: tweet.scrapedAt ? Number(tweet.scrapedAt) : 0,
         }));

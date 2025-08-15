@@ -8,6 +8,8 @@ import type { TweetData, TwitterSelectors, PageProcessResult } from '~/types/spi
 import { config } from '~/lib/config';
 
 export class TwitterSelector {
+  private capturedVideoUrls: Map<string, any> = new Map(); // 存储捕获的视频URL
+
   // Twitter List选择器配置
   // ⚠️ 注意: Twitter/X的前端结构会不定期更新，以下选择器可能需要维护
   // 选择器设计原则: 优先使用data-testid > aria-label > class，避免依赖动态class
@@ -41,7 +43,54 @@ export class TwitterSelector {
     showMoreButton: '[data-testid="tweet-text-show-more-link"]', // "Show more"/"查看更多"按钮
   };
 
-  constructor(private readonly page: Page) {}
+  constructor(private readonly page: Page) {
+    this.setupNetworkCapture();
+  }
+
+  /**
+   * 设置网络捕获 - 在构造函数中立即开始监听
+   */
+  private async setupNetworkCapture(): Promise<void> {
+    // 监听所有网络响应
+    this.page.on('response', (response) => {
+      try {
+        const url = response.url();
+        
+        // 捕获视频相关的URL
+        if (url.includes('video.twimg.com') && url.includes('.mp4')) {
+          // 从URL中提取媒体ID
+          const match = url.match(/amplify_video\/(\d+)\//);
+          if (match && match[1]) {
+            const mediaId = match[1];
+            console.log(`🎯 捕获视频URL [${mediaId}]: ${url.substring(0, 100)}...`);
+            this.capturedVideoUrls.set(mediaId, {
+              video: url.split('?')[0], // 移除查询参数
+              timestamp: Date.now(),
+            });
+          }
+        }
+        
+        // 捕获预览图
+        if (url.includes('amplify_video_thumb') && url.includes('.jpg')) {
+          const match = url.match(/amplify_video_thumb\/(\d+)\//);
+          if (match && match[1]) {
+            const mediaId = match[1];
+            console.log(`🖼️ 捕获预览图 [${mediaId}]: ${url}`);
+            const existing = this.capturedVideoUrls.get(mediaId) || {};
+            this.capturedVideoUrls.set(mediaId, {
+              ...existing,
+              preview: url,
+              timestamp: Date.now(),
+            });
+          }
+        }
+      } catch (error) {
+        // 忽略错误，继续监听
+      }
+    });
+    
+    console.log('🔍 网络捕获已启动，监听视频URL...');
+  }
 
   /**
    * 等待Timeline容器加载
@@ -619,7 +668,7 @@ export class TwitterSelector {
   }
 
   /**
-   * 提取图片URLs
+   * 提取推文配图URLs（排除用户头像）
    */
   async extractImageUrls(tweetElement: any): Promise<string[]> {
     try {
@@ -629,14 +678,152 @@ export class TwitterSelector {
       for (const imgElement of imageElements) {
         const src = await imgElement.getAttribute('src');
         if (src && src.includes('pbs.twimg.com')) {
-          imageUrls.push(src);
+          // 排除profile图片和视频预览图
+          if (!src.includes('profile_images') && !src.includes('amplify_video_thumb')) {
+            imageUrls.push(src);
+          }
         }
       }
 
       return imageUrls;
     } catch (error) {
-      console.error('提取图片URLs失败:', error);
+      console.error('提取推文配图URLs失败:', error);
       return [];
+    }
+  }
+
+  /**
+   * 提取用户头像URL
+   */
+  async extractProfileImage(tweetElement: any): Promise<string | null> {
+    try {
+      const imageElements = await tweetElement.$$(this.selectors.images);
+
+      for (const imgElement of imageElements) {
+        const src = await imgElement.getAttribute('src');
+        if (src && src.includes('pbs.twimg.com') && src.includes('profile_images')) {
+          console.log(`✅ 提取到用户头像: ${src}`);
+          return src;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('提取用户头像失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 提取视频相关URLs（简化版 - 从已捕获的网络请求中获取）
+   */
+  async extractVideoUrls(tweetElement: any): Promise<{ preview?: string; video?: string } | null> {
+    try {
+      // 检查是否包含视频播放器
+      const videoPlayer = await tweetElement.$('[data-testid="videoPlayer"]');
+      if (!videoPlayer) {
+        return null;
+      }
+
+      console.log('🎬 发现视频内容，开始提取...');
+      const result: { preview?: string; video?: string } = {};
+
+      // 1. 首先尝试从DOM获取预览图
+      const videoElement = await videoPlayer.$('video[poster]');
+      if (videoElement) {
+        const poster = await videoElement.getAttribute('poster');
+        if (poster && poster.includes('amplify_video_thumb')) {
+          result.preview = poster;
+          console.log(`✅ 从DOM提取到视频预览图: ${poster}`);
+          
+          // 从预览图中提取媒体ID
+          const match = poster.match(/amplify_video_thumb\/(\d+)/);
+          if (match && match[1]) {
+            const mediaId = match[1];
+            console.log(`🔎 媒体ID: ${mediaId}`);
+            
+            // 2. 从已捕获的网络请求中查找对应的视频URL
+            const capturedData = this.capturedVideoUrls.get(mediaId);
+            if (capturedData) {
+              if (capturedData.video) {
+                result.video = capturedData.video;
+                console.log(`✅ 从缓存获取视频URL: ${result.video}`);
+              }
+              if (capturedData.preview && !result.preview) {
+                result.preview = capturedData.preview;
+              }
+            } else {
+              console.log(`⚠️ 未在缓存中找到媒体ID ${mediaId} 的视频URL`);
+              
+              // 3. 如果缓存中没有，尝试构造URL（基于已知模式）
+              // Twitter视频URL通常遵循固定模式
+              const possibleUrls = [
+                `https://video.twimg.com/amplify_video/${mediaId}/vid/avc1/720x1280/`,
+                `https://video.twimg.com/amplify_video/${mediaId}/vid/avc1/1280x720/`,
+                `https://video.twimg.com/amplify_video/${mediaId}/vid/avc1/1920x1080/`,
+                `https://video.twimg.com/ext_tw_video/${mediaId}/pu/vid/avc1/720x1280/`,
+                `https://video.twimg.com/ext_tw_video/${mediaId}/pu/vid/avc1/1280x720/`,
+              ];
+              
+              // 检查缓存的所有URL，看是否有包含该媒体ID的
+              for (const [id, data] of this.capturedVideoUrls.entries()) {
+                if (data.video && data.video.includes(mediaId)) {
+                  result.video = data.video;
+                  console.log(`✅ 从缓存找到相关视频URL: ${result.video}`);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 4. 如果还没有找到视频URL，尝试从DOM中的source标签获取
+      if (!result.video) {
+        console.log('🔄 尝试从DOM获取视频源...');
+        const sources = await videoPlayer.$$('video source');
+        for (const source of sources) {
+          try {
+            const src = await source.getAttribute('src');
+            if (src && !src.startsWith('blob:')) {
+              console.log(`📹 从source标签获取: ${src}`);
+              result.video = src;
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+
+      // 5. 最后尝试从video元素的src属性获取
+      if (!result.video && videoElement) {
+        try {
+          const videoSrc = await videoElement.getAttribute('src');
+          if (videoSrc && !videoSrc.startsWith('blob:')) {
+            console.log(`📺 从video元素获取: ${videoSrc}`);
+            result.video = videoSrc;
+          }
+        } catch (e) {
+          // 忽略错误
+        }
+      }
+
+      // 6. 输出调试信息
+      if (!result.video && !result.preview) {
+        console.log('❌ 未能提取视频信息');
+        console.log('📊 当前缓存的视频URL数量:', this.capturedVideoUrls.size);
+        if (this.capturedVideoUrls.size > 0) {
+          console.log('📋 缓存内容:', Array.from(this.capturedVideoUrls.entries()));
+        }
+        return null;
+      }
+
+      console.log('🎉 视频提取成功:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ 提取视频URLs失败:', error);
+      return null;
     }
   }
 
@@ -733,7 +920,11 @@ export class TwitterSelector {
       const { nickname, username } = await this.extractUserInfo(tweetElement);
       const publishedAt = await this.extractPublishTime(tweetElement);
       const { replyCount, retweetCount, likeCount, viewCount } = await this.extractEngagementMetrics(tweetElement);
+      
+      // 分别提取不同类型的媒体内容
       const imageUrls = await this.extractImageUrls(tweetElement);
+      const profileImageUrl = await this.extractProfileImage(tweetElement);
+      const videoUrls = await this.extractVideoUrls(tweetElement);
 
       // 构建推文URL（增强的方法，确保正确性）
       const tweetUrl = await this.buildTweetUrl(tweetElement, tweetId, username);
@@ -750,6 +941,8 @@ export class TwitterSelector {
         isRT: isRetweet,
         isReply,
         imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+        profileImageUrl: profileImageUrl || undefined,
+        videoUrls: videoUrls || undefined,
         tweetUrl,
         publishedAt,
         listId,

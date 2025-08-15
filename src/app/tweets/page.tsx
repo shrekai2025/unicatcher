@@ -198,9 +198,17 @@ export default function TweetsPage() {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-3">
                                 <div className="flex-shrink-0">
-                                  <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                    <span className="text-blue-600 text-sm">🐦</span>
-                                  </div>
+                                  {tweet.profileImageUrl ? (
+                                    <img
+                                      src={tweet.profileImageUrl}
+                                      alt={`${tweet.userNickname} 的头像`}
+                                      className="h-8 w-8 rounded-full object-cover border border-gray-200"
+                                    />
+                                  ) : (
+                                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                      <span className="text-blue-600 text-sm">🐦</span>
+                                    </div>
+                                  )}
                                 </div>
                                 <div>
                                   <p className="text-sm font-medium text-gray-900">
@@ -267,7 +275,7 @@ export default function TweetsPage() {
                             {tweet.imageUrls && tweet.imageUrls.length > 0 && (
                               <div className="mt-3">
                                 <p className="text-sm text-gray-500 mb-2">
-                                  图片 ({tweet.imageUrls.length} 张):
+                                  推文配图 ({tweet.imageUrls.length} 张):
                                 </p>
                                 <div className="flex space-x-2">
                                   {tweet.imageUrls.slice(0, 3).map((image: string, index: number) => (
@@ -283,6 +291,41 @@ export default function TweetsPage() {
                                       <span className="text-gray-500 text-xs">
                                         +{tweet.imageUrls.length - 3}
                                       </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            {/* 视频内容 */}
+                            {tweet.videoUrls && (
+                              <div className="mt-3">
+                                <p className="text-sm text-gray-500 mb-2">
+                                  视频内容:
+                                </p>
+                                <div className="space-y-2">
+                                  {tweet.videoUrls.preview && (
+                                    <div>
+                                      <p className="text-xs text-gray-400 mb-1">预览图:</p>
+                                      <img
+                                        src={tweet.videoUrls.preview}
+                                        alt="视频预览"
+                                        className="h-32 w-48 object-cover rounded-md border border-gray-200"
+                                      />
+                                    </div>
+                                  )}
+                                  {tweet.videoUrls.video && (
+                                    <div>
+                                      <p className="text-xs text-gray-400 mb-1">视频链接:</p>
+                                      <a
+                                        href={tweet.videoUrls.video}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 text-xs break-all"
+                                      >
+                                        {tweet.videoUrls.video.length > 50 
+                                          ? `${tweet.videoUrls.video.substring(0, 50)}...` 
+                                          : tweet.videoUrls.video}
+                                      </a>
                                     </div>
                                   )}
                                 </div>

@@ -102,7 +102,9 @@ model Tweet {
   viewCount     Int      @default(0) // 浏览数
   isRT          Boolean  @default(false) // 是否为被转推的推文
   isReply       Boolean  @default(false) // 是否为回复推文
-  imageUrls     String?  // 配图URLs（JSON数组格式）
+  imageUrls     String?  // 推文配图URLs（JSON数组格式，不含用户头像）
+  profileImageUrl String? // 用户头像URL
+  videoUrls     String?  // 视频相关URLs（JSON格式：{preview, video}）
   tweetUrl      String   // 推文完整链接
   publishedAt   BigInt   // 发推时间戳
   listId        String   // 来源List ID

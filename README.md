@@ -243,11 +243,34 @@ NODE_ENV=development
 PORT=3067
 NEXTAUTH_URL=http://localhost:3067   # 仅用于生成 baseUrl（并未启用 NextAuth）
 ENABLE_RESOURCE_OPTIMIZATION=true     # 资源拦截优化（节流图片/媒体请求）
+
+# Playwright 浏览器路径（可选，不设置会自动检测）
+# PLAYWRIGHT_BROWSERS_PATH=/path/to/playwright/browsers
 ```
 
-Playwright 浏览器路径会自动在服务端启动时设置：
+### Playwright 浏览器路径配置
+支持通过环境变量 `PLAYWRIGHT_BROWSERS_PATH` 自定义浏览器位置，适应不同环境：
+
+**自动检测路径（不设置环境变量时）：**
+- macOS：`~/Library/Caches/ms-playwright`
+- Linux：`~/.cache/ms-playwright`
 - Windows：`%USERPROFILE%/AppData/Local/ms-playwright`
-- Linux/macOS（容器用户）：`/home/appuser/.cache/ms-playwright`
+- Docker 容器：`/home/appuser/.cache/ms-playwright`
+
+**手动指定示例：**
+```bash
+# macOS 用户
+PLAYWRIGHT_BROWSERS_PATH="/Users/your-username/Library/Caches/ms-playwright"
+
+# Linux 用户
+PLAYWRIGHT_BROWSERS_PATH="/home/your-username/.cache/ms-playwright"
+
+# Windows 用户
+PLAYWRIGHT_BROWSERS_PATH="C:\Users\your-username\AppData\Local\ms-playwright"
+
+# Docker 环境
+PLAYWRIGHT_BROWSERS_PATH="/home/appuser/.cache/ms-playwright"
+```
 
 ---
 

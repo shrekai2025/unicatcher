@@ -30,7 +30,12 @@ export interface TweetData {
   viewCount: number;             // 浏览数
   isRT: boolean;                 // 是否为被转推的推文
   isReply: boolean;              // 是否为回复推文
-  imageUrls?: string[];          // 配图URL数组
+  imageUrls?: string[];          // 推文配图URL数组（不含用户头像）
+  profileImageUrl?: string;      // 用户头像URL
+  videoUrls?: {                  // 视频相关URLs
+    preview?: string;            // 视频预览图URL
+    video?: string;              // 视频文件URL
+  };
   tweetUrl: string;              // 推文链接
   publishedAt: number;           // 发推时间戳 (JavaScript number，存储时转为bigint)
   listId: string;                // 来源List ID
