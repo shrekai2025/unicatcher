@@ -203,6 +203,16 @@ export default function TweetsPage() {
                                       src={tweet.profileImageUrl}
                                       alt={`${tweet.userNickname} 的头像`}
                                       className="h-8 w-8 rounded-full object-cover border border-gray-200"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        const parent = target.parentElement!;
+                                        parent.innerHTML = '<div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center"><span class="text-blue-600 text-sm">🐦</span></div>';
+                                      }}
+                                      style={{
+                                        minHeight: '32px',
+                                        minWidth: '32px',
+                                        backgroundColor: '#dbeafe'
+                                      }}
                                     />
                                   ) : (
                                     <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
@@ -292,28 +302,24 @@ export default function TweetsPage() {
                                 </p>
                                 <div className="flex flex-wrap gap-2">
                                   {tweet.imageUrls.slice(0, 6).map((image: string, index: number) => (
-                                    <div key={index} className="relative">
+                                    <div key={index} className="relative bg-gray-100 rounded border border-gray-300 overflow-hidden">
                                       <img
                                         src={image}
                                         alt={`推文图片 ${index + 1}`}
-                                        className="w-20 h-20 object-cover rounded border border-gray-300 cursor-pointer hover:opacity-80"
+                                        className="w-20 h-20 object-cover cursor-pointer hover:opacity-80 transition-opacity"
                                         onClick={() => window.open(image, '_blank')}
                                         onError={(e) => {
                                           const target = e.target as HTMLImageElement;
-                                          target.style.display = 'none';
-                                          const errorDiv = target.nextElementSibling as HTMLElement;
-                                          if (errorDiv) errorDiv.style.display = 'flex';
+                                          const parent = target.parentElement!;
+                                          parent.innerHTML = `<div class="w-20 h-20 flex items-center justify-center text-xs text-gray-500 cursor-pointer" onclick="window.open('${image}', '_blank')">图片加载失败<br/>点击查看</div>`;
                                         }}
                                         loading="lazy"
-                                        crossOrigin="anonymous"
+                                        style={{
+                                          minHeight: '80px',
+                                          minWidth: '80px',
+                                          backgroundColor: '#f3f4f6'
+                                        }}
                                       />
-                                      <div 
-                                        className="w-20 h-20 bg-gray-100 rounded border border-gray-300 flex items-center justify-center text-xs text-gray-500 cursor-pointer"
-                                        style={{display: 'none'}}
-                                        onClick={() => window.open(image, '_blank')}
-                                      >
-                                        图片加载失败<br/>点击查看
-                                      </div>
                                     </div>
                                   ))}
                                   {tweet.imageUrls.length > 6 && (
@@ -334,28 +340,24 @@ export default function TweetsPage() {
                                   {tweet.videoUrls.preview && (
                                     <div>
                                       <p className="text-xs text-gray-600 mb-2 font-medium">📸 视频预览图:</p>
-                                      <div className="relative inline-block">
+                                      <div className="relative inline-block bg-gray-100 rounded border border-gray-300 overflow-hidden">
                                         <img
                                           src={tweet.videoUrls.preview}
                                           alt="视频预览"
-                                          className="w-48 h-32 object-cover rounded border border-gray-300 cursor-pointer hover:opacity-80"
+                                          className="w-48 h-32 object-cover cursor-pointer hover:opacity-80 transition-opacity"
                                           onClick={() => window.open(tweet.videoUrls.preview, '_blank')}
                                           onError={(e) => {
                                             const target = e.target as HTMLImageElement;
-                                            target.style.display = 'none';
-                                            const errorDiv = target.nextElementSibling as HTMLElement;
-                                            if (errorDiv) errorDiv.style.display = 'flex';
+                                            const parent = target.parentElement!;
+                                            parent.innerHTML = `<div class="w-48 h-32 flex items-center justify-center text-sm text-gray-500 cursor-pointer" onclick="window.open('${tweet.videoUrls.preview}', '_blank')">🎬<br/>预览图加载失败<br/>点击查看原图</div><div class="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">🎥 视频</div>`;
                                           }}
                                           loading="lazy"
-                                          crossOrigin="anonymous"
+                                          style={{
+                                            minHeight: '128px',
+                                            minWidth: '192px',
+                                            backgroundColor: '#f3f4f6'
+                                          }}
                                         />
-                                        <div 
-                                          className="w-48 h-32 bg-gray-100 rounded border border-gray-300 flex items-center justify-center text-sm text-gray-500 cursor-pointer"
-                                          style={{display: 'none'}}
-                                          onClick={() => window.open(tweet.videoUrls.preview, '_blank')}
-                                        >
-                                          🎬<br/>预览图加载失败<br/>点击查看原图
-                                        </div>
                                         <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
                                           🎥 视频
                                         </div>
