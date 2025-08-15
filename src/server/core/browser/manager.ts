@@ -479,28 +479,7 @@ export class BrowserManager {
         const resourceType = request.resourceType();
         const url = request.url();
 
-        // 检查是否为需要拦截的资源类型
-        if (optimizationConfig.blockedResourceTypes.includes(resourceType as any)) {
-          // 检查是否在允许的域名列表中
-          const isAllowedDomain = optimizationConfig.allowedDomains.some(domain => 
-            url.includes(domain)
-          );
-
-          // 如果不在允许域名列表中，则拦截
-          if (!isAllowedDomain) {
-            if (optimizationConfig.logBlockedRequests) {
-              console.log(`🚫 拦截资源: ${resourceType} - ${url}`);
-            }
-            
-            // 返回空响应以节省带宽
-            route.fulfill({
-              status: 200,
-              contentType: this.getContentTypeForResource(resourceType),
-              body: this.getEmptyResponseForResource(resourceType)
-            });
-            return;
-          }
-        }
+        // 资源拦截已禁用，直接跳过检查
 
         // 允许加载的资源继续请求
         if (optimizationConfig.logBlockedRequests && 

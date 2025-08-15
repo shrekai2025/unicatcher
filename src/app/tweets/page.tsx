@@ -220,6 +220,18 @@ export default function TweetsPage() {
                                 </div>
                               </div>
                               <div className="flex items-center space-x-2">
+                                {/* 推文类型标识 */}
+                                {tweet.isRT && (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                                    🔄 转推
+                                  </span>
+                                )}
+                                {tweet.isReply && (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                                    💬 回复
+                                  </span>
+                                )}
+                                
                                 <a
                                   href={tweet.tweetUrl}
                                   target="_blank"
@@ -272,62 +284,131 @@ export default function TweetsPage() {
                                 <span className="ml-4">采集: {formatDate(tweet.createdAt)}</span>
                               </div>
                             </div>
+                            {/* 推文配图展示 */}
                             {tweet.imageUrls && tweet.imageUrls.length > 0 && (
                               <div className="mt-3">
                                 <p className="text-sm text-gray-500 mb-2">
-                                  推文配图 ({tweet.imageUrls.length} 张):
+                                  📸 推文配图 ({tweet.imageUrls.length} 张):
                                 </p>
-                                <div className="flex space-x-2">
-                                  {tweet.imageUrls.slice(0, 3).map((image: string, index: number) => (
-                                    <img
-                                      key={index}
-                                      src={image}
-                                      alt={`推文图片 ${index + 1}`}
-                                      className="h-16 w-16 object-cover rounded-md border border-gray-200"
-                                    />
+                                <div className="flex flex-wrap gap-2">
+                                  {tweet.imageUrls.slice(0, 6).map((image: string, index: number) => (
+                                    <div key={index} className="relative">
+                                      <img
+                                        src={image}
+                                        alt={`推文图片 ${index + 1}`}
+                                        className="w-20 h-20 object-cover rounded border border-gray-300 cursor-pointer hover:opacity-80"
+                                        onClick={() => window.open(image, '_blank')}
+                                        onError={(e) => {
+                                          const target = e.target as HTMLImageElement;
+                                          target.style.display = 'none';
+                                          const errorDiv = target.nextElementSibling as HTMLElement;
+                                          if (errorDiv) errorDiv.style.display = 'flex';
+                                        }}
+                                        loading="lazy"
+                                        crossOrigin="anonymous"
+                                      />
+                                      <div 
+                                        className="w-20 h-20 bg-gray-100 rounded border border-gray-300 flex items-center justify-center text-xs text-gray-500 cursor-pointer"
+                                        style={{display: 'none'}}
+                                        onClick={() => window.open(image, '_blank')}
+                                      >
+                                        图片加载失败<br/>点击查看
+                                      </div>
+                                    </div>
                                   ))}
-                                  {tweet.imageUrls.length > 3 && (
-                                    <div className="h-16 w-16 bg-gray-100 rounded-md border border-gray-200 flex items-center justify-center">
-                                      <span className="text-gray-500 text-xs">
-                                        +{tweet.imageUrls.length - 3}
-                                      </span>
+                                  {tweet.imageUrls.length > 6 && (
+                                    <div className="w-20 h-20 bg-gray-100 rounded border border-gray-300 flex items-center justify-center text-xs text-gray-500">
+                                      +{tweet.imageUrls.length - 6}<br/>张图片
                                     </div>
                                   )}
                                 </div>
                               </div>
                             )}
-                            {/* 视频内容 */}
+                            {/* 视频内容展示 */}
                             {tweet.videoUrls && (
                               <div className="mt-3">
                                 <p className="text-sm text-gray-500 mb-2">
-                                  视频内容:
+                                  🎬 视频内容:
                                 </p>
-                                <div className="space-y-2">
+                                <div className="bg-gray-50 rounded-lg p-3 space-y-3">
                                   {tweet.videoUrls.preview && (
                                     <div>
-                                      <p className="text-xs text-gray-400 mb-1">预览图:</p>
-                                      <img
-                                        src={tweet.videoUrls.preview}
-                                        alt="视频预览"
-                                        className="h-32 w-48 object-cover rounded-md border border-gray-200"
-                                      />
+                                      <p className="text-xs text-gray-600 mb-2 font-medium">📸 视频预览图:</p>
+                                      <div className="relative inline-block">
+                                        <img
+                                          src={tweet.videoUrls.preview}
+                                          alt="视频预览"
+                                          className="w-48 h-32 object-cover rounded border border-gray-300 cursor-pointer hover:opacity-80"
+                                          onClick={() => window.open(tweet.videoUrls.preview, '_blank')}
+                                          onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            target.style.display = 'none';
+                                            const errorDiv = target.nextElementSibling as HTMLElement;
+                                            if (errorDiv) errorDiv.style.display = 'flex';
+                                          }}
+                                          loading="lazy"
+                                          crossOrigin="anonymous"
+                                        />
+                                        <div 
+                                          className="w-48 h-32 bg-gray-100 rounded border border-gray-300 flex items-center justify-center text-sm text-gray-500 cursor-pointer"
+                                          style={{display: 'none'}}
+                                          onClick={() => window.open(tweet.videoUrls.preview, '_blank')}
+                                        >
+                                          🎬<br/>预览图加载失败<br/>点击查看原图
+                                        </div>
+                                        <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+                                          🎥 视频
+                                        </div>
+                                      </div>
                                     </div>
                                   )}
+                                  
                                   {tweet.videoUrls.video && (
                                     <div>
-                                      <p className="text-xs text-gray-400 mb-1">视频链接:</p>
-                                      <a
-                                        href={tweet.videoUrls.video}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-blue-600 hover:text-blue-800 text-xs break-all"
-                                      >
-                                        {tweet.videoUrls.video.length > 50 
-                                          ? `${tweet.videoUrls.video.substring(0, 50)}...` 
-                                          : tweet.videoUrls.video}
-                                      </a>
+                                      <p className="text-xs text-gray-600 mb-2 font-medium">🔗 视频文件:</p>
+                                      <div className="bg-white rounded-md p-2 border border-gray-200">
+                                        <div className="flex items-center space-x-2">
+                                          <span className="text-sm text-gray-700 flex-1 break-all">
+                                            {tweet.videoUrls.video.length > 80 
+                                              ? `${tweet.videoUrls.video.substring(0, 80)}...` 
+                                              : tweet.videoUrls.video}
+                                          </span>
+                                          <div className="flex space-x-1">
+                                            <a
+                                              href={tweet.videoUrls.video}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                            >
+                                              📱 播放
+                                            </a>
+                                            <button
+                                              onClick={() => navigator.clipboard?.writeText(tweet.videoUrls.video)}
+                                              className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                            >
+                                              📋 复制
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
                                     </div>
                                   )}
+                                  
+                                  {/* 视频信息摘要 */}
+                                  <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-200">
+                                    <span>
+                                      {tweet.videoUrls.preview && tweet.videoUrls.video 
+                                        ? "✅ 预览图和视频文件已采集" 
+                                        : tweet.videoUrls.preview 
+                                        ? "⚠️ 仅采集到预览图" 
+                                        : "⚠️ 仅采集到视频文件"}
+                                    </span>
+                                    {tweet.videoUrls.video?.includes('.mp4') && (
+                                      <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                                        MP4 格式
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             )}
