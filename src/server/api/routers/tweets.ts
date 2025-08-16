@@ -428,6 +428,108 @@ export const tweetsRouter = createTRPCRouter({
       }
     }),
 
+  /**
+   * 获取媒体卡片数据（用于viewer页面瀑布流展示）
+   */
+  getMediaCards: protectedProcedure
+    .input(
+      z.object({
+        listId: z.string().optional(),
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(100).default(100),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        // 获取推文数据，按时间倒序
+        const result = await storageService.getTweets(
+          undefined,
+          input.listId,
+          1,
+          10000 // 先获取大量数据，然后处理成媒体卡片
+        );
+
+        // 将推文转换为媒体卡片数据
+        const mediaCards: any[] = [];
+        
+        result.tweets
+          .sort((a, b) => b.publishedAt - a.publishedAt) // 按时间倒序
+          .forEach((tweet) => {
+            // 处理图片
+            if (tweet.imageUrls && tweet.imageUrls.length > 0) {
+              tweet.imageUrls.forEach((imageUrl: string, index: number) => {
+                mediaCards.push({
+                  id: `${tweet.id}-img-${index}`,
+                  type: 'image',
+                  mediaUrl: imageUrl,
+                  tweetId: tweet.id,
+                  tweetContent: tweet.content,
+                  tweetUrl: tweet.tweetUrl,
+                  userNickname: tweet.userNickname,
+                  userUsername: tweet.userUsername,
+                  profileImageUrl: tweet.profileImageUrl,
+                  viewCount: tweet.viewCount || 0,
+                  publishedAt: tweet.publishedAt,
+                });
+              });
+            }
+
+            // 处理视频
+            if (tweet.videoUrls) {
+              mediaCards.push({
+                id: `${tweet.id}-video`,
+                type: 'video',
+                mediaUrl: tweet.videoUrls.preview || '', // 预览图
+                videoUrl: tweet.videoUrls.video || '', // 视频文件URL
+                tweetId: tweet.id,
+                tweetContent: tweet.content,
+                tweetUrl: tweet.tweetUrl,
+                userNickname: tweet.userNickname,
+                userUsername: tweet.userUsername,
+                profileImageUrl: tweet.profileImageUrl,
+                viewCount: tweet.viewCount || 0,
+                publishedAt: tweet.publishedAt,
+              });
+            }
+
+            // 如果没有媒体文件，只展示文字内容
+            if ((!tweet.imageUrls || tweet.imageUrls.length === 0) && !tweet.videoUrls) {
+              mediaCards.push({
+                id: `${tweet.id}-text`,
+                type: 'text',
+                mediaUrl: '',
+                tweetId: tweet.id,
+                tweetContent: tweet.content,
+                tweetUrl: tweet.tweetUrl,
+                userNickname: tweet.userNickname,
+                userUsername: tweet.userUsername,
+                profileImageUrl: tweet.profileImageUrl,
+                viewCount: tweet.viewCount || 0,
+                publishedAt: tweet.publishedAt,
+              });
+            }
+          });
+
+        // 分页处理
+        const startIndex = (input.page - 1) * input.limit;
+        const endIndex = startIndex + input.limit;
+        const paginatedCards = mediaCards.slice(startIndex, endIndex);
+
+        return {
+          success: true,
+          data: {
+            cards: paginatedCards,
+            total: mediaCards.length,
+            page: input.page,
+            limit: input.limit,
+            hasMore: endIndex < mediaCards.length,
+          },
+        };
+      } catch (error) {
+        throw new Error("获取媒体卡片数据失败");
+      }
+    }),
+
 });
 
 // 辅助函数：获取热门用户
