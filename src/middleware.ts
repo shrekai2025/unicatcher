@@ -11,7 +11,7 @@ const adminOnlyPaths = ['/dashboard', '/tasks', '/tweets', '/extracts', '/x-logi
 const viewerOnlyPaths = ['/viewer'];
 
 // 公开路径（不需要认证）
-const publicPaths = ['/login', '/api/health', '/api/external'];
+const publicPaths = ['/login', '/api/health', '/api/external', '/debug-auth'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -28,15 +28,23 @@ export function middleware(request: NextRequest) {
     // 检查认证状态（通过 cookie）
     const authCookie = request.cookies.get('unicatcher-auth');
     
+    // 调试日志
+    console.log(`[Middleware] Checking path: ${pathname}`);
+    console.log(`[Middleware] Auth cookie exists: ${!!authCookie?.value}`);
+    
     if (!authCookie?.value) {
       // 未认证，重定向到登录页
+      console.log(`[Middleware] No auth cookie, redirecting to login`);
       const loginUrl = new URL('/login', request.url);
       return NextResponse.redirect(loginUrl);
     }
     
     try {
       const auth = JSON.parse(decodeURIComponent(authCookie.value));
+      console.log(`[Middleware] Auth data:`, { isAuthenticated: auth.isAuthenticated, role: auth.role });
+      
       if (!auth.isAuthenticated) {
+        console.log(`[Middleware] Not authenticated, redirecting to login`);
         const loginUrl = new URL('/login', request.url);
         return NextResponse.redirect(loginUrl);
       }
@@ -46,20 +54,27 @@ export function middleware(request: NextRequest) {
       const isAdminOnlyPath = adminOnlyPaths.some(path => pathname.startsWith(path));
       const isViewerOnlyPath = viewerOnlyPaths.some(path => pathname.startsWith(path));
 
+      console.log(`[Middleware] Role check:`, { userRole, isAdminOnlyPath, isViewerOnlyPath });
+
       if (isAdminOnlyPath && userRole !== 'admin') {
         // viewer用户访问admin页面，重定向到viewer页面
+        console.log(`[Middleware] Non-admin accessing admin path, redirecting to viewer`);
         const viewerUrl = new URL('/viewer', request.url);
         return NextResponse.redirect(viewerUrl);
       }
 
       if (isViewerOnlyPath && userRole !== 'viewer' && userRole !== 'admin') {
         // 其他用户访问viewer页面，重定向到dashboard
+        console.log(`[Middleware] Invalid role for viewer path, redirecting to dashboard`);
         const dashboardUrl = new URL('/dashboard', request.url);
         return NextResponse.redirect(dashboardUrl);
       }
 
-    } catch {
+      console.log(`[Middleware] Access granted for ${pathname}`);
+
+    } catch (error) {
       // Cookie 解析失败，重定向到登录页
+      console.log(`[Middleware] Cookie parsing failed:`, error);
       const loginUrl = new URL('/login', request.url);
       return NextResponse.redirect(loginUrl);
     }

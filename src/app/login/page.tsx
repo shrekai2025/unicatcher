@@ -18,10 +18,18 @@ export default function LoginPage() {
 
     if (login(username, password)) {
       const session = getSession();
+      console.log('Login successful:', session);
+      
+      // 验证cookie是否正确设置
+      const cookieCheck = document.cookie.includes('unicatcher-auth');
+      console.log('Cookie set check:', cookieCheck);
+      
       // 根据角色跳转到不同页面
       const redirectPath = session.role === 'viewer' ? '/viewer' : '/dashboard';
+      console.log('Redirecting to:', redirectPath);
       router.push(redirectPath);
     } else {
+      console.log('Login failed for:', username);
       setError('用户名或密码错误');
     }
     

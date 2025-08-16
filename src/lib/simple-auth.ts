@@ -35,8 +35,9 @@ export function login(username: string, password: string): boolean {
     if (typeof window !== 'undefined') {
       // 同时设置 localStorage 和 cookie
       localStorage.setItem(AUTH_KEY, authString);
-      // 使用 encodeURIComponent 编码 cookie 值
-      document.cookie = `unicatcher-auth=${encodeURIComponent(authString)}; path=/; max-age=86400`; // 24小时
+      // 设置cookie，确保在所有环境下都能工作
+      document.cookie = `unicatcher-auth=${encodeURIComponent(authString)}; path=/; max-age=86400; SameSite=Lax`; // 24小时
+      console.log('Authentication set:', { username, role: user.role }); // 调试日志
     }
     return true;
   }
