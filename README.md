@@ -310,7 +310,7 @@ npm run build && npm run start
 # 推送 Schema 变更到数据库
 npm run db:push
 
-# 生成 Prisma 客户端
+# 生成 Prisma 客户端（创建迁移）
 npm run db:generate
 
 # 重建数据库（清空所有数据）
@@ -318,6 +318,7 @@ npm run db:reset
 
 # 打开数据库管理界面
 npm run db:studio           # 端口 5555
+npx prisma studio --hostname 0.0.0.0 --port 5556
 
 # 安全初始化数据库（推荐）
 npm run safe-init-db
@@ -332,6 +333,8 @@ npm run safe-init-db
 ```bash
 # 启动服务
 pm2 start ecosystem.config.js
+
+pm2 start npm --name unicatcher -- start
 
 # 查看服务状态
 pm2 status
@@ -370,6 +373,11 @@ pm2 unstartup                          # 取消开机自启
 
 # 更新应用
 git pull
+# 强制重置到远程分支（推荐）
+git fetch origin
+git reset --hard origin/main
+git clean -fd
+
 npm install                            # 如有依赖更新
 pm2 restart unicatcher
 
