@@ -7,6 +7,7 @@ interface VideoData {
   videoUrl: string;
   previewUrl: string;
   tweetContent: string;
+  tweetUrl: string;
   userNickname: string;
   userUsername: string;
 }
@@ -144,7 +145,7 @@ export function FloatingVideoPlayer({ isOpen, videoData, onClose }: FloatingVide
               {/* 操作按钮 */}
               <div className="flex items-center space-x-2 mt-3 pt-3 border-t border-gray-100">
                 <button
-                  onClick={() => window.open(videoData.videoUrl, '_blank')}
+                  onClick={() => window.open(videoData.tweetUrl, '_blank')}
                   className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-2 rounded transition-colors"
                 >
                   原推文

@@ -28,6 +28,7 @@ interface VideoData {
   videoUrl: string;
   previewUrl: string;
   tweetContent: string;
+  tweetUrl: string;
   userNickname: string;
   userUsername: string;
 }
@@ -83,6 +84,7 @@ export default function ViewerPage() {
         videoUrl: card.videoUrl,
         previewUrl: card.mediaUrl,
         tweetContent: card.tweetContent,
+        tweetUrl: card.tweetUrl,
         userNickname: card.userNickname,
         userUsername: card.userUsername,
       };
@@ -143,7 +145,7 @@ export default function ViewerPage() {
               {/* 原推文按钮 */}
               {card.videoUrl && (
                 <button
-                  onClick={() => openVideo(card.videoUrl!)}
+                  onClick={() => openTweet(card.tweetUrl)}
                   className="absolute top-2 left-2 bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded"
                 >
                   原推文
