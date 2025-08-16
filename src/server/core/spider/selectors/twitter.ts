@@ -52,6 +52,8 @@ export class TwitterSelector {
    * 设置网络捕获 - 在构造函数中立即开始监听
    */
   private async setupNetworkCapture(): Promise<void> {
+    let captureCount = 0;
+    
     // 监听所有网络响应
     this.page.on('response', (response) => {
       try {
@@ -63,6 +65,7 @@ export class TwitterSelector {
           const match = url.match(/amplify_video\/(\d+)\//);
           if (match && match[1]) {
             const mediaId = match[1];
+            captureCount++;
             const existing = this.capturedVideoUrls.get(mediaId);
             if (!existing?.video) { // 只在首次捕获时记录日志
               console.log(`🎯 捕获视频URL [${mediaId}]: ${url.substring(0, 100)}...`);
@@ -80,6 +83,7 @@ export class TwitterSelector {
           const match = url.match(/amplify_video_thumb\/(\d+)\//);
           if (match && match[1]) {
             const mediaId = match[1];
+            captureCount++;
             const existing = this.capturedVideoUrls.get(mediaId) || {};
             if (!existing.preview) { // 只在首次捕获时记录日志
               console.log(`🖼️ 捕获预览图 [${mediaId}]: ${url}`);
@@ -96,17 +100,33 @@ export class TwitterSelector {
       }
     });
     
-    console.log('🔍 网络捕获已启动，监听视频URL...');
+    // 每5秒汇总一次捕获情况（调试模式下输出详细统计）
+    if (process.env.SPIDER_DEBUG === 'true') {
+      setInterval(() => {
+        if (captureCount > 0) {
+          console.log(`📊 媒体资源捕获统计: ${captureCount} 个，视频缓存: ${this.capturedVideoUrls.size} 个`);
+          captureCount = 0; // 重置计数器
+        }
+      }, 5000);
+    } else {
+      // 生产模式：只在捕获到重要资源时输出简要信息
+      setInterval(() => {
+        if (captureCount > 0) {
+          console.log(`🎬 捕获媒体: ${captureCount} 个`);
+          captureCount = 0;
+        }
+      }, 10000); // 更长的间隔
+    }
   }
 
   /**
    * 等待Timeline容器加载
    */
   async waitForTimeline(): Promise<void> {
-    console.log('正在等待Timeline容器加载...');
+    console.log('🔍 等待页面加载...');
     
     // 定义多个可能的选择器
-    const possibleSelectors = [
+    const possibleSelectors: string[] = [
       this.selectors.timelineContainer,
       '[data-testid="primaryColumn"]',
       '[data-testid="timeline"]', 
@@ -114,21 +134,19 @@ export class TwitterSelector {
       '[aria-label*="Timeline"]',
       'section[role="region"]',
       'div[data-testid="cellInnerDiv"]'
-    ];
+    ].filter((selector): selector is string => typeof selector === 'string' && selector.length > 0);
     
     let lastError: Error | null = null;
     
     // 尝试每个选择器
-    for (const selector of possibleSelectors) {
+    for (let i = 0; i < possibleSelectors.length; i++) {
       try {
-        console.log(`尝试选择器: ${selector}`);
-        await this.page.waitForSelector(selector, {
+        await this.page.waitForSelector(possibleSelectors[i]!, {
           timeout: 10000, // 减少单个选择器的等待时间
         });
-        console.log(`Timeline容器已加载 (使用选择器: ${selector})`);
+        console.log(`✅ Timeline容器已加载 (方案${i + 1})`);
         return;
       } catch (error) {
-        console.log(`选择器 ${selector} 失败，尝试下一个...`);
         lastError = error instanceof Error ? error : new Error('选择器等待失败');
         continue;
       }
@@ -136,8 +154,6 @@ export class TwitterSelector {
     
     // 如果所有选择器都失败，尝试检查页面是否至少有基本内容
     try {
-      console.log('尝试检查页面基本内容...');
-      
       // 检查是否被重定向到登录页面
       const loginButton = await this.page.$('[data-testid="loginButton"], [href="/login"], input[name="text"]');
       if (loginButton) {
@@ -147,21 +163,20 @@ export class TwitterSelector {
       // 检查是否有推文内容
       const tweetElements = await this.page.$$('article, [data-testid="tweet"]');
       if (tweetElements.length > 0) {
-        console.log(`找到 ${tweetElements.length} 个推文元素，继续执行`);
+        console.log(`✅ 检测到 ${tweetElements.length} 个推文，继续执行`);
         return;
       }
       
       // 最后检查页面是否至少加载了基本结构
       const mainContent = await this.page.$('main, #react-root, body');
       if (mainContent) {
-        console.log('页面基本结构已加载，尝试继续');
-        // 额外等待一下，让内容加载
+        console.log('⚠️ 页面结构已加载，等待内容...');
         await this.page.waitForTimeout(5000);
         return;
       }
       
     } catch (checkError) {
-      console.error('页面内容检查失败:', checkError);
+      console.error('❌ 页面检查失败:', checkError);
     }
     
     // 所有尝试都失败了
