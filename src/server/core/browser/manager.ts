@@ -481,20 +481,17 @@ export class BrowserManager {
 
         // 资源拦截已禁用，直接跳过检查
 
-        // 允许加载的资源继续请求
-        if (optimizationConfig.logBlockedRequests && 
-            optimizationConfig.allowedResourceTypes.includes(resourceType as any)) {
-          console.log(`✅ 允许资源: ${resourceType} - ${url}`);
+        // 仅在调试模式下记录详细的资源访问日志
+        if (optimizationConfig.logBlockedRequests) {
+          if (optimizationConfig.allowedResourceTypes.includes(resourceType as any)) {
+            console.log(`✅ 允许: ${resourceType} - ${url.substring(0, 60)}...`);
+          }
         }
         
         route.continue();
       });
 
-      console.log('✅ 资源优化已启用 - 当前拦截规则:', {
-        blockedTypes: optimizationConfig.blockedResourceTypes,
-        allowedDomains: optimizationConfig.allowedDomains,
-        logEnabled: optimizationConfig.logBlockedRequests
-      });
+      console.log('✅ 浏览器资源优化已启用');
     } catch (error) {
       console.error('设置资源优化失败:', error);
       // 不抛出错误，继续正常执行

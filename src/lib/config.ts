@@ -134,8 +134,8 @@ export const config = {
         'video.twimg.com', // Twitter视频媒体服务器
         'abs-0.twimg.com', // Twitter emoji等静态资源
       ],
-      // 启用详细的资源请求日志（便于视频URL调试）
-      logBlockedRequests: true, // 强制启用，便于调试视频采集
+      // 启用资源请求日志（可通过环境变量控制）
+      logBlockedRequests: process.env.SPIDER_DEBUG === 'true', // 调试模式开关
     },
   },
 
