@@ -147,7 +147,7 @@ export function FloatingVideoPlayer({ isOpen, videoData, onClose }: FloatingVide
                   onClick={() => window.open(videoData.videoUrl, '_blank')}
                   className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-2 rounded transition-colors"
                 >
-                  原视频
+                  原推文
                 </button>
                 <button
                   onClick={toggleExpanded}
