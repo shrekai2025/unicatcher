@@ -8,6 +8,18 @@
 import { useState } from 'react';
 import { api } from '~/trpc/react';
 
+// 为提取记录增加最小可用类型，避免隐式 any
+interface ExtractRecord {
+  id: string;
+  batchId: string;
+  createdAt: string | Date;
+  status: string;
+  tweetCount: number;
+  listId?: string | null;
+  username?: string | null;
+  isReExtract: boolean;
+}
+
 export default function ExtractsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
@@ -198,7 +210,7 @@ export default function ExtractsPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {extractsData.data.records.map((record) => (
+                    {extractsData.data.records.map((record: ExtractRecord) => (
                       <tr key={record.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">

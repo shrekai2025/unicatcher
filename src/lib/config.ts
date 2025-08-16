@@ -99,6 +99,11 @@ export const config = {
         '--allow-running-insecure-content',
         '--disable-blink-features=AutomationControlled',
         '--disable-features=VizDisplayCompositor',
+        // 无GUI环境额外优化（移除可能冲突的参数）
+        '--disable-background-networking',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--force-device-scale-factor=1',
       ],
     },
     // 浏览器实例管理策略
