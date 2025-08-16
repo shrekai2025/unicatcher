@@ -383,6 +383,9 @@ pm2 restart unicatcher
 
 # 查看详细信息
 pm2 describe unicatcher
+
+# 更新（videook分支）
+cd ~/unicatcher && pm2 stop unicatcher && sleep 5 && git stash && git pull origin videook && npm ci && npx prisma db push && npm run build && pm2 start unicatcher && pm2 logs unicatcher --lines 20
 ```
 
 ### Docker 管理
