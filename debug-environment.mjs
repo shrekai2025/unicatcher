@@ -109,6 +109,27 @@ async function debugEnvironment() {
     const videoThumbs = await page.$$eval('img[src*="amplify_video_thumb"]', thumbs => thumbs.length);
     console.log(`  视频缩略图数量: ${videoThumbs}`);
     
+    // 更详细的图片检查
+    const allImageSrcs = await page.$$eval('img', imgs => 
+      imgs.map(img => ({ src: img.src, alt: img.alt }))
+    );
+    
+    console.log(`  所有图片src (前10个):`);
+    allImageSrcs.slice(0, 10).forEach((img, i) => {
+      console.log(`    图片 ${i + 1}: ${img.src.substring(0, 80)}${img.src.length > 80 ? '...' : ''}`);
+    });
+    
+    // 检查是否有pbs.twimg.com图片
+    const pbsImages = allImageSrcs.filter(img => img.src.includes('pbs.twimg.com'));
+    console.log(`  pbs.twimg.com图片数量: ${pbsImages.length}`);
+    
+    // 检查amplify相关图片
+    const amplifyImages = allImageSrcs.filter(img => img.src.includes('amplify'));
+    console.log(`  amplify相关图片数量: ${amplifyImages.length}`);
+    amplifyImages.forEach((img, i) => {
+      console.log(`    amplify图片 ${i + 1}: ${img.src}`);
+    });
+    
     // 检查具体的视频元素
     console.log('\n5️⃣ 视频元素详细检查:');
     
