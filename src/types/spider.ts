@@ -40,6 +40,11 @@ export interface TweetData {
   publishedAt: number;           // 发推时间戳 (JavaScript number，存储时转为bigint)
   listId: string;                // 来源List ID
   scrapedAt: number;             // 爬取时间戳 (JavaScript number，存储时转为bigint)
+  
+  // 逻辑删除相关字段
+  isDeleted?: boolean;           // 是否已被逻辑删除
+  deletedAt?: Date;              // 删除时间
+  deletedBy?: string;            // 删除操作的用户
 }
 
 // 爬虫任务配置

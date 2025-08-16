@@ -5,6 +5,7 @@ import { Navigation } from '~/components/navigation';
 import { FloatingVideoPlayer } from '~/components/floating-video-player';
 import { api } from '~/trpc/react';
 import { formatCount } from '~/lib/format';
+import { getSession } from '~/lib/simple-auth';
 
 interface MediaCard {
   id: string;
@@ -59,7 +60,11 @@ export default function ViewerPage() {
   };
 
   const handleDelete = async (tweetId: string) => {
-    await deleteTweet.mutateAsync({ id: tweetId });
+    const session = getSession();
+    await deleteTweet.mutateAsync({ 
+      id: tweetId, 
+      deletedBy: session.username 
+    });
   };
 
   const openTweet = (tweetUrl: string) => {
@@ -160,13 +165,13 @@ export default function ViewerPage() {
             👁️ {formatCount(card.viewCount)}
           </div>
 
-          {/* 删除按钮 */}
+          {/* 隐藏按钮 */}
           <button
             onClick={() => handleDelete(card.tweetId)}
             className="absolute top-2 right-12 bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
             disabled={deleteTweet.isPending}
           >
-            删除
+            隐藏
           </button>
 
           {/* Hover显示用户信息 */}

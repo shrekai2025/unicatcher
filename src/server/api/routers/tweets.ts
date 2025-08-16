@@ -250,52 +250,54 @@ export const tweetsRouter = createTRPCRouter({
     }),
 
   /**
-   * 删除推文数据
+   * 逻辑删除推文数据
    */
   delete: protectedProcedure
     .input(
       z.object({
         id: z.string().min(1, "推文ID不能为空"),
+        deletedBy: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
       try {
-        await storageService.deleteTweet(input.id);
+        await storageService.deleteTweet(input.id, input.deletedBy);
         
         return {
           success: true,
-          message: "推文删除成功",
+          message: "推文已隐藏",
         };
       } catch (error) {
         throw new Error(
-          error instanceof Error ? error.message : "删除推文失败"
+          error instanceof Error ? error.message : "隐藏推文失败"
         );
       }
     }),
 
   /**
-   * 批量删除推文数据
+   * 批量逻辑删除推文数据
    */
   batchDelete: protectedProcedure
     .input(
       z.object({
         ids: z.array(z.string()).min(1, "推文ID列表不能为空"),
+        deletedBy: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
       try {
-        const deletedCount = await storageService.batchDeleteTweets(input.ids);
+        const deletedCount = await storageService.batchDeleteTweets(input.ids, input.deletedBy);
         
         return {
           success: true,
-          message: `成功删除 ${deletedCount} 条推文`,
+          message: `成功隐藏 ${deletedCount} 条推文`,
           data: {
             deletedCount,
           },
         };
       } catch (error) {
         throw new Error(
-          error instanceof Error ? error.message : "批量删除推文失败"
+          error instanceof Error ? error.message : "批量隐藏推文失败"
         );
       }
     }),

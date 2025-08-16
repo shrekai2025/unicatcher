@@ -127,12 +127,15 @@ export class StorageService {
   }
 
   /**
-   * 检查推文是否存在
+   * 检查推文是否存在（排除逻辑删除）
    */
   async checkTweetExists(tweetId: string): Promise<boolean> {
     try {
       const tweet = await db.tweet.findUnique({
-        where: { id: tweetId },
+        where: { 
+          id: tweetId,
+          isDeleted: false,
+        },
       });
       return !!tweet;
     } catch (error) {
@@ -142,12 +145,15 @@ export class StorageService {
   }
 
   /**
-   * 获取List中已存在的推文ID列表
+   * 获取List中已存在的推文ID列表（排除逻辑删除）
    */
   async getExistingTweetIds(listId: string): Promise<Set<string>> {
     try {
       const tweets = await db.tweet.findMany({
-        where: { listId },
+        where: { 
+          listId,
+          isDeleted: false,
+        },
         select: { id: true },
       });
 
@@ -196,12 +202,26 @@ export class StorageService {
       console.log(`    videoUrls (${dbData.videoUrls?.length || 0}字符): ${dbData.videoUrls || 'null'}`);
       console.log(`    profileImageUrl: ${dbData.profileImageUrl || 'null'}`);
       
+      // 首先检查推文是否已被逻辑删除
+      const existingTweet = await db.tweet.findUnique({
+        where: { id: tweetData.id },
+        select: { isDeleted: true }
+      });
+
+      // 如果推文已被逻辑删除，则跳过保存
+      if (existingTweet?.isDeleted) {
+        console.log(`🙈 跳过已逻辑删除的垃圾推文: ${tweetData.id}`);
+        return;
+      }
+
       // 使用 upsert：如果存在则更新，不存在则创建
       await db.tweet.upsert({
-        where: { id: tweetData.id },
+        where: { 
+          id: tweetData.id,
+        },
         create: dbData,
         update: {
-          // 更新时只更新媒体字段和计数
+          // 更新时只更新媒体字段和计数（不影响逻辑删除状态）
           replyCount: tweetData.replyCount,
           retweetCount: tweetData.retweetCount,
           likeCount: tweetData.likeCount,
@@ -247,7 +267,7 @@ export class StorageService {
   }
 
   /**
-   * 获取推文数据
+   * 获取推文数据（排除逻辑删除）
    */
   async getTweets(
     taskId?: string,
@@ -261,7 +281,9 @@ export class StorageService {
     limit: number;
   }> {
     try {
-      const where: any = {};
+      const where: any = {
+        isDeleted: false, // 排除逻辑删除的推文
+      };
       if (taskId) where.taskId = taskId;
       if (listId) where.listId = listId;
 
@@ -282,6 +304,8 @@ export class StorageService {
             retweetCount: true,
             likeCount: true,
             viewCount: true,
+            isRT: true,
+            isReply: true,
             imageUrls: true,
             profileImageUrl: true,
             videoUrls: true,
@@ -294,6 +318,10 @@ export class StorageService {
             syncedAt: true,
             analyzedAt: true,
             analysisBatchId: true,
+            // 逻辑删除字段
+            isDeleted: true,
+            deletedAt: true,
+            deletedBy: true,
             taskId: true,
             createdAt: true,
             updatedAt: true,
@@ -369,7 +397,7 @@ export class StorageService {
   }
 
   /**
-   * 获取统计信息
+   * 获取统计信息（排除逻辑删除的推文）
    */
   async getStats(): Promise<{
     totalTasks: number;
@@ -390,7 +418,7 @@ export class StorageService {
         db.spiderTask.count({ where: { status: 'completed' } }),
         db.spiderTask.count({ where: { status: 'running' } }),
         db.spiderTask.count({ where: { status: 'failed' } }),
-        db.tweet.count(),
+        db.tweet.count({ where: { isDeleted: false } }), // 排除逻辑删除的推文
       ]);
 
       return {
@@ -413,43 +441,53 @@ export class StorageService {
   }
 
   /**
-   * 删除单个推文
+   * 逻辑删除单个推文
    */
-  async deleteTweet(tweetId: string): Promise<void> {
+  async deleteTweet(tweetId: string, deletedBy?: string): Promise<void> {
     try {
-      await db.tweet.delete({
+      await db.tweet.update({
         where: { id: tweetId },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          deletedBy: deletedBy || 'system',
+        },
       });
-      console.log(`推文删除成功: ${tweetId}`);
+      console.log(`推文逻辑删除成功: ${tweetId}`);
     } catch (error) {
-      console.error('删除推文失败:', error);
-      throw new Error('删除推文失败');
+      console.error('逻辑删除推文失败:', error);
+      throw new Error('逻辑删除推文失败');
     }
   }
 
   /**
-   * 批量删除推文
+   * 批量逻辑删除推文
    */
-  async batchDeleteTweets(tweetIds: string[]): Promise<number> {
+  async batchDeleteTweets(tweetIds: string[], deletedBy?: string): Promise<number> {
     try {
-      const result = await db.tweet.deleteMany({
+      const result = await db.tweet.updateMany({
         where: {
           id: {
             in: tweetIds,
           },
         },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          deletedBy: deletedBy || 'system',
+        },
       });
       
-      console.log(`批量删除推文成功: ${result.count} 条`);
+      console.log(`批量逻辑删除推文成功: ${result.count} 条`);
       return result.count;
     } catch (error) {
-      console.error('批量删除推文失败:', error);
-      throw new Error('批量删除推文失败');
+      console.error('批量逻辑删除推文失败:', error);
+      throw new Error('批量逻辑删除推文失败');
     }
   }
 
   /**
-   * 导出推文数据
+   * 导出推文数据（排除逻辑删除）
    */
   async exportTweets(
     taskId?: string,
@@ -457,7 +495,9 @@ export class StorageService {
     format: 'json' | 'csv' = 'json'
   ): Promise<string> {
     try {
-      const where: any = {};
+      const where: any = {
+        isDeleted: false, // 排除逻辑删除的推文
+      };
       if (taskId) where.taskId = taskId;
       if (listId) where.listId = listId;
 
@@ -517,7 +557,7 @@ export class StorageService {
   }
 
   /**
-   * 统计符合条件的可用推文数量 (高效计数)
+   * 统计符合条件的可用推文数量 (高效计数，排除逻辑删除)
    */
   async countAvailableTweets(params: {
     listId?: string;
@@ -528,7 +568,9 @@ export class StorageService {
       const { listId, username, isExtracted } = params;
 
       // 构建查询条件
-      const where: any = {};
+      const where: any = {
+        isDeleted: false, // 排除逻辑删除的推文
+      };
       
       // 根据是否已提取设置状态条件
       if (isExtracted) {
@@ -607,7 +649,9 @@ export class StorageService {
       // 使用事务确保原子性操作
       const result = await db.$transaction(async (tx) => {
         // 构建查询条件
-        const where: any = {};
+        const where: any = {
+          isDeleted: false, // 排除逻辑删除的推文
+        };
         
         // 根据是否已提取设置状态条件
         if (isExtracted) {

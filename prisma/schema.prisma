@@ -116,6 +116,11 @@ model Tweet {
   analyzedAt        DateTime? // 分析完成时间
   analysisBatchId   String?   // 分析批次ID
   
+  // 逻辑删除相关字段
+  isDeleted  Boolean   @default(false) // 是否已被逻辑删除
+  deletedAt  DateTime? // 删除时间
+  deletedBy  String?   // 删除操作的用户
+  
   // 关联任务
   taskId     String
   task       SpiderTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -128,6 +133,9 @@ model Tweet {
   @@index([taskId])
   @@index([analysisStatus])
   @@index([syncedAt])
+  @@index([isDeleted])
+  @@index([isDeleted, publishedAt])
+  @@index([isDeleted, listId])
 }
 
 // 数据同步记录表 - 记录外部系统的数据获取历史
