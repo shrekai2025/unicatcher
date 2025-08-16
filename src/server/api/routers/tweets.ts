@@ -472,6 +472,7 @@ export const tweetsRouter = createTRPCRouter({
                   profileImageUrl: tweet.profileImageUrl,
                   viewCount: tweet.viewCount || 0,
                   publishedAt: tweet.publishedAt,
+                  isReply: tweet.isReply || false,
                 });
               });
             }
@@ -491,6 +492,7 @@ export const tweetsRouter = createTRPCRouter({
                 profileImageUrl: tweet.profileImageUrl,
                 viewCount: tweet.viewCount || 0,
                 publishedAt: tweet.publishedAt,
+                isReply: tweet.isReply || false,
               });
             }
 
@@ -508,6 +510,7 @@ export const tweetsRouter = createTRPCRouter({
                 profileImageUrl: tweet.profileImageUrl,
                 viewCount: tweet.viewCount || 0,
                 publishedAt: tweet.publishedAt,
+                isReply: tweet.isReply || false,
               });
             }
           });
