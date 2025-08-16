@@ -163,30 +163,44 @@ export class StorageService {
    */
   async saveTweet(tweetData: TweetData, taskId: string): Promise<void> {
     try {
-      await db.tweet.create({
-        data: {
-          id: tweetData.id,
-          content: tweetData.content,
-          userNickname: tweetData.userNickname,
-          userUsername: tweetData.userUsername,
-          replyCount: tweetData.replyCount,
-          retweetCount: tweetData.retweetCount,
-          likeCount: tweetData.likeCount,
-          viewCount: tweetData.viewCount,
-          isReply: tweetData.isReply,
-          isRT: tweetData.isRT,
-          imageUrls: tweetData.imageUrls ? JSON.stringify(tweetData.imageUrls) : null,
-          profileImageUrl: tweetData.profileImageUrl || null,
-          videoUrls: tweetData.videoUrls ? JSON.stringify(tweetData.videoUrls) : null,
-          tweetUrl: tweetData.tweetUrl,
-          publishedAt: BigInt(tweetData.publishedAt),
-          listId: tweetData.listId,
-          scrapedAt: BigInt(tweetData.scrapedAt),
-          taskId,
-        },
-      });
+      // 🔍 调试日志：检查接收到的媒体数据
+      console.log(`💾 保存推文 [${tweetData.id}]:`);
+      console.log(`  📷 配图数量: ${tweetData.imageUrls?.length || 0}`);
+      console.log(`  👤 头像: ${tweetData.profileImageUrl ? '有' : '无'}`);
+      console.log(`  🎥 视频数据: ${tweetData.videoUrls ? JSON.stringify(tweetData.videoUrls) : '无'}`);
+      
+      const dbData = {
+        id: tweetData.id,
+        content: tweetData.content,
+        userNickname: tweetData.userNickname,
+        userUsername: tweetData.userUsername,
+        replyCount: tweetData.replyCount,
+        retweetCount: tweetData.retweetCount,
+        likeCount: tweetData.likeCount,
+        viewCount: tweetData.viewCount,
+        isReply: tweetData.isReply,
+        isRT: tweetData.isRT,
+        imageUrls: tweetData.imageUrls ? JSON.stringify(tweetData.imageUrls) : null,
+        profileImageUrl: tweetData.profileImageUrl || null,
+        videoUrls: tweetData.videoUrls ? JSON.stringify(tweetData.videoUrls) : null,
+        tweetUrl: tweetData.tweetUrl,
+        publishedAt: BigInt(tweetData.publishedAt),
+        listId: tweetData.listId,
+        scrapedAt: BigInt(tweetData.scrapedAt),
+        taskId,
+      };
+      
+      // 🔍 调试日志：检查即将写入数据库的数据
+      console.log(`  💾 写库数据:`);
+      console.log(`    imageUrls (${dbData.imageUrls?.length || 0}字符): ${dbData.imageUrls?.substring(0, 100)}...`);
+      console.log(`    videoUrls (${dbData.videoUrls?.length || 0}字符): ${dbData.videoUrls || 'null'}`);
+      console.log(`    profileImageUrl: ${dbData.profileImageUrl || 'null'}`);
+      
+      await db.tweet.create({ data: dbData });
+      
+      console.log(`✅ 推文保存成功: ${tweetData.id}`);
     } catch (error) {
-      console.error('保存推文失败:', error);
+      console.error(`❌ 保存推文失败 [${tweetData.id}]:`, error);
       throw new Error('保存推文失败');
     }
   }
