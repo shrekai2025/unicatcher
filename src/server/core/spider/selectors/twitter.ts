@@ -778,6 +778,29 @@ export class TwitterSelector {
         }
       }
 
+      // 1.b 若未从 video[poster] 提取到媒体ID，则尝试在推文内查找缩略图 IMG 提取媒体ID
+      if (!result.preview) {
+        try {
+          const thumbImg = await tweetElement.$('img[src*="amplify_video_thumb/"]');
+          if (thumbImg) {
+            const thumbSrc = await thumbImg.getAttribute('src');
+            if (thumbSrc) {
+              result.preview = thumbSrc;
+              const thumbMatch = thumbSrc.match(/amplify_video_thumb\/(\d+)\//);
+              if (thumbMatch && thumbMatch[1]) {
+                const mediaId = thumbMatch[1];
+                console.log(`🔎 通过IMG提取媒体ID: ${mediaId}`);
+                const capturedData = this.capturedVideoUrls.get(mediaId);
+                if (capturedData && capturedData.video) {
+                  result.video = capturedData.video;
+                  console.log(`✅ 通过IMG媒体ID从缓存获取视频URL: ${result.video}`);
+                }
+              }
+            }
+          }
+        } catch {}
+      }
+
       // 4. 如果还没有找到视频URL，尝试从DOM中的source标签获取
       if (!result.video) {
         console.log('🔄 尝试从DOM获取视频源...');
