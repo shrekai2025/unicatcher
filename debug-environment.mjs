@@ -58,7 +58,7 @@ async function debugEnvironment() {
     });
     
     // 访问一个有视频的推文
-    const testUrl = 'https://x.com/elonmusk/status/1956535198625169408';
+    const testUrl = 'https://x.com/Morph_VGart/status/1956596791903932803';
     console.log(`\n3️⃣ 访问测试页面: ${testUrl}`);
     
     await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 30000 });
