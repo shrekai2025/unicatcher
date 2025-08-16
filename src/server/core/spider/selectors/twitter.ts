@@ -63,8 +63,12 @@ export class TwitterSelector {
           const match = url.match(/amplify_video\/(\d+)\//);
           if (match && match[1]) {
             const mediaId = match[1];
-            console.log(`🎯 捕获视频URL [${mediaId}]: ${url.substring(0, 100)}...`);
+            const existing = this.capturedVideoUrls.get(mediaId);
+            if (!existing?.video) { // 只在首次捕获时记录日志
+              console.log(`🎯 捕获视频URL [${mediaId}]: ${url.substring(0, 100)}...`);
+            }
             this.capturedVideoUrls.set(mediaId, {
+              ...existing,
               video: url.split('?')[0], // 移除查询参数
               timestamp: Date.now(),
             });
@@ -76,8 +80,10 @@ export class TwitterSelector {
           const match = url.match(/amplify_video_thumb\/(\d+)\//);
           if (match && match[1]) {
             const mediaId = match[1];
-            console.log(`🖼️ 捕获预览图 [${mediaId}]: ${url}`);
             const existing = this.capturedVideoUrls.get(mediaId) || {};
+            if (!existing.preview) { // 只在首次捕获时记录日志
+              console.log(`🖼️ 捕获预览图 [${mediaId}]: ${url}`);
+            }
             this.capturedVideoUrls.set(mediaId, {
               ...existing,
               preview: url,
@@ -716,20 +722,26 @@ export class TwitterSelector {
   }
 
   /**
-   * 建立推文ID到媒体ID的映射
+   * 建立推文ID到媒体ID的映射（增强版 - 从已捕获的URL推断）
    */
   async buildTweetVideoMapping(tweetElement: any, tweetId: string): Promise<void> {
     try {
+      console.log(`🔍 为推文 [${tweetId}] 建立视频映射...`);
+      
       // 方法1: 在推文中查找所有视频相关的媒体ID
       const videoThumbs = await tweetElement.$$('img[src*="amplify_video_thumb"]');
+      console.log(`  📊 找到 ${videoThumbs.length} 个视频缩略图`);
       
       if (videoThumbs.length === 0) {
         // 方法2: 尝试更宽泛的选择器
         const allImages = await tweetElement.$$('img');
+        console.log(`  📊 查找所有图片: ${allImages.length} 个`);
+        
         for (const img of allImages) {
           try {
             const src = await img.getAttribute('src');
             if (src && src.includes('amplify_video_thumb')) {
+              console.log(`  📸 发现视频缩略图: ${src}`);
               const match = src.match(/amplify_video_thumb\/(\d+)/);
               if (match && match[1]) {
                 const mediaId = match[1];
@@ -742,12 +754,45 @@ export class TwitterSelector {
             continue;
           }
         }
+        
+        // 方法3: 如果DOM中找不到，从已捕获的URL中尝试匹配
+        console.log(`  🎯 DOM中未找到缩略图，尝试从缓存匹配...`);
+        
+        // 检查最近捕获的视频URL，看是否与当前推文相关
+        const recentMediaIds = Array.from(this.capturedVideoUrls.keys());
+        console.log(`  📋 可用媒体ID: ${recentMediaIds.join(', ')}`);
+        
+        // 简单策略：如果只有一个最近的媒体ID，就假设是当前推文的
+        if (recentMediaIds.length === 1) {
+          const mediaId = recentMediaIds[0];
+          if (mediaId) {
+            this.tweetVideoMapping.set(tweetId, mediaId);
+            console.log(`🔗 通过单一匹配建立映射: 推文[${tweetId}] -> 媒体[${mediaId}]`);
+            return;
+          }
+        }
+        
+        // 更智能的策略：基于时间戳匹配最近的媒体ID
+        if (recentMediaIds.length > 1) {
+          const sortedByTime = recentMediaIds
+            .map(id => ({ id, timestamp: this.capturedVideoUrls.get(id)?.timestamp || 0 }))
+            .sort((a, b) => b.timestamp - a.timestamp);
+          
+          const latestMediaId = sortedByTime[0]?.id;
+          if (latestMediaId) {
+            this.tweetVideoMapping.set(tweetId, latestMediaId);
+            console.log(`🔗 通过时间匹配建立映射: 推文[${tweetId}] -> 媒体[${latestMediaId}]`);
+          }
+          return;
+        }
+        
       } else {
         // 处理找到的视频缩略图
         for (const thumb of videoThumbs) {
           try {
             const src = await thumb.getAttribute('src');
             if (src) {
+              console.log(`  📸 处理缩略图: ${src}`);
               const match = src.match(/amplify_video_thumb\/(\d+)/);
               if (match && match[1]) {
                 const mediaId = match[1];
@@ -761,6 +806,8 @@ export class TwitterSelector {
           }
         }
       }
+      
+      console.log(`⚠️ 未能为推文 [${tweetId}] 建立视频映射`);
     } catch (error) {
       console.warn('建立推文视频映射失败:', error);
     }
