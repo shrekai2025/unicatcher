@@ -61,7 +61,7 @@ async function debugVideoStorage() {
       const tweetsWithId = await prisma.tweet.findMany({
         where: {
           OR: [
-            { tweetId: videoId },
+            { id: videoId },
             { content: { contains: videoId } },
             { imageUrls: { contains: videoId } },
             { videoUrls: { contains: videoId } }
@@ -69,7 +69,6 @@ async function debugVideoStorage() {
         },
         select: {
           id: true,
-          tweetId: true,
           content: true,
           imageUrls: true,
           videoUrls: true,
@@ -81,7 +80,7 @@ async function debugVideoStorage() {
       if (tweetsWithId.length > 0) {
         tweetsWithId.forEach((tweet, idx) => {
           console.log(`  📝 推文 ${idx + 1}:`);
-          console.log(`    ID: ${tweet.tweetId}`);
+          console.log(`    ID: ${tweet.id}`);
           console.log(`    时间: ${tweet.publishedAt}`);
           console.log(`    内容: ${tweet.content?.substring(0, 100)}...`);
           console.log(`    配图: ${tweet.imageUrls || '无'}`);
@@ -100,7 +99,6 @@ async function debugVideoStorage() {
       take: 5,
       select: {
         id: true,
-        tweetId: true,
         content: true,
         imageUrls: true,
         videoUrls: true,
@@ -111,7 +109,7 @@ async function debugVideoStorage() {
     
     recentTweets.forEach((tweet, idx) => {
       console.log(`\n📝 推文 ${idx + 1}:`);
-      console.log(`  ID: ${tweet.tweetId}`);
+      console.log(`  ID: ${tweet.id}`);
       console.log(`  时间: ${tweet.publishedAt}`);
       console.log(`  内容: ${tweet.content?.substring(0, 80)}...`);
       console.log(`  配图长度: ${tweet.imageUrls?.length || 0}`);
