@@ -34,7 +34,7 @@ async function debugEnvironment() {
         '--disable-background-timer-throttling',
         '--disable-backgrounding-occluded-windows',
         '--disable-renderer-backgrounding',
-        '--disable-features=TranslateUI',
+        '--disable-features=TranslateUI,VizDisplayCompositor',
         '--disable-extensions',
         '--mute-audio',
         '--no-first-run',
@@ -49,14 +49,10 @@ async function debugEnvironment() {
         '--ignore-ssl-errors',
         '--allow-running-insecure-content',
         '--disable-blink-features=AutomationControlled',
-        '--disable-features=VizDisplayCompositor',
-        '--virtual-time-budget=5000',
         '--disable-background-networking',
         '--disable-default-apps',
         '--disable-sync',
-        '--enable-features=NetworkService,NetworkServiceLogging',
         '--force-device-scale-factor=1',
-        '--use-mock-keychain',
       ]
     });
     

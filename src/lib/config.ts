@@ -99,14 +99,11 @@ export const config = {
         '--allow-running-insecure-content',
         '--disable-blink-features=AutomationControlled',
         '--disable-features=VizDisplayCompositor',
-        // 无GUI环境额外优化
-        '--virtual-time-budget=5000',  // 设置虚拟时间预算
+        // 无GUI环境额外优化（移除可能冲突的参数）
         '--disable-background-networking',
         '--disable-default-apps',
         '--disable-sync',
-        '--enable-features=NetworkService,NetworkServiceLogging',
         '--force-device-scale-factor=1',
-        '--use-mock-keychain',
       ],
     },
     // 浏览器实例管理策略
