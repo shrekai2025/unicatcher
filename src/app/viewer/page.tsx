@@ -200,7 +200,7 @@ export default function ViewerPage() {
 
         {/* 推文内容 */}
         <div className="p-3">
-          <p className="text-sm text-gray-800 line-clamp-3">{card.tweetContent}</p>
+          <p className="text-sm text-gray-800 line-clamp-6">{card.tweetContent}</p>
         </div>
       </div>
     );
@@ -244,9 +244,11 @@ export default function ViewerPage() {
         {/* 媒体卡片瀑布流 */}
         {mediaData?.data.cards && mediaData.data.cards.length > 0 && (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 mb-4">
+            <div className="masonry-container mb-4">
               {mediaData.data.cards.map((card) => (
-                <MediaCardComponent key={card.id} card={card} />
+                <div key={card.id} className="masonry-item">
+                  <MediaCardComponent card={card} />
+                </div>
               ))}
             </div>
 
@@ -286,11 +288,47 @@ export default function ViewerPage() {
 
         {/* 样式定义 */}
         <style jsx>{`
-          .line-clamp-3 {
+          .line-clamp-6 {
             display: -webkit-box;
-            -webkit-line-clamp: 3;
+            -webkit-line-clamp: 6;
             -webkit-box-orient: vertical;
             overflow: hidden;
+          }
+          
+          .masonry-container {
+            column-count: 2;
+            column-gap: 12px;
+            column-fill: balance;
+          }
+          
+          @media (min-width: 768px) {
+            .masonry-container {
+              column-count: 3;
+            }
+          }
+          
+          @media (min-width: 1024px) {
+            .masonry-container {
+              column-count: 4;
+            }
+          }
+          
+          @media (min-width: 1280px) {
+            .masonry-container {
+              column-count: 5;
+            }
+          }
+          
+          @media (min-width: 1536px) {
+            .masonry-container {
+              column-count: 6;
+            }
+          }
+          
+          .masonry-item {
+            break-inside: avoid;
+            page-break-inside: avoid;
+            margin-bottom: 12px;
           }
         `}</style>
       </div>
