@@ -33,11 +33,38 @@ export function login(username: string, password: string): boolean {
     const authString = JSON.stringify(authData);
     
     if (typeof window !== 'undefined') {
-      // 同时设置 localStorage 和 cookie
+      // 先清除旧的认证信息
+      localStorage.removeItem(AUTH_KEY);
+      document.cookie = 'unicatcher-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      
+      // 设置新的认证信息
       localStorage.setItem(AUTH_KEY, authString);
       // 设置cookie，确保在所有环境下都能工作
       document.cookie = `unicatcher-auth=${encodeURIComponent(authString)}; path=/; max-age=86400; SameSite=Lax`; // 24小时
-      console.log('Authentication set:', { username, role: user.role }); // 调试日志
+      
+      // 调试日志 - 验证数据完整性
+      console.log('Authentication set:', { username, role: user.role, authData, authString });
+      
+      // 验证cookie设置是否成功
+      setTimeout(() => {
+        const cookieValue = document.cookie.split('; ').find(row => row.startsWith('unicatcher-auth='));
+        if (cookieValue) {
+          try {
+            const cookieParts = cookieValue.split('=');
+            if (cookieParts[1]) {
+              const decodedValue = decodeURIComponent(cookieParts[1]);
+              const parsedData = JSON.parse(decodedValue);
+              console.log('Cookie verification:', parsedData);
+            } else {
+              console.error('Cookie value is empty');
+            }
+          } catch (e) {
+            console.error('Cookie parsing error:', e);
+          }
+        } else {
+          console.error('Cookie not found after setting');
+        }
+      }, 100);
     }
     return true;
   }

@@ -56,6 +56,15 @@ export function middleware(request: NextRequest) {
 
       console.log(`[Middleware] Role check:`, { userRole, isAdminOnlyPath, isViewerOnlyPath });
 
+      // 如果role未定义或无效，清除认证并重定向到登录页
+      if (!userRole || (userRole !== 'admin' && userRole !== 'viewer')) {
+        console.log(`[Middleware] Invalid or undefined role: ${userRole}, redirecting to login`);
+        const response = NextResponse.redirect(new URL('/login', request.url));
+        // 清除无效的cookie
+        response.cookies.set('unicatcher-auth', '', { maxAge: 0, path: '/' });
+        return response;
+      }
+
       if (isAdminOnlyPath && userRole !== 'admin') {
         // viewer用户访问admin页面，重定向到viewer页面
         console.log(`[Middleware] Non-admin accessing admin path, redirecting to viewer`);
@@ -64,10 +73,10 @@ export function middleware(request: NextRequest) {
       }
 
       if (isViewerOnlyPath && userRole !== 'viewer' && userRole !== 'admin') {
-        // 其他用户访问viewer页面，重定向到dashboard
-        console.log(`[Middleware] Invalid role for viewer path, redirecting to dashboard`);
-        const dashboardUrl = new URL('/dashboard', request.url);
-        return NextResponse.redirect(dashboardUrl);
+        // 这个条件现在不应该触发，因为上面已经检查了role的有效性
+        console.log(`[Middleware] Invalid role for viewer path, redirecting to login`);
+        const loginUrl = new URL('/login', request.url);
+        return NextResponse.redirect(loginUrl);
       }
 
       console.log(`[Middleware] Access granted for ${pathname}`);

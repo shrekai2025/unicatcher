@@ -59,6 +59,28 @@ export default function DebugAuthPage() {
     alert('已设置临时认证cookie，请尝试访问 /viewer');
   };
 
+  const handleClearAuth = () => {
+    // 清除所有认证信息
+    localStorage.removeItem('unicatcher-auth');
+    document.cookie = 'unicatcher-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    
+    // 刷新显示信息
+    setTimeout(() => {
+      const session = getSession();
+      const cookies = document.cookie;
+      const localStorage_auth = localStorage.getItem('unicatcher-auth');
+      
+      setAuthInfo({
+        session,
+        localStorage_auth,
+        cookies_contains_auth: cookies.includes('unicatcher-auth'),
+        all_cookies: cookies
+      });
+    }, 100);
+    
+    alert('已清除所有认证信息');
+  };
+
   return (
     <div className="p-6">
       <div className="max-w-4xl mx-auto">
@@ -87,6 +109,13 @@ export default function DebugAuthPage() {
                 className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
               >
                 设置临时认证
+              </button>
+              
+              <button
+                onClick={handleClearAuth}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+              >
+                清除认证状态
               </button>
             </div>
           </div>
