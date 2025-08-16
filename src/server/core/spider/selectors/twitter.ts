@@ -8,7 +8,8 @@ import type { TweetData, TwitterSelectors, PageProcessResult } from '~/types/spi
 import { config } from '~/lib/config';
 
 export class TwitterSelector {
-  private capturedVideoUrls: Map<string, any> = new Map(); // 存储捕获的视频URL
+  private capturedVideoUrls: Map<string, any> = new Map(); // 存储捕获的视频URL (key: 媒体ID)
+  private tweetVideoMapping: Map<string, string> = new Map(); // 推文ID到媒体ID的映射
 
   // Twitter List选择器配置
   // ⚠️ 注意: Twitter/X的前端结构会不定期更新，以下选择器可能需要维护
@@ -715,9 +716,37 @@ export class TwitterSelector {
   }
 
   /**
-   * 提取视频相关URLs（简化版 - 从已捕获的网络请求中获取）
+   * 建立推文ID到媒体ID的映射
    */
-  async extractVideoUrls(tweetElement: any): Promise<{ preview?: string; video?: string } | null> {
+  async buildTweetVideoMapping(tweetElement: any, tweetId: string): Promise<void> {
+    try {
+      // 在推文中查找所有视频相关的媒体ID
+      const videoThumbs = await tweetElement.$$('img[src*="amplify_video_thumb/"]');
+      for (const thumb of videoThumbs) {
+        try {
+          const src = await thumb.getAttribute('src');
+          if (src) {
+            const match = src.match(/amplify_video_thumb\/(\d+)\//);
+            if (match && match[1]) {
+              const mediaId = match[1];
+              this.tweetVideoMapping.set(tweetId, mediaId);
+              console.log(`🔗 建立映射: 推文[${tweetId}] -> 媒体[${mediaId}]`);
+              break; // 一般一条推文只有一个视频
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    } catch (error) {
+      console.warn('建立推文视频映射失败:', error);
+    }
+  }
+
+  /**
+   * 提取视频相关URLs（增强版 - 支持推文ID到媒体ID映射）
+   */
+  async extractVideoUrls(tweetElement: any, tweetId?: string): Promise<{ preview?: string; video?: string } | null> {
     try {
       // 检查是否包含视频播放器
       const videoPlayer = await tweetElement.$('[data-testid="videoPlayer"]');
@@ -832,12 +861,35 @@ export class TwitterSelector {
         }
       }
 
-      // 6. 输出调试信息
+      // 6. 最后兜底：使用推文ID到媒体ID的映射
+      if ((!result.video || !result.preview) && tweetId) {
+        const mappedMediaId = this.tweetVideoMapping.get(tweetId);
+        if (mappedMediaId) {
+          console.log(`🎯 使用映射: 推文[${tweetId}] -> 媒体[${mappedMediaId}]`);
+          const mappedData = this.capturedVideoUrls.get(mappedMediaId);
+          if (mappedData) {
+            if (mappedData.video && !result.video) {
+              result.video = mappedData.video;
+              console.log(`✅ 通过映射获取视频URL: ${result.video}`);
+            }
+            if (mappedData.preview && !result.preview) {
+              result.preview = mappedData.preview;
+              console.log(`✅ 通过映射获取预览图: ${result.preview}`);
+            }
+          }
+        }
+      }
+
+      // 7. 输出调试信息
       if (!result.video && !result.preview) {
         console.log('❌ 未能提取视频信息');
         console.log('📊 当前缓存的视频URL数量:', this.capturedVideoUrls.size);
+        console.log('📊 推文映射数量:', this.tweetVideoMapping.size);
         if (this.capturedVideoUrls.size > 0) {
           console.log('📋 缓存内容:', Array.from(this.capturedVideoUrls.entries()));
+        }
+        if (this.tweetVideoMapping.size > 0) {
+          console.log('📋 映射内容:', Array.from(this.tweetVideoMapping.entries()));
         }
         return null;
       }
@@ -938,6 +990,9 @@ export class TwitterSelector {
         return null;
       }
 
+      // 🎯 建立推文ID到媒体ID的映射 - 在提取视频前先扫描并建立映射
+      await this.buildTweetVideoMapping(tweetElement, tweetId);
+
       // 提取各项数据
       const content = await this.extractTweetText(tweetElement);
       const { nickname, username } = await this.extractUserInfo(tweetElement);
@@ -947,7 +1002,7 @@ export class TwitterSelector {
       // 分别提取不同类型的媒体内容
       const imageUrls = await this.extractImageUrls(tweetElement);
       const profileImageUrl = await this.extractProfileImage(tweetElement);
-      const videoUrls = await this.extractVideoUrls(tweetElement);
+      const videoUrls = await this.extractVideoUrls(tweetElement, tweetId); // 传入推文ID
 
       // 构建推文URL（增强的方法，确保正确性）
       const tweetUrl = await this.buildTweetUrl(tweetElement, tweetId, username);
