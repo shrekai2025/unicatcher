@@ -159,7 +159,7 @@ export class StorageService {
   }
 
   /**
-   * 保存推文数据
+   * 保存推文数据（使用UPSERT避免重复）
    */
   async saveTweet(tweetData: TweetData, taskId: string): Promise<void> {
     try {
@@ -196,9 +196,25 @@ export class StorageService {
       console.log(`    videoUrls (${dbData.videoUrls?.length || 0}字符): ${dbData.videoUrls || 'null'}`);
       console.log(`    profileImageUrl: ${dbData.profileImageUrl || 'null'}`);
       
-      await db.tweet.create({ data: dbData });
+      // 使用 upsert：如果存在则更新，不存在则创建
+      await db.tweet.upsert({
+        where: { id: tweetData.id },
+        create: dbData,
+        update: {
+          // 更新时只更新媒体字段和计数
+          replyCount: tweetData.replyCount,
+          retweetCount: tweetData.retweetCount,
+          likeCount: tweetData.likeCount,
+          viewCount: tweetData.viewCount,
+          imageUrls: dbData.imageUrls,
+          profileImageUrl: dbData.profileImageUrl,
+          videoUrls: dbData.videoUrls,
+          scrapedAt: dbData.scrapedAt,
+          updatedAt: new Date(),
+        }
+      });
       
-      console.log(`✅ 推文保存成功: ${tweetData.id}`);
+      console.log(`✅ 推文保存/更新成功: ${tweetData.id}`);
     } catch (error) {
       console.error(`❌ 保存推文失败 [${tweetData.id}]:`, error);
       throw new Error('保存推文失败');

@@ -484,7 +484,11 @@ export class BrowserManager {
         // 允许加载的资源继续请求
         if (optimizationConfig.logBlockedRequests && 
             optimizationConfig.allowedResourceTypes.includes(resourceType as any)) {
-          console.log(`✅ 允许资源: ${resourceType} - ${url}`);
+          // 只记录重要的媒体资源（减少日志噪音）
+          if ((resourceType === 'image' || resourceType === 'media') && 
+              (url.includes('amplify_video') || url.includes('video.twimg'))) {
+            console.log(`✅ 允许资源: ${resourceType} - ${url}`);
+          }
         }
         
         route.continue();

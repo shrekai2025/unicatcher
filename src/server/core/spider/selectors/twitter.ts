@@ -720,22 +720,45 @@ export class TwitterSelector {
    */
   async buildTweetVideoMapping(tweetElement: any, tweetId: string): Promise<void> {
     try {
-      // 在推文中查找所有视频相关的媒体ID
-      const videoThumbs = await tweetElement.$$('img[src*="amplify_video_thumb/"]');
-      for (const thumb of videoThumbs) {
-        try {
-          const src = await thumb.getAttribute('src');
-          if (src) {
-            const match = src.match(/amplify_video_thumb\/(\d+)\//);
-            if (match && match[1]) {
-              const mediaId = match[1];
-              this.tweetVideoMapping.set(tweetId, mediaId);
-              console.log(`🔗 建立映射: 推文[${tweetId}] -> 媒体[${mediaId}]`);
-              break; // 一般一条推文只有一个视频
+      // 方法1: 在推文中查找所有视频相关的媒体ID
+      const videoThumbs = await tweetElement.$$('img[src*="amplify_video_thumb"]');
+      
+      if (videoThumbs.length === 0) {
+        // 方法2: 尝试更宽泛的选择器
+        const allImages = await tweetElement.$$('img');
+        for (const img of allImages) {
+          try {
+            const src = await img.getAttribute('src');
+            if (src && src.includes('amplify_video_thumb')) {
+              const match = src.match(/amplify_video_thumb\/(\d+)/);
+              if (match && match[1]) {
+                const mediaId = match[1];
+                this.tweetVideoMapping.set(tweetId, mediaId);
+                console.log(`🔗 建立映射: 推文[${tweetId}] -> 媒体[${mediaId}]`);
+                return;
+              }
             }
+          } catch (e) {
+            continue;
           }
-        } catch (e) {
-          continue;
+        }
+      } else {
+        // 处理找到的视频缩略图
+        for (const thumb of videoThumbs) {
+          try {
+            const src = await thumb.getAttribute('src');
+            if (src) {
+              const match = src.match(/amplify_video_thumb\/(\d+)/);
+              if (match && match[1]) {
+                const mediaId = match[1];
+                this.tweetVideoMapping.set(tweetId, mediaId);
+                console.log(`🔗 建立映射: 推文[${tweetId}] -> 媒体[${mediaId}]`);
+                return; // 找到一个就返回
+              }
+            }
+          } catch (e) {
+            continue;
+          }
         }
       }
     } catch (error) {
@@ -754,7 +777,7 @@ export class TwitterSelector {
         return null;
       }
 
-      console.log('🎬 发现视频内容，开始提取...');
+      console.log(`🎬 发现视频内容，开始提取... [推文ID: ${tweetId}]`);
       const result: { preview?: string; video?: string } = {};
 
       // 1. 首先尝试从DOM获取预览图
