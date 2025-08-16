@@ -1,17 +1,35 @@
 // 极简认证工具
 const AUTH_KEY = 'unicatcher-auth';
-const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'a2885828';
+
+// 用户配置
+const USERS = {
+  admin: {
+    password: 'a2885828',
+    role: 'admin'
+  },
+  viewer: {
+    password: '012345678',
+    role: 'viewer'
+  }
+} as const;
+
+export type UserRole = 'admin' | 'viewer';
 
 export interface SimpleSession {
   isAuthenticated: boolean;
   username?: string;
+  role?: UserRole;
 }
 
 // 登录验证
 export function login(username: string, password: string): boolean {
-  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-    const authData = { isAuthenticated: true, username: ADMIN_USERNAME };
+  const user = USERS[username as keyof typeof USERS];
+  if (user && user.password === password) {
+    const authData = { 
+      isAuthenticated: true, 
+      username: username,
+      role: user.role 
+    };
     const authString = JSON.stringify(authData);
     
     if (typeof window !== 'undefined') {

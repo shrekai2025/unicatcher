@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '~/lib/utils';
-import { logout } from '~/lib/simple-auth';
+import { logout, getSession } from '~/lib/simple-auth';
+import type { UserRole } from '~/lib/simple-auth';
 
-const navigation = [
+const adminNavigation = [
   { name: '仪表板', href: '/dashboard', icon: '📊' },
   { name: '任务管理', href: '/tasks', icon: '⚙️' },
   { name: '推文数据', href: '/tweets', icon: '🐦' },
@@ -13,13 +14,42 @@ const navigation = [
   { name: 'API文档', href: '/api-docs', icon: '📖' },
 ];
 
+const viewerNavigation = [
+  { name: '数据查看', href: '/viewer', icon: '👁️' },
+];
+
+function getNavigationByRole(role?: UserRole) {
+  switch (role) {
+    case 'admin':
+      return adminNavigation;
+    case 'viewer':
+      return viewerNavigation;
+    default:
+      return [];
+  }
+}
+
 export function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
+  const session = getSession();
+  const navigation = getNavigationByRole(session.role);
 
   const handleLogout = () => {
     logout();
     router.push('/login');
+  };
+
+  // 根据角色确定默认主页
+  const getHomeHref = () => {
+    switch (session.role) {
+      case 'admin':
+        return '/dashboard';
+      case 'viewer':
+        return '/viewer';
+      default:
+        return '/dashboard';
+    }
   };
 
   return (
@@ -28,7 +58,7 @@ export function Navigation() {
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <Link href="/dashboard" className="text-2xl font-bold text-blue-600">
+              <Link href={getHomeHref()} className="text-2xl font-bold text-blue-600">
                 UniCatcher
               </Link>
             </div>
@@ -50,7 +80,10 @@ export function Navigation() {
               ))}
             </div>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-600">
+              欢迎，{session.username}
+            </span>
             <button
               onClick={handleLogout}
               className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"

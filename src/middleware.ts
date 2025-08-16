@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // 需要认证的路径
-const protectedPaths = ['/dashboard', '/tasks', '/tweets', '/extracts', '/x-login'];
+const protectedPaths = ['/dashboard', '/tasks', '/tweets', '/extracts', '/x-login', '/viewer'];
+
+// 仅admin可访问的路径
+const adminOnlyPaths = ['/dashboard', '/tasks', '/tweets', '/extracts', '/x-login'];
+
+// 仅viewer可访问的路径
+const viewerOnlyPaths = ['/viewer'];
 
 // 公开路径（不需要认证）
 const publicPaths = ['/login', '/api/health', '/api/external'];
@@ -34,6 +40,24 @@ export function middleware(request: NextRequest) {
         const loginUrl = new URL('/login', request.url);
         return NextResponse.redirect(loginUrl);
       }
+
+      // 检查角色权限
+      const userRole = auth.role;
+      const isAdminOnlyPath = adminOnlyPaths.some(path => pathname.startsWith(path));
+      const isViewerOnlyPath = viewerOnlyPaths.some(path => pathname.startsWith(path));
+
+      if (isAdminOnlyPath && userRole !== 'admin') {
+        // viewer用户访问admin页面，重定向到viewer页面
+        const viewerUrl = new URL('/viewer', request.url);
+        return NextResponse.redirect(viewerUrl);
+      }
+
+      if (isViewerOnlyPath && userRole !== 'viewer' && userRole !== 'admin') {
+        // 其他用户访问viewer页面，重定向到dashboard
+        const dashboardUrl = new URL('/dashboard', request.url);
+        return NextResponse.redirect(dashboardUrl);
+      }
+
     } catch {
       // Cookie 解析失败，重定向到登录页
       const loginUrl = new URL('/login', request.url);
@@ -41,10 +65,26 @@ export function middleware(request: NextRequest) {
     }
   }
   
-  // 如果访问根路径，重定向到 dashboard
+  // 如果访问根路径，根据用户角色重定向
   if (pathname === '/') {
-    const dashboardUrl = new URL('/dashboard', request.url);
-    return NextResponse.redirect(dashboardUrl);
+    const authCookie = request.cookies.get('unicatcher-auth');
+    
+    if (authCookie?.value) {
+      try {
+        const auth = JSON.parse(decodeURIComponent(authCookie.value));
+        if (auth.isAuthenticated) {
+          const redirectPath = auth.role === 'viewer' ? '/viewer' : '/dashboard';
+          const redirectUrl = new URL(redirectPath, request.url);
+          return NextResponse.redirect(redirectUrl);
+        }
+      } catch {
+        // Cookie解析失败，重定向到登录页
+      }
+    }
+    
+    // 未登录或解析失败，重定向到登录页
+    const loginUrl = new URL('/login', request.url);
+    return NextResponse.redirect(loginUrl);
   }
   
   return NextResponse.next();
