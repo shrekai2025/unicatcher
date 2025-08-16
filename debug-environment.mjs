@@ -29,11 +29,34 @@ async function debugEnvironment() {
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
+        '--disable-web-security',
         '--disable-gpu',
-        '--no-first-run',
         '--disable-background-timer-throttling',
         '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding'
+        '--disable-renderer-backgrounding',
+        '--disable-features=TranslateUI',
+        '--disable-extensions',
+        '--mute-audio',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-extensions-http-throttling',
+        '--disable-login-animations',
+        '--disable-notifications',
+        '--disable-permissions-api',
+        '--disable-presentation-api',
+        '--disable-print-preview',
+        '--ignore-certificate-errors',
+        '--ignore-ssl-errors',
+        '--allow-running-insecure-content',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-features=VizDisplayCompositor',
+        '--virtual-time-budget=5000',
+        '--disable-background-networking',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--enable-features=NetworkService,NetworkServiceLogging',
+        '--force-device-scale-factor=1',
+        '--use-mock-keychain',
       ]
     });
     
@@ -61,8 +84,19 @@ async function debugEnvironment() {
     const testUrl = 'https://x.com/Morph_VGart/status/1956596791903932803';
     console.log(`\n3️⃣ 访问测试页面: ${testUrl}`);
     
-    await page.goto(testUrl, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.waitForTimeout(5000);
+    // 使用更宽松的加载策略
+    await page.goto(testUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    
+    // 等待基本内容加载
+    try {
+      await page.waitForSelector('body', { timeout: 10000 });
+      console.log('✅ 页面body已加载');
+    } catch (error) {
+      console.log('⚠️ 等待body超时，继续执行');
+    }
+    
+    // 等待更长时间让内容渲染
+    await page.waitForTimeout(8000);
     
     // 检查页面基本元素
     console.log('\n4️⃣ DOM结构检查:');

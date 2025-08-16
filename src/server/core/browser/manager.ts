@@ -141,14 +141,22 @@ export class BrowserManager {
 
       console.log(`正在导航到: ${url}`);
       
-      // 使用更灵活的页面加载策略
+      // 使用更灵活的页面加载策略，适配无GUI环境
       await this.page.goto(url, {
         waitUntil: 'domcontentloaded', // 改为domcontentloaded，不等待所有资源
         timeout: this.browserConfig.timeout,
       });
 
-      // 额外等待确保页面基本内容加载
-      await this.page.waitForTimeout(3000);
+      // 无GUI环境需要更多时间等待内容渲染
+      await this.page.waitForTimeout(5000);
+      
+      // 尝试等待基本内容加载
+      try {
+        await this.page.waitForSelector('body', { timeout: 10000 });
+        console.log('页面body元素已加载');
+      } catch (error) {
+        console.warn('等待body元素超时，继续执行');
+      }
       
       console.log('页面导航完成');
     } catch (error) {
