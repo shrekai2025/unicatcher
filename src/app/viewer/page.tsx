@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Navigation } from '~/components/navigation';
 import { FloatingVideoPlayer } from '~/components/floating-video-player';
+import { PresetModal } from '~/components/preset-modal';
+import { PresetButton } from '~/components/preset-button';
 import { api } from '~/trpc/react';
 import { formatCount } from '~/lib/format';
 import { getSession } from '~/lib/simple-auth';
+import { PresetManager, type FilterPreset } from '~/lib/preset-manager';
 
 interface MediaCard {
   id: string;
@@ -34,20 +37,40 @@ interface VideoData {
 }
 
 export default function ViewerPage() {
-  const [listId, setListId] = useState('1952162308337324098');
+  const [listId, setListId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   
   // 浮动播放器状态
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
   const [currentVideo, setCurrentVideo] = useState<VideoData | null>(null);
+  
+  // 预制功能状态
+  const [presets, setPresets] = useState<FilterPreset[]>([]);
+  const [selectedPresets, setSelectedPresets] = useState<FilterPreset[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // 加载预制项目
+  useEffect(() => {
+    setPresets(PresetManager.getPresets());
+  }, []);
+
+  // 计算有效的listIds
+  const effectiveListIds = selectedPresets.length > 0 
+    ? selectedPresets.map(preset => preset.listId)
+    : listId ? [listId] : undefined;
 
   // 获取媒体卡片数据
   const { data: mediaData, isLoading, refetch } = api.tweets.getMediaCards.useQuery({
-    listId: listId || undefined,
+    listIds: effectiveListIds,
     page: currentPage,
     limit: 100,
   });
+
+  // 监听预制选择变化，触发数据重新获取
+  useEffect(() => {
+    refetch();
+  }, [selectedPresets, refetch]);
 
   // 删除推文
   const deleteTweet = api.tweets.delete.useMutation({
@@ -58,6 +81,8 @@ export default function ViewerPage() {
 
   const handleSearch = () => {
     setCurrentPage(1);
+    // 清空预制选择，使用手动输入的listId
+    setSelectedPresets([]);
     refetch();
   };
 
@@ -96,6 +121,31 @@ export default function ViewerPage() {
   const closePlayer = () => {
     setIsPlayerOpen(false);
     setCurrentVideo(null);
+  };
+
+  // 预制管理函数
+  const handleSavePreset = (presetData: Omit<FilterPreset, 'id' | 'createdAt'>) => {
+    const newPreset = PresetManager.addPreset(presetData);
+    setPresets(PresetManager.getPresets());
+  };
+
+  const handleDeletePreset = (presetId: string) => {
+    PresetManager.deletePreset(presetId);
+    setPresets(PresetManager.getPresets());
+    // 如果删除的预制项目正在被选中，则从选中列表中移除
+    setSelectedPresets(prev => prev.filter(preset => preset.id !== presetId));
+  };
+
+  const handleTogglePreset = (preset: FilterPreset) => {
+    setSelectedPresets(prev => {
+      const isSelected = prev.some(p => p.id === preset.id);
+      if (isSelected) {
+        return prev.filter(p => p.id !== preset.id);
+      } else {
+        return [...prev, preset];
+      }
+    });
+    setCurrentPage(1); // 重置到第一页
   };
 
   const MediaCardComponent = ({ card }: { card: MediaCard }) => {
@@ -223,7 +273,7 @@ export default function ViewerPage() {
         <div className="max-w-7xl mx-auto">
         {/* 过滤区域 */}
         <div className="bg-white shadow-sm rounded p-3 mb-4">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 mb-3">
             <label htmlFor="listId" className="text-sm font-medium text-gray-700 whitespace-nowrap">
               List ID
             </label>
@@ -234,14 +284,45 @@ export default function ViewerPage() {
               onChange={(e) => setListId(e.target.value)}
               placeholder="输入List ID进行过滤"
               className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              disabled={selectedPresets.length > 0}
             />
             <button
               onClick={handleSearch}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 text-sm rounded transition-colors whitespace-nowrap"
+              disabled={selectedPresets.length > 0}
+              className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-3 py-1.5 text-sm rounded transition-colors whitespace-nowrap"
             >
               筛选
             </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 text-sm rounded transition-colors whitespace-nowrap"
+            >
+              预制
+            </button>
           </div>
+
+          {/* 预制项目列表 */}
+          {presets.length > 0 && (
+            <div className="border-t pt-3">
+              <div className="flex flex-wrap gap-2">
+                {presets.map((preset) => (
+                  <PresetButton
+                    key={preset.id}
+                    preset={preset}
+                    isSelected={selectedPresets.some(p => p.id === preset.id)}
+                    onToggle={handleTogglePreset}
+                    onDelete={handleDeletePreset}
+                  />
+                ))}
+              </div>
+              {selectedPresets.length > 0 && (
+                <div className="mt-2 text-xs text-gray-500">
+                  已选择 {selectedPresets.length} 个预制项目：
+                  {selectedPresets.map(p => p.name).join(', ')}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 加载状态 */}
@@ -342,6 +423,13 @@ export default function ViewerPage() {
           }
         `}</style>
       </div>
+
+      {/* 预制弹窗 */}
+      <PresetModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSavePreset}
+      />
 
       {/* 浮动视频播放器 */}
       <FloatingVideoPlayer

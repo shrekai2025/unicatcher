@@ -436,7 +436,7 @@ export const tweetsRouter = createTRPCRouter({
   getMediaCards: protectedProcedure
     .input(
       z.object({
-        listId: z.string().optional(),
+        listIds: z.array(z.string()).optional(), // 支持多个listId
         page: z.number().int().min(1).default(1),
         limit: z.number().int().min(1).max(100).default(100),
       })
@@ -444,9 +444,8 @@ export const tweetsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       try {
         // 获取推文数据，按时间倒序
-        const result = await storageService.getTweets(
-          undefined,
-          input.listId,
+        const result = await storageService.getTweetsByListIds(
+          input.listIds,
           1,
           10000 // 先获取大量数据，然后处理成媒体卡片
         );

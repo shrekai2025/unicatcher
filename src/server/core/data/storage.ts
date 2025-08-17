@@ -347,6 +347,88 @@ export class StorageService {
   }
 
   /**
+   * 根据多个listId获取推文数据（排除逻辑删除）
+   */
+  async getTweetsByListIds(
+    listIds?: string[],
+    page = 1,
+    limit = 20
+  ): Promise<{
+    tweets: any[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    try {
+      const where: any = {
+        isDeleted: false, // 排除逻辑删除的推文
+      };
+      
+      // 如果提供了listIds数组且不为空，则添加IN查询条件
+      if (listIds && listIds.length > 0) {
+        where.listId = { in: listIds };
+      }
+
+      const skip = (page - 1) * limit;
+
+      const [tweets, total] = await Promise.all([
+        db.tweet.findMany({
+          where,
+          orderBy: { publishedAt: 'desc' },
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            content: true,
+            userNickname: true,
+            userUsername: true,
+            replyCount: true,
+            retweetCount: true,
+            likeCount: true,
+            viewCount: true,
+            isRT: true,
+            isReply: true,
+            imageUrls: true,
+            profileImageUrl: true,
+            videoUrls: true,
+            tweetUrl: true,
+            publishedAt: true,
+            listId: true,
+            scrapedAt: true,
+            // 新的分析字段 - 如果不存在则为null
+            analysisStatus: true,
+            syncedAt: true,
+            analyzedAt: true,
+            analysisBatchId: true,
+            // 逻辑删除字段
+            isDeleted: true,
+            deletedAt: true,
+            deletedBy: true,
+            taskId: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        db.tweet.count({ where }),
+      ]);
+
+      // 解析媒体URLs并转换BigInt为数字
+      const parsedTweets = tweets.map((tweet: any) => ({
+        ...tweet,
+        imageUrls: tweet.imageUrls ? JSON.parse(tweet.imageUrls) : [],
+        videoUrls: tweet.videoUrls ? JSON.parse(tweet.videoUrls) : null,
+        publishedAt: tweet.publishedAt ? Number(tweet.publishedAt) : 0,
+        scrapedAt: tweet.scrapedAt ? Number(tweet.scrapedAt) : 0,
+      }));
+
+      return { tweets: parsedTweets, total, page, limit };
+    } catch (error) {
+      console.error('根据listIds获取推文数据失败:', error);
+      return { tweets: [], total: 0, page, limit };
+    }
+  }
+
+  /**
    * 删除任务及相关推文
    */
   async deleteTask(taskId: string): Promise<void> {
@@ -605,7 +687,8 @@ export class StorageService {
   async extractTweetData(params: {
     batchId: string;
     maxCount: number;
-    listId?: string;
+    listId?: string;     // 保留单个listId支持（兼容性）
+    listIds?: string[];  // 新增多个listIds支持
     username?: string;
     isExtracted: boolean;
     isRT?: boolean;
@@ -618,6 +701,7 @@ export class StorageService {
         batchId, 
         maxCount, 
         listId, 
+        listIds,
         username, 
         isExtracted,
         isRT,
@@ -625,6 +709,9 @@ export class StorageService {
         dryRun = false,
         requireFullAmount = false
       } = params;
+
+      // 处理listId兼容性：统一使用listIds数组
+      const effectiveListIds = listIds || (listId ? [listId] : undefined);
 
       // 如果需要足额返回，先检查数据量
       if (requireFullAmount) {
@@ -663,9 +750,9 @@ export class StorageService {
           ];
         }
 
-        // 添加可选过滤条件
-        if (listId) {
-          where.listId = listId;
+        // 添加可选过滤条件 - 支持多个listIds
+        if (effectiveListIds && effectiveListIds.length > 0) {
+          where.listId = { in: effectiveListIds };
         }
         
         if (username) {

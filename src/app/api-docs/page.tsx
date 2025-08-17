@@ -351,7 +351,8 @@ export default function APIDocsPage() {
                     <pre>{JSON.stringify({
                       batchId: "string (必填) - 批次标识符",
                       maxCount: "number (必填, 1-10000) - 最大提取数量",
-                      listId: "string (可选) - 按 List ID 筛选",
+                      listId: "string (可选) - 按单个 List ID 筛选 (兼容旧版)",
+                      listIds: "array (可选) - 按多个 List IDs 筛选 (推荐)",
                       username: "string (可选) - 按用户名筛选",
                       isExtracted: "boolean (可选, 默认: false) - 提取状态",
                       dryRun: "boolean (可选, 默认: false) - 预览模式，不标记为已输出",
@@ -372,7 +373,8 @@ export default function APIDocsPage() {
                         extractedAt: "2024-01-15T10:30:00Z",
                         isDryRun: false,
                         filters: {
-                          listId: "1234567890",
+                          listId: "1234567890",              // 兼容字段
+                          listIds: ["1234567890", "9876543210"], // 新增字段
                           username: "example_user",
                           isExtracted: false,
                           dryRun: false,
@@ -443,6 +445,20 @@ export default function APIDocsPage() {
     "maxCount": 1000,
     "requireFullAmount": true,
     "listId": "1948042550071496895"
+  }'`}</code></pre>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">多个 List IDs (推荐)</h4>
+                  <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm">
+                    <pre><code>{`curl -X POST http://43.153.84.145:3067/api/external/data/extract \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: unicatcher-api-key-demo" \\
+  -d '{
+    "batchId": "batch_multi_001",
+    "maxCount": 500,
+    "listIds": ["1948042550071496895", "1952162308337324098"],
+    "isExtracted": false
   }'`}</code></pre>
                   </div>
                 </div>
