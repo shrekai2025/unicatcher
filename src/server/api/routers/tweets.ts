@@ -453,7 +453,7 @@ export const tweetsRouter = createTRPCRouter({
         // 将推文转换为媒体卡片数据
         const mediaCards: any[] = [];
         
-        result.tweets
+        result.        tweets
           .sort((a, b) => b.publishedAt - a.publishedAt) // 按时间倒序
           .forEach((tweet) => {
             // 处理图片
@@ -472,6 +472,20 @@ export const tweetsRouter = createTRPCRouter({
                   viewCount: tweet.viewCount || 0,
                   publishedAt: tweet.publishedAt,
                   isReply: tweet.isReply || false,
+                  contentTypes: (() => {
+                    try {
+                      return tweet.contentTypes ? JSON.parse(tweet.contentTypes) : [];
+                    } catch (e) {
+                      return [];
+                    }
+                  })(),
+                  keywords: (() => {
+                    try {
+                      return tweet.topicTags ? JSON.parse(tweet.topicTags) : [];
+                    } catch (e) {
+                      return [];
+                    }
+                  })(),
                 });
               });
             }
@@ -492,6 +506,8 @@ export const tweetsRouter = createTRPCRouter({
                 viewCount: tweet.viewCount || 0,
                 publishedAt: tweet.publishedAt,
                 isReply: tweet.isReply || false,
+                contentTypes: tweet.contentTypes ? JSON.parse(tweet.contentTypes) : [],
+                keywords: tweet.topicTags ? JSON.parse(tweet.topicTags) : [],
               });
             }
 
@@ -510,6 +526,8 @@ export const tweetsRouter = createTRPCRouter({
                 viewCount: tweet.viewCount || 0,
                 publishedAt: tweet.publishedAt,
                 isReply: tweet.isReply || false,
+                contentTypes: tweet.contentTypes ? JSON.parse(tweet.contentTypes) : [],
+                keywords: tweet.topicTags ? JSON.parse(tweet.topicTags) : [],
               });
             }
           });

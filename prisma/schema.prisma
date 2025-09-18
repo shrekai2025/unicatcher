@@ -116,6 +116,15 @@ model Tweet {
   analyzedAt        DateTime? // 分析完成时间
   analysisBatchId   String?   // 分析批次ID
   
+  // AI处理相关字段
+  keywords          String?   // AI提取的关键词（JSON数组格式）- 暂时保留
+  topicTags         String?   // 命中的主题标签（JSON数组格式）
+  contentTypes      String?   // 内容类型（JSON数组格式）- 如教程、产品介绍等
+  isValueless       Boolean?  // 是否为无价值推文（打招呼、日常生活等）
+  aiProcessedAt     DateTime? // AI处理完成时间
+  aiProcessStatus   String?   // AI处理状态: pending, processing, completed, failed
+  aiRetryCount      Int      @default(0) // AI处理重试次数
+  
   // 逻辑删除相关字段
   isDeleted  Boolean   @default(false) // 是否已被逻辑删除
   deletedAt  DateTime? // 删除时间
@@ -136,6 +145,10 @@ model Tweet {
   @@index([isDeleted])
   @@index([isDeleted, publishedAt])
   @@index([isDeleted, listId])
+  @@index([aiProcessStatus])
+  @@index([userUsername])
+  @@index([isDeleted, aiProcessStatus])
+  @@index([isDeleted, listId, publishedAt])
 }
 
 // 数据同步记录表 - 记录外部系统的数据获取历史
@@ -164,4 +177,56 @@ model DataSyncRecord {
   @@index([batchId])
   @@index([extractType])
   @@index([createdAt])
+}
+
+// 主题标签配置表 - 管理AI处理时需要匹配的主题标签
+model TopicTag {
+  id          String   @id @default(cuid())
+  name        String   @unique // 主题标签名称
+  description String?  // 标签描述
+  isActive    Boolean  @default(true) // 是否启用
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([name])
+}
+
+// 内容类型配置表 - 管理AI处理时需要匹配的内容类型
+model ContentType {
+  id          String   @id @default(cuid())
+  name        String   @unique // 内容类型名称（如：教程、产品介绍、产品试用等）
+  description String?  // 类型描述
+  isActive    Boolean  @default(true) // 是否启用
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([name])
+}
+
+// AI处理记录表 - 记录AI批处理的历史和状态
+model AIProcessRecord {
+  id            String    @id @default(cuid())
+  batchId       String    @unique // 批次ID
+  status        String    // 处理状态: processing, completed, failed, cancelled
+  totalTweets   Int       @default(0) // 总推文数
+  processedTweets Int     @default(0) // 已处理推文数
+  failedTweets  Int       @default(0) // 处理失败推文数
+  startedAt     DateTime  @default(now()) // 开始时间
+  completedAt   DateTime? // 完成时间
+  errorMessage  String?   // 错误信息
+  
+  // 处理配置
+  filterConfig  String?   // 筛选配置（JSON格式）
+  aiProvider    String    @default("openai") // AI提供商
+  aiModel       String    @default("gpt-4o") // AI模型
+  systemPrompt  String?   // 系统提示词
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([startedAt])
+  @@index([batchId])
 }

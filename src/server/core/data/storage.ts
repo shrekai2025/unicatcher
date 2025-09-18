@@ -318,6 +318,10 @@ export class StorageService {
             syncedAt: true,
             analyzedAt: true,
             analysisBatchId: true,
+            // AI处理字段
+            contentTypes: true,
+            topicTags: true,
+            keywords: true,
             // 逻辑删除字段
             isDeleted: true,
             deletedAt: true,
@@ -400,6 +404,10 @@ export class StorageService {
             syncedAt: true,
             analyzedAt: true,
             analysisBatchId: true,
+            // AI处理字段
+            contentTypes: true,
+            topicTags: true,
+            keywords: true,
             // 逻辑删除字段
             isDeleted: true,
             deletedAt: true,

@@ -24,6 +24,8 @@ interface MediaCard {
   viewCount: number;
   publishedAt: number;
   isReply: boolean;
+  contentTypes?: string[];  // 解析后的内容类型数组
+  keywords?: string[];      // 解析后的关键词数组(topicTags)
 }
 
 interface VideoData {
@@ -40,6 +42,7 @@ export default function ViewerPage() {
   const [listId, setListId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'masonry' | 'compact' | 'compact-image'>('masonry');
   
   // 浮动播放器状态
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
@@ -148,6 +151,7 @@ export default function ViewerPage() {
     setCurrentPage(1); // 重置到第一页
   };
 
+  // 瀑布流卡片组件
   const MediaCardComponent = ({ card }: { card: MediaCard }) => {
     const isHovered = hoveredCard === card.id;
 
@@ -266,6 +270,170 @@ export default function ViewerPage() {
     );
   };
 
+  // 紧凑列表组件
+  const CompactCardComponent = ({ card }: { card: MediaCard }) => {
+    const cleanContent = card.tweetContent.replace(/\s+/g, ' ').trim();
+    
+    // 获取标签数据（现在已经是解析后的数组了）
+    const contentTypes = card.contentTypes || [];
+    const keywords = card.keywords || [];
+    
+    return (
+      <div className="bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors group cursor-pointer" onClick={() => openTweet(card.tweetUrl)}>
+        <div className="p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-gray-800 flex-1 pr-2">
+              {cleanContent} @{card.userUsername}
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(card.tweetId);
+              }}
+              className="text-red-500 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 flex-shrink-0"
+              disabled={deleteTweet.isPending}
+            >
+              ✕
+            </button>
+          </div>
+          
+          {/* 标签区域 */}
+          {(contentTypes.length > 0 || keywords.length > 0) && (
+            <div className="flex flex-wrap gap-1">
+              {/* 内容类型标签 */}
+              {contentTypes.map((type, index) => (
+                <span
+                  key={`type-${index}`}
+                  className="inline-block px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded"
+                >
+                  {type}
+                </span>
+              ))}
+              {/* 关键词标签 */}
+              {keywords.map((keyword, index) => (
+                <span
+                  key={`keyword-${index}`}
+                  className="inline-block px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded"
+                >
+                  {keyword}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // 紧凑图组件
+  const CompactImageCardComponent = ({ card }: { card: MediaCard }) => {
+    const cleanContent = card.tweetContent.replace(/\s+/g, ' ').trim();
+    
+    // 获取标签数据
+    const contentTypes = card.contentTypes || [];
+    const keywords = card.keywords || [];
+    
+    // 判断是否有媒体文件
+    const hasMedia = card.type !== 'text';
+    
+    return (
+      <div className="bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors group cursor-pointer" onClick={() => openTweet(card.tweetUrl)}>
+        <div className="p-3">
+          <div className="flex gap-3">
+            {/* 媒体文件区域 */}
+            {hasMedia && (
+              <div className="flex-shrink-0">
+                {card.type === 'image' && (
+                  <img
+                    src={card.mediaUrl}
+                    alt="推文图片"
+                    className="w-24 h-24 object-cover rounded cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openTweet(card.tweetUrl);
+                    }}
+                    loading="lazy"
+                  />
+                )}
+                
+                {card.type === 'video' && (
+                  <div className="relative w-24 h-24">
+                    {card.mediaUrl && (
+                      <img
+                        src={card.mediaUrl}
+                        alt="视频预览"
+                        className="w-24 h-24 object-cover rounded"
+                        loading="lazy"
+                      />
+                    )}
+                    
+                    {/* 播放按钮 */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playVideo(card);
+                        }}
+                        className="bg-black bg-opacity-60 hover:bg-opacity-80 text-white rounded-full p-1 transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M8 5v10l7-5-7-5z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* 内容区域 */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-gray-800 flex-1 pr-2">
+                  {cleanContent} @{card.userUsername}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(card.tweetId);
+                  }}
+                  className="text-red-500 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 flex-shrink-0"
+                  disabled={deleteTweet.isPending}
+                >
+                  ✕
+                </button>
+              </div>
+              
+              {/* 标签区域 */}
+              {(contentTypes.length > 0 || keywords.length > 0) && (
+                <div className="flex flex-wrap gap-1">
+                  {/* 内容类型标签 */}
+                  {contentTypes.map((type, index) => (
+                    <span
+                      key={`type-${index}`}
+                      className="inline-block px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded"
+                    >
+                      {type}
+                    </span>
+                  ))}
+                  {/* 关键词标签 */}
+                  {keywords.map((keyword, index) => (
+                    <span
+                      key={`keyword-${index}`}
+                      className="inline-block px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded"
+                    >
+                      {keyword}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <Navigation />
@@ -273,32 +441,74 @@ export default function ViewerPage() {
         <div className="max-w-7xl mx-auto">
         {/* 过滤区域 */}
         <div className="bg-white shadow-sm rounded p-3 mb-4">
-          <div className="flex items-center space-x-3 mb-3">
-            <label htmlFor="listId" className="text-sm font-medium text-gray-700 whitespace-nowrap">
-              List ID
-            </label>
-            <input
-              type="text"
-              id="listId"
-              value={listId}
-              onChange={(e) => setListId(e.target.value)}
-              placeholder="输入List ID进行过滤"
-              className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-              disabled={selectedPresets.length > 0}
-            />
-            <button
-              onClick={handleSearch}
-              disabled={selectedPresets.length > 0}
-              className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-3 py-1.5 text-sm rounded transition-colors whitespace-nowrap"
-            >
-              筛选
-            </button>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 text-sm rounded transition-colors whitespace-nowrap"
-            >
-              预制
-            </button>
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-3">
+            {/* List ID 和操作按钮 */}
+            <div className="flex items-center space-x-3 flex-1">
+              <label htmlFor="listId" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                List ID
+              </label>
+              <input
+                type="text"
+                id="listId"
+                value={listId}
+                onChange={(e) => setListId(e.target.value)}
+                placeholder="输入List ID进行过滤"
+                className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                disabled={selectedPresets.length > 0}
+              />
+              <button
+                onClick={handleSearch}
+                disabled={selectedPresets.length > 0}
+                className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-3 py-1.5 text-sm rounded transition-colors whitespace-nowrap"
+              >
+                筛选
+              </button>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 text-sm rounded transition-colors whitespace-nowrap"
+              >
+                预制
+              </button>
+            </div>
+
+            {/* 布局切换 */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('masonry')}
+                  className={`px-2 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1 ${
+                    viewMode === 'masonry'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  <span>🔳</span>
+                  <span className="hidden lg:inline">瀑布流</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('compact')}
+                  className={`px-2 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1 ${
+                    viewMode === 'compact'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  <span>📋</span>
+                  <span className="hidden lg:inline">紧凑</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('compact-image')}
+                  className={`px-2 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1 ${
+                    viewMode === 'compact-image'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  <span>🖼️</span>
+                  <span className="hidden lg:inline">紧凑图</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* 预制项目列表 */}
@@ -332,16 +542,33 @@ export default function ViewerPage() {
           </div>
         )}
 
-        {/* 媒体卡片瀑布流 */}
+        {/* 数据展示区域 */}
         {mediaData?.data.cards && mediaData.data.cards.length > 0 && (
           <>
-            <div className="masonry-container mb-4">
-              {mediaData.data.cards.map((card) => (
-                <div key={card.id} className="masonry-item">
-                  <MediaCardComponent card={card} />
-                </div>
-              ))}
-            </div>
+            {viewMode === 'masonry' ? (
+              // 瀑布流布局
+              <div className="masonry-container mb-4">
+                {mediaData.data.cards.map((card) => (
+                  <div key={card.id} className="masonry-item">
+                    <MediaCardComponent card={card} />
+                  </div>
+                ))}
+              </div>
+            ) : viewMode === 'compact' ? (
+              // 紧凑列表布局
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 max-w-4xl mx-auto overflow-hidden">
+                {mediaData.data.cards.map((card) => (
+                  <CompactCardComponent key={card.id} card={card} />
+                ))}
+              </div>
+            ) : (
+              // 紧凑图布局
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 max-w-4xl mx-auto overflow-hidden">
+                {mediaData.data.cards.map((card) => (
+                  <CompactImageCardComponent key={card.id} card={card} />
+                ))}
+              </div>
+            )}
 
             {/* 分页 */}
             <div className="flex justify-center items-center space-x-4">

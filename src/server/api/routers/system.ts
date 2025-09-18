@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { StorageService } from "~/server/core/data/storage";
+import { db } from "~/server/db";
 
 const storageService = new StorageService();
 
@@ -68,6 +69,67 @@ export const systemRouter = createTRPCRouter({
       } catch (error) {
         throw new Error(
           error instanceof Error ? error.message : "系统清理失败"
+        );
+      }
+    }),
+
+  /**
+   * 清除无价值推文
+   */
+  cleanValuelessTweets: protectedProcedure
+    .mutation(async () => {
+      try {
+        // 删除所有isValueless为true的推文
+        const result = await db.tweet.deleteMany({
+          where: {
+            isValueless: true,
+          },
+        });
+
+        return {
+          success: true,
+          message: `成功删除 ${result.count} 条无价值推文`,
+          deletedCount: result.count,
+        };
+      } catch (error) {
+        throw new Error(
+          error instanceof Error ? error.message : "清除无价值推文失败"
+        );
+      }
+    }),
+
+  /**
+   * 清除旧推文
+   */
+  cleanOldTweets: protectedProcedure
+    .input(
+      z.object({
+        beforeDate: z.string(), // ISO日期字符串
+      })
+    )
+    .mutation(async ({ input }) => {
+      try {
+        // 将日期字符串转换为时间戳
+        const beforeTimestamp = BigInt(new Date(input.beforeDate).getTime());
+
+        // 删除指定时间之前的推文
+        const result = await db.tweet.deleteMany({
+          where: {
+            publishedAt: {
+              lt: beforeTimestamp,
+            },
+          },
+        });
+
+        return {
+          success: true,
+          message: `成功删除 ${result.count} 条旧推文（发布时间早于 ${new Date(input.beforeDate).toLocaleString()}）`,
+          deletedCount: result.count,
+          beforeDate: input.beforeDate,
+        };
+      } catch (error) {
+        throw new Error(
+          error instanceof Error ? error.message : "清除旧推文失败"
         );
       }
     }),

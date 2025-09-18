@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // 需要认证的路径
-const protectedPaths = ['/dashboard', '/tasks', '/tweets', '/extracts', '/x-login', '/viewer'];
+const protectedPaths = ['/dashboard', '/tasks', '/tweets', '/extracts', '/tweet-processing', '/x-login', '/viewer'];
 
 // 仅admin可访问的路径
-const adminOnlyPaths = ['/dashboard', '/tasks', '/tweets', '/extracts', '/x-login'];
+const adminOnlyPaths = ['/dashboard', '/tasks', '/tweets', '/extracts', '/tweet-processing', '/x-login'];
 
 // 仅viewer可访问的路径
 const viewerOnlyPaths = ['/viewer'];

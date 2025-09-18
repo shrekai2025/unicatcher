@@ -154,8 +154,6 @@ export default function APIDocsPage() {
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h4 className="font-medium text-gray-800 mb-2">登录信息</h4>
                 <ul className="text-sm text-gray-600 space-y-1">
-                  <li><strong>用户名:</strong> admin</li>
-                  <li><strong>密码:</strong> a2885828</li>
                   <li><strong>登录页面:</strong> <code>/login</code></li>
                 </ul>
               </div>

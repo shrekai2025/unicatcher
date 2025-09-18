@@ -404,7 +404,7 @@ try {
 # Step 9: Authentication system verification
 Write-Host "`nStep 9: Authentication system verification..." -ForegroundColor Magenta
 
-Write-InstallLog "SUCCESS" "Simple authentication system configured (admin/a2885828)"
+Write-InstallLog "SUCCESS" "Simple authentication system configured (admin/******)"
 Write-InstallLog "INFO" "No additional JWT configuration needed"
 
 # Step 10: Final verification
@@ -454,7 +454,7 @@ if ($script:ErrorCount -eq 0) {
     Write-Host "   1. Start development server: npm run dev" -ForegroundColor White
     Write-Host "   2. Start production server: npm run start" -ForegroundColor White
     Write-Host "   3. Access application: http://localhost:3067" -ForegroundColor White
-    Write-Host "   4. Login credentials: admin / a2885828" -ForegroundColor White
+    Write-Host "   4. Login credentials: admin / ******" -ForegroundColor White
     Write-Host ""
     Write-Host "Troubleshooting tools:" -ForegroundColor Cyan
     Write-Host "   - Environment check: npm run windows-check" -ForegroundColor White

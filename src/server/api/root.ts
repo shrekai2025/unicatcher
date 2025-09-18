@@ -3,6 +3,7 @@ import { tasksRouter } from "~/server/api/routers/tasks";
 import { tweetsRouter } from "~/server/api/routers/tweets";
 import { systemRouter } from "~/server/api/routers/system";
 import { extractsRouter } from "~/server/api/routers/extracts";
+import { tweetProcessingRouter } from "~/server/api/routers/tweet-processing";
 
 /**
  * This is the primary router for your server.
@@ -14,6 +15,7 @@ export const appRouter = createTRPCRouter({
   tweets: tweetsRouter,
   system: systemRouter,
   extracts: extractsRouter,
+  tweetProcessing: tweetProcessingRouter,
   // 注释掉或删除post路由，因为我们不需要它
   // post: postRouter,
 });

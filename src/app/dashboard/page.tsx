@@ -24,9 +24,36 @@ export default function DashboardPage() {
     todayTweets: 0,
   });
 
+  // 清理功能状态
+  const [showOldTweetsModal, setShowOldTweetsModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+
   const systemStatus = api.system.status.useQuery();
   const recentTasks = api.tasks.list.useQuery({ page: 1, limit: 5 });
   const recentTweets = api.tweets.list.useQuery({ page: 1, limit: 5 });
+
+  // 清理功能 mutations
+  const cleanValuelessTweets = api.system.cleanValuelessTweets.useMutation({
+    onSuccess: (data) => {
+      alert(data.message);
+      systemStatus.refetch();
+    },
+    onError: (error) => {
+      alert(`清理失败: ${error.message}`);
+    },
+  });
+
+  const cleanOldTweets = api.system.cleanOldTweets.useMutation({
+    onSuccess: (data) => {
+      alert(data.message);
+      setShowOldTweetsModal(false);
+      setSelectedDate('');
+      systemStatus.refetch();
+    },
+    onError: (error) => {
+      alert(`清理失败: ${error.message}`);
+    },
+  });
 
   useEffect(() => {
     if (systemStatus.data?.data) {
@@ -38,6 +65,24 @@ export default function DashboardPage() {
       }));
     }
   }, [systemStatus.data]);
+
+  // 处理清理无价值推文
+  const handleCleanValuelessTweets = () => {
+    if (confirm('确定要删除所有无价值推文吗？此操作不可恢复！')) {
+      cleanValuelessTweets.mutate();
+    }
+  };
+
+  // 处理清理旧推文
+  const handleCleanOldTweets = () => {
+    if (!selectedDate) {
+      alert('请选择日期');
+      return;
+    }
+    if (confirm(`确定要删除 ${new Date(selectedDate).toLocaleString()} 之前的所有推文吗？此操作不可恢复！`)) {
+      cleanOldTweets.mutate({ beforeDate: selectedDate });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -156,6 +201,63 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* 数据库清理功能 */}
+          <div className="bg-white shadow rounded-lg mb-8">
+            <div className="px-4 py-5 sm:p-6">
+              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                数据库清理
+              </h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* 清除无价值推文 */}
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
+                        <span className="text-white text-sm">🗑️</span>
+                      </div>
+                    </div>
+                    <div className="ml-4 flex-1">
+                      <h4 className="text-sm font-medium text-gray-900">清除无价值推文</h4>
+                      <p className="text-sm text-gray-500">删除所有被AI标记为无价值的推文</p>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      onClick={handleCleanValuelessTweets}
+                      disabled={cleanValuelessTweets.isPending}
+                      className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {cleanValuelessTweets.isPending ? '删除中...' : '立即删除'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 清除旧推文 */}
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
+                        <span className="text-white text-sm">📅</span>
+                      </div>
+                    </div>
+                    <div className="ml-4 flex-1">
+                      <h4 className="text-sm font-medium text-gray-900">清除旧推文</h4>
+                      <p className="text-sm text-gray-500">删除指定时间之前的所有推文</p>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setShowOldTweetsModal(true)}
+                      className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                    >
+                      选择时间并删除
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             {/* 最近任务 */}
             <div className="bg-white shadow rounded-lg">
@@ -265,6 +367,52 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* 选择时间弹窗 */}
+      {showOldTweetsModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                选择删除时间点
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                将删除此时间之前发布的所有推文，此操作不可恢复！
+              </p>
+              <div className="mb-4">
+                <label htmlFor="date-input" className="block text-sm font-medium text-gray-700 mb-2">
+                  选择日期时间
+                </label>
+                <input
+                  id="date-input"
+                  type="datetime-local"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowOldTweetsModal(false);
+                    setSelectedDate('');
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleCleanOldTweets}
+                  disabled={cleanOldTweets.isPending || !selectedDate}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {cleanOldTweets.isPending ? '删除中...' : '确认删除'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
