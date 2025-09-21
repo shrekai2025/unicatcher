@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI批处理接口测试</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #4f46e5, #7c3aed);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        
+        .form-container {
+            padding: 40px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        
+        .list-ids-container {
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .list-id-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .list-id-input input {
+            flex: 1;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-add {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-add:hover {
+            background: #059669;
+        }
+        
+        .btn-remove {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-remove:hover {
+            background: #dc2626;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #4f46e5, #7c3aed);
+            color: white;
+            padding: 16px 32px;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 20px;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .response-container {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border-left: 4px solid #4f46e5;
+        }
+        
+        .response-title {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 10px;
+        }
+        
+        .response-content {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 16px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffffff33;
+            border-top: 2px solid #ffffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .status-success {
+            border-left-color: #10b981;
+        }
+        
+        .status-error {
+            border-left-color: #ef4444;
+        }
+        
+        .help-text {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AI批处理接口测试 (完整版)</h1>
+            <p>测试 /api/external/ai-batch/start 接口 - 支持所有筛选和配置参数</p>
+        </div>
+        
+        <div class="form-container">
+            <form id="batchForm">
+                <div class="form-group">
+                    <label for="serverUrl">服务器地址</label>
+                    <input type="text" id="serverUrl" value="http://localhost:3067" placeholder="http://localhost:3067">
+                    <div class="help-text">服务器的基础URL</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="apiKey">API Key</label>
+                    <input type="text" id="apiKey" value="unicatcher-api-key-demo" placeholder="unicatcher-api-key-demo">
+                    <div class="help-text">用于认证的API密钥</div>
+                </div>
+                
+                <div class="form-group">
+                    <label>List IDs (可添加多个)</label>
+                    <div class="list-ids-container">
+                        <div id="listIdsContainer">
+                            <div class="list-id-input">
+                                <input type="text" placeholder="输入 List ID，例如: 1948042550071496895" class="list-id-field">
+                                <button type="button" class="btn btn-remove" onclick="removeListId(this)">删除</button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-add" onclick="addListId()">+ 添加 List ID</button>
+                    </div>
+                    <div class="help-text">至少添加一个List ID，可以添加多个</div>
+                </div>
+                
+                <!-- 筛选配置 -->
+                <div class="form-group">
+                    <label>用户名筛选 (可选)</label>
+                    <div class="list-ids-container">
+                        <div id="usernamesContainer">
+                            <!-- 默认为空，用户可以添加 -->
+                        </div>
+                        <button type="button" class="btn btn-add" onclick="addUsername()">+ 添加用户名</button>
+                    </div>
+                    <div class="help-text">可选：按用户名筛选推文，留空表示不筛选</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="publishedAfter">发布时间筛选 (可选)</label>
+                    <input type="datetime-local" id="publishedAfter">
+                    <div class="help-text">可选：只处理此时间之后发布的推文</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="isExtracted">提取状态筛选</label>
+                    <select id="isExtracted">
+                        <option value="all">全部</option>
+                        <option value="true">已提取</option>
+                        <option value="false">未提取</option>
+                    </select>
+                    <div class="help-text">按推文提取状态筛选</div>
+                </div>
+                
+                <!-- 处理配置 -->
+                <div class="form-group">
+                    <label for="batchSize">批次大小</label>
+                    <input type="number" id="batchSize" value="10" min="1" max="100">
+                    <div class="help-text">每批处理的推文数量 (1-100)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="batchProcessingMode">处理模式</label>
+                    <select id="batchProcessingMode">
+                        <option value="optimized">优化模式</option>
+                        <option value="traditional">传统模式</option>
+                    </select>
+                    <div class="help-text">批处理的执行模式</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="systemPrompt">系统提示词 (可选)</label>
+                    <textarea id="systemPrompt" rows="3" placeholder="你是专业的推文分析师..."></textarea>
+                    <div class="help-text">可选：自定义AI分析的系统提示词</div>
+                </div>
+                
+                <!-- AI配置 -->
+                <div class="form-group">
+                    <label for="aiProvider">AI提供商</label>
+                    <select id="aiProvider">
+                        <option value="openai">OpenAI</option>
+                        <option value="openai-badger">OpenAI Badger</option>
+                    </select>
+                    <div class="help-text">选择AI服务提供商</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="aiApiKey">OpenAI API Key</label>
+                    <input type="password" id="aiApiKey" placeholder="sk-your-openai-api-key">
+                    <div class="help-text">用于AI处理的OpenAI API密钥</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="aiModel">AI模型</label>
+                    <select id="aiModel">
+                        <option value="gpt-4o">gpt-4o</option>
+                        <option value="gpt-4">gpt-4</option>
+                        <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                    </select>
+                    <div class="help-text">选择AI模型</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="aiBaseURL">自定义API基础URL (可选)</label>
+                    <input type="url" id="aiBaseURL" placeholder="https://api.openai.com/v1">
+                    <div class="help-text">可选：自定义OpenAI API的基础URL</div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                    <span id="submitText">🚀 启动AI批处理</span>
+                    <span id="loadingText" class="loading" style="display: none;">
+                        <div class="spinner"></div>
+                        处理中...
+                    </span>
+                </button>
+            </form>
+            
+            <div id="responseContainer" class="response-container" style="display: none;">
+                <div class="response-title" id="responseTitle">响应结果</div>
+                <div class="response-content" id="responseContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let listIdCount = 1;
+        let usernameCount = 1;
+
+        function addListId() {
+            listIdCount++;
+            const container = document.getElementById('listIdsContainer');
+            const div = document.createElement('div');
+            div.className = 'list-id-input';
+            div.innerHTML = `
+                <input type="text" placeholder="输入 List ID，例如: 1948042550071496895" class="list-id-field">
+                <button type="button" class="btn btn-remove" onclick="removeListId(this)">删除</button>
+            `;
+            container.appendChild(div);
+        }
+
+        function removeListId(button) {
+            const container = document.getElementById('listIdsContainer');
+            if (container.children.length > 1) {
+                button.parentElement.remove();
+            } else {
+                alert('至少需要保留一个List ID输入框');
+            }
+        }
+
+        function addUsername() {
+            usernameCount++;
+            const container = document.getElementById('usernamesContainer');
+            const div = document.createElement('div');
+            div.className = 'list-id-input';
+            div.innerHTML = `
+                <input type="text" placeholder="输入用户名，例如: elonmusk" class="username-field">
+                <button type="button" class="btn btn-remove" onclick="removeUsername(this)">删除</button>
+            `;
+            container.appendChild(div);
+        }
+
+        function removeUsername(button) {
+            const container = document.getElementById('usernamesContainer');
+            // 直接删除，因为用户名是可选的
+            button.parentElement.remove();
+        }
+
+        function getListIds() {
+            const inputs = document.querySelectorAll('.list-id-field');
+            const listIds = [];
+            inputs.forEach(input => {
+                if (input.value.trim()) {
+                    listIds.push(input.value.trim());
+                }
+            });
+            return listIds;
+        }
+
+        function getUsernames() {
+            const inputs = document.querySelectorAll('.username-field');
+            const usernames = [];
+            inputs.forEach(input => {
+                if (input.value.trim()) {
+                    usernames.push(input.value.trim());
+                }
+            });
+            return usernames.length > 0 ? usernames : undefined;
+        }
+
+        function showResponse(title, content, isSuccess = true) {
+            const container = document.getElementById('responseContainer');
+            const titleElement = document.getElementById('responseTitle');
+            const contentElement = document.getElementById('responseContent');
+            
+            titleElement.textContent = title;
+            contentElement.textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+            
+            container.className = `response-container ${isSuccess ? 'status-success' : 'status-error'}`;
+            container.style.display = 'block';
+            
+            // 滚动到响应区域
+            container.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function setLoading(loading) {
+            const submitBtn = document.getElementById('submitBtn');
+            const submitText = document.getElementById('submitText');
+            const loadingText = document.getElementById('loadingText');
+            
+            if (loading) {
+                submitBtn.disabled = true;
+                submitText.style.display = 'none';
+                loadingText.style.display = 'flex';
+            } else {
+                submitBtn.disabled = false;
+                submitText.style.display = 'block';
+                loadingText.style.display = 'none';
+            }
+        }
+
+        document.getElementById('batchForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const serverUrl = document.getElementById('serverUrl').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const listIds = getListIds();
+            const usernames = getUsernames();
+            const publishedAfter = document.getElementById('publishedAfter').value;
+            const isExtracted = document.getElementById('isExtracted').value;
+            const batchSize = parseInt(document.getElementById('batchSize').value);
+            const batchProcessingMode = document.getElementById('batchProcessingMode').value;
+            const systemPrompt = document.getElementById('systemPrompt').value.trim();
+            const aiProvider = document.getElementById('aiProvider').value;
+            const aiApiKey = document.getElementById('aiApiKey').value.trim();
+            const aiModel = document.getElementById('aiModel').value;
+            const aiBaseURL = document.getElementById('aiBaseURL').value.trim();
+            
+            // 验证输入
+            if (!serverUrl) {
+                alert('请输入服务器地址');
+                return;
+            }
+            
+            if (!apiKey) {
+                alert('请输入API Key');
+                return;
+            }
+            
+            if (listIds.length === 0) {
+                alert('请至少输入一个List ID');
+                return;
+            }
+            
+            if (!aiApiKey) {
+                alert('请输入OpenAI API Key');
+                return;
+            }
+            
+            // 构建请求数据
+            const requestData = {
+                listIds: listIds,
+                batchSize: batchSize,
+                batchProcessingMode: batchProcessingMode,
+                isExtracted: isExtracted,
+                aiConfig: {
+                    apiKey: aiApiKey,
+                    model: aiModel,
+                    provider: aiProvider
+                }
+            };
+            
+            // 添加可选字段
+            if (usernames && usernames.length > 0) {
+                requestData.usernames = usernames;
+            }
+            
+            if (publishedAfter) {
+                requestData.publishedAfter = new Date(publishedAfter).toISOString();
+            }
+            
+            if (systemPrompt) {
+                requestData.systemPrompt = systemPrompt;
+            }
+            
+            if (aiBaseURL) {
+                requestData.aiConfig.baseURL = aiBaseURL;
+            }
+            
+            setLoading(true);
+            
+            try {
+                const response = await fetch(`${serverUrl}/api/external/ai-batch/start`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': apiKey
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResponse('✅ 请求成功', data, true);
+                } else {
+                    showResponse(`❌ 请求失败 (${response.status})`, data, false);
+                }
+                
+            } catch (error) {
+                showResponse('❌ 网络错误', error.message, false);
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // 页面加载完成后的提示
+        window.addEventListener('load', function() {
+            console.log('🤖 AI批处理测试页面已加载');
+            console.log('请确保服务器正在运行，然后填写必要信息进行测试');
+        });
+    </script>
+</body>
+</html>
