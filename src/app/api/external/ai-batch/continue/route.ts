@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
     const schema = z.object({
       previousBatchId: z.string().optional(), // 可选：指定上一个批次ID用于参考
       // 使用与start接口相同的参数
+      listIds: z.array(z.string()).optional(), // 支持多个List ID筛选
       usernames: z.array(z.string()).optional(),
       publishedAfter: z.string().optional().transform(val => val ? new Date(val) : undefined),
       isExtracted: z.enum(['all', 'true', 'false']).optional().default('all'),
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[AI批处理API] 收到继续处理请求:', {
       previousBatchId: validatedData.previousBatchId,
+      listIds: validatedData.listIds,
       usernames: validatedData.usernames,
       batchSize: validatedData.batchSize,
       timestamp: new Date().toISOString()
@@ -125,6 +127,7 @@ export async function POST(request: NextRequest) {
     await processManager.startBatchProcess({
       batchId: newBatchId,
       filterConfig: {
+        listIds: validatedData.listIds,
         usernames: validatedData.usernames,
         publishedAfter: validatedData.publishedAfter,
         isExtracted: validatedData.isExtracted,

@@ -243,10 +243,17 @@ const apiEndpoints: ApiEndpoint[] = [
     description: '启动AI批处理任务（单批次模式，全局唯一）',
     params: [
       {
+        name: 'listIds',
+        type: 'array<string>',
+        required: false,
+        description: '筛选特定List的推文，支持多个List ID',
+        example: ['1948042550071496895', '1952162308337324098']
+      },
+      {
         name: 'usernames',
         type: 'array<string>',
         required: false,
-        description: '筛选特定用户的推文（不支持listIds）',
+        description: '筛选特定用户的推文',
         example: ['elonmusk', 'sundarpichai']
       },
       {
@@ -396,6 +403,7 @@ const apiEndpoints: ApiEndpoint[] = [
   -H "Content-Type: application/json" \\
   -H "X-API-Key: unicatcher-api-key-demo" \\
   -d '{
+    "listIds": ["1948042550071496895"],
     "usernames": ["elonmusk"],
     "batchSize": 20,
     "aiConfig": {
@@ -552,6 +560,13 @@ const apiEndpoints: ApiEndpoint[] = [
         example: 'batch_1703123456789_abc123'
       },
       {
+        name: 'listIds',
+        type: 'array<string>',
+        required: false,
+        description: '筛选特定List的推文，支持多个List ID',
+        example: ['1948042550071496895']
+      },
+      {
         name: 'usernames',
         type: 'array<string>',
         required: false,
@@ -670,6 +685,7 @@ const apiEndpoints: ApiEndpoint[] = [
   -H "X-API-Key: unicatcher-api-key-demo" \\
   -d '{
     "previousBatchId": "batch_1703123456789_abc123",
+    "listIds": ["1948042550071496895"],
     "usernames": ["elonmusk"],
     "aiConfig": {"apiKey": "sk-your-openai-api-key"}
   }'`

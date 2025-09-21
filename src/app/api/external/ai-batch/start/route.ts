@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     // 验证请求参数
     const schema = z.object({
       // 筛选配置
+      listIds: z.array(z.string()).optional(), // 支持多个List ID筛选
       usernames: z.array(z.string()).optional(),
       publishedAfter: z.string().optional().transform(val => val ? new Date(val) : undefined),
       isExtracted: z.enum(['all', 'true', 'false']).optional().default('all'),
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
     const validatedData = schema.parse(body);
 
     console.log('[AI批处理API] 收到启动请求:', {
+      listIds: validatedData.listIds,
       usernames: validatedData.usernames,
       publishedAfter: validatedData.publishedAfter,
       isExtracted: validatedData.isExtracted,
@@ -87,6 +89,10 @@ export async function POST(request: NextRequest) {
       ],
     };
 
+    if (validatedData.listIds && validatedData.listIds.length > 0) {
+      where.listId = { in: validatedData.listIds };
+    }
+
     if (validatedData.usernames && validatedData.usernames.length > 0) {
       where.userUsername = { in: validatedData.usernames };
     }
@@ -115,6 +121,7 @@ export async function POST(request: NextRequest) {
         status: 'processing',
         totalTweets,
         filterConfig: JSON.stringify({
+          listIds: validatedData.listIds,
           usernames: validatedData.usernames,
           publishedAfter: validatedData.publishedAfter,
           isExtracted: validatedData.isExtracted,
@@ -130,6 +137,7 @@ export async function POST(request: NextRequest) {
     await processManager.startBatchProcess({
       batchId,
       filterConfig: {
+        listIds: validatedData.listIds,
         usernames: validatedData.usernames,
         publishedAfter: validatedData.publishedAfter,
         isExtracted: validatedData.isExtracted,
