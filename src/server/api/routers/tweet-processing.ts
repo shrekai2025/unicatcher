@@ -9,6 +9,38 @@ import { db } from '~/server/db';
 import { AIProcessManager } from '~/server/core/ai/process-manager';
 import type { Prisma } from '@prisma/client';
 
+// 全局实例，避免重复声明
+const processManager = AIProcessManager.getInstance();
+
+/**
+ * 清理旧的AI处理记录，保留最近10条
+ */
+async function cleanupOldAIRecords(): Promise<void> {
+  try {
+    // 获取所有记录，按创建时间降序排列
+    const allRecords = await db.aIProcessRecord.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+
+    // 如果记录数超过10条，删除多余的
+    if (allRecords.length > 10) {
+      const recordsToDelete = allRecords.slice(10); // 保留前10条，删除其余的
+      const idsToDelete = recordsToDelete.map(r => r.id);
+
+      await db.aIProcessRecord.deleteMany({
+        where: {
+          id: { in: idsToDelete }
+        }
+      });
+
+      console.log(`[AI记录清理] 删除了 ${recordsToDelete.length} 条旧记录，保留最近 10 条`);
+    }
+  } catch (error) {
+    console.error('[AI记录清理] 清理失败:', error);
+  }
+}
+
 // 推文筛选参数 Schema
 const TweetFilterSchema = z.object({
   listIds: z.array(z.string()).optional(),
@@ -303,6 +335,24 @@ export const tweetProcessingRouter = createTRPCRouter({
       });
     }),
 
+  // 更新内容类型
+  updateContentType: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+      data: z.object({
+        name: z.string().optional(),
+        description: z.string().optional(),
+      }),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, data } = input;
+      const type = await db.contentType.update({
+        where: { id },
+        data,
+      });
+      return type;
+    }),
+
   // 删除内容类型
   deleteContentType: protectedProcedure
     .input(z.object({ id: z.string() }))
@@ -324,10 +374,13 @@ export const tweetProcessingRouter = createTRPCRouter({
         take: input.limit,
       });
 
-      // 解析 filterConfig JSON 字段
+      // 解析 JSON 字段
       const processedRecords = records.map((record) => ({
         ...record,
         filterConfig: record.filterConfig ? JSON.parse(record.filterConfig) : null,
+        requestDetails: record.requestDetails ? JSON.parse(record.requestDetails) : null,
+        responseDetails: record.responseDetails ? JSON.parse(record.responseDetails) : null,
+        processingLogs: record.processingLogs ? JSON.parse(record.processingLogs) : [],
       }));
 
       return processedRecords;
@@ -338,6 +391,7 @@ export const tweetProcessingRouter = createTRPCRouter({
     .input(z.object({
       filterConfig: TweetFilterSchema.omit({ page: true, limit: true }),
       batchSize: z.number().min(1).max(100).default(10),
+      batchProcessingMode: z.enum(['optimized', 'traditional']).default('optimized'),
       systemPrompt: z.string().optional(),
       aiConfig: z.object({
         apiKey: z.string().min(1),
@@ -347,8 +401,14 @@ export const tweetProcessingRouter = createTRPCRouter({
       }),
     }))
     .mutation(async ({ input }) => {
-      const { filterConfig, batchSize, systemPrompt, aiConfig } = input;
+      const { filterConfig, batchSize, batchProcessingMode, systemPrompt, aiConfig } = input;
       
+      // 首先检查是否有任务正在运行
+      const globalStatus = await processManager.getGlobalStatus();
+      if (globalStatus.hasActiveTask) {
+        throw new Error(`AI批处理任务正在运行中: ${globalStatus.currentBatchId}，请等待当前任务完成`);
+      }
+
       // 生成批次ID
       const batchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
@@ -390,16 +450,40 @@ export const tweetProcessingRouter = createTRPCRouter({
           systemPrompt,
           aiProvider: aiConfig.provider,
           aiModel: aiConfig.model,
+          batchProcessingMode,
+          requestDetails: JSON.stringify({
+            filterConfig,
+            batchSize,
+            batchProcessingMode,
+            aiConfig: {
+              provider: aiConfig.provider,
+              model: aiConfig.model,
+              baseURL: aiConfig.baseURL,
+            },
+            systemPrompt,
+            timestamp: new Date().toISOString(),
+          }),
+          processingLogs: JSON.stringify([
+            {
+              timestamp: new Date().toISOString(),
+              level: 'info',
+              message: `批处理任务启动: ${batchId}`,
+              data: { totalTweets, batchSize, mode: batchProcessingMode }
+            }
+          ]),
         },
       });
 
+      // 清理旧记录，保留最近10条
+      await cleanupOldAIRecords();
+
       // 启动异步 AI 处理任务
-      const processManager = AIProcessManager.getInstance();
       try {
         await processManager.startBatchProcess({
           batchId,
           filterConfig,
           batchSize,
+          batchProcessingMode,
           systemPrompt,
           aiConfig,
         });
@@ -420,6 +504,11 @@ export const tweetProcessingRouter = createTRPCRouter({
         batchId,
         recordId: processRecord.id,
         totalTweets,
+        batchSize,
+        estimatedBatches: Math.ceil(totalTweets / batchSize),
+        mode: batchProcessingMode,
+        status: 'processing',
+        message: 'AI批处理任务启动成功（单批次模式）',
       };
     }),
 
@@ -427,16 +516,122 @@ export const tweetProcessingRouter = createTRPCRouter({
   stopAIBatchProcess: protectedProcedure
     .input(z.object({ batchId: z.string() }))
     .mutation(async ({ input }) => {
-      const processManager = AIProcessManager.getInstance();
       await processManager.stopBatchProcess(input.batchId);
       return { success: true };
+    }),
+
+  // 继续 AI 批处理
+  continueAIBatchProcess: protectedProcedure
+    .input(z.object({
+      previousBatchId: z.string().optional(),
+      filterConfig: TweetFilterSchema.omit({ page: true, limit: true }),
+      batchSize: z.number().min(1).max(100).default(10),
+      batchProcessingMode: z.enum(['optimized', 'traditional']).default('optimized'),
+      systemPrompt: z.string().optional(),
+      aiConfig: z.object({
+        apiKey: z.string().min(1),
+        provider: z.enum(['openai', 'openai-badger']).default('openai'),
+        model: z.string().default('gpt-4o'),
+        baseURL: z.string().optional(),
+      }),
+    }))
+    .mutation(async ({ input }) => {
+      const { previousBatchId, filterConfig, batchSize, batchProcessingMode, systemPrompt, aiConfig } = input;
+      
+      // 检查是否有任务正在运行
+      const globalStatus = await processManager.getGlobalStatus();
+      if (globalStatus.hasActiveTask) {
+        throw new Error(`AI批处理任务正在运行中: ${globalStatus.currentBatchId}，请等待当前任务完成`);
+      }
+
+      // 生成新的批次ID
+      const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+      // 查询符合条件且未处理的推文
+      const where: Prisma.TweetWhereInput = {
+        isDeleted: false,
+        OR: [
+          { aiProcessStatus: null },
+          { aiProcessStatus: 'pending' },
+          { aiProcessStatus: 'failed', aiRetryCount: { lt: 3 } },
+        ],
+      };
+
+      if (filterConfig.listIds && filterConfig.listIds.length > 0) {
+        where.listId = { in: filterConfig.listIds };
+      }
+
+      if (filterConfig.usernames && filterConfig.usernames.length > 0) {
+        where.userUsername = { in: filterConfig.usernames };
+      }
+
+      if (filterConfig.publishedAfter) {
+        where.publishedAt = { gte: BigInt(filterConfig.publishedAfter.getTime()) };
+      }
+
+      const remainingTweets = await db.tweet.count({ where });
+
+      if (remainingTweets === 0) {
+        throw new Error('没有更多符合条件的推文需要处理');
+      }
+
+      // 创建处理记录
+      const processRecord = await db.aIProcessRecord.create({
+        data: {
+          batchId: newBatchId,
+          status: 'processing',
+          totalTweets: remainingTweets,
+          filterConfig: JSON.stringify({
+            ...filterConfig,
+            previousBatchId,
+          }),
+          systemPrompt,
+          aiProvider: aiConfig.provider,
+          aiModel: aiConfig.model,
+          batchProcessingMode,
+        },
+      });
+
+      // 启动新的批处理任务
+      try {
+        await processManager.startBatchProcess({
+          batchId: newBatchId,
+          filterConfig,
+          batchSize,
+          batchProcessingMode,
+          systemPrompt,
+          aiConfig,
+        });
+      } catch (error) {
+        // 如果启动失败，更新记录状态
+        await db.aIProcessRecord.update({
+          where: { batchId: newBatchId },
+          data: {
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : '启动失败',
+            completedAt: new Date(),
+          },
+        });
+        throw error;
+      }
+
+      return {
+        batchId: newBatchId,
+        previousBatchId,
+        recordId: processRecord.id,
+        remainingTweets,
+        batchSize,
+        estimatedBatches: Math.ceil(remainingTweets / batchSize),
+        mode: batchProcessingMode,
+        status: 'processing',
+        message: '继续处理任务启动成功',
+      };
     }),
 
   // 获取批处理状态
   getBatchProcessStatus: protectedProcedure
     .input(z.object({ batchId: z.string() }))
     .query(async ({ input }) => {
-      const processManager = AIProcessManager.getInstance();
       const status = await processManager.getBatchStatus(input.batchId);
       return status;
     }),

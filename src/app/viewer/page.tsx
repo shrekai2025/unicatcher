@@ -25,7 +25,7 @@ interface MediaCard {
   publishedAt: number;
   isReply: boolean;
   contentTypes?: string[];  // 解析后的内容类型数组
-  keywords?: string[];      // 解析后的关键词数组(topicTags)
+  keywords?: string[];      // 解析后的主题标签数组(来源于topicTags字段)
 }
 
 interface VideoData {
@@ -299,25 +299,35 @@ export default function ViewerPage() {
           
           {/* 标签区域 */}
           {(contentTypes.length > 0 || keywords.length > 0) && (
-            <div className="flex flex-wrap gap-1">
+            <div className="space-y-1">
               {/* 内容类型标签 */}
-              {contentTypes.map((type, index) => (
-                <span
-                  key={`type-${index}`}
-                  className="inline-block px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded"
-                >
-                  {type}
-                </span>
-              ))}
-              {/* 关键词标签 */}
-              {keywords.map((keyword, index) => (
-                <span
-                  key={`keyword-${index}`}
-                  className="inline-block px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded"
-                >
-                  {keyword}
-                </span>
-              ))}
+              {contentTypes.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-xs text-gray-500 mr-1">内容类型:</span>
+                  {contentTypes.map((type, index) => (
+                    <span
+                      key={`type-${index}`}
+                      className="inline-block px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded"
+                    >
+                      {type}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {/* 主题标签 */}
+              {keywords.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-xs text-gray-500 mr-1">主题标签:</span>
+                  {keywords.map((keyword, index) => (
+                    <span
+                      key={`keyword-${index}`}
+                      className="inline-block px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 rounded"
+                    >
+                      {keyword}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -406,25 +416,35 @@ export default function ViewerPage() {
               
               {/* 标签区域 */}
               {(contentTypes.length > 0 || keywords.length > 0) && (
-                <div className="flex flex-wrap gap-1">
+                <div className="space-y-1">
                   {/* 内容类型标签 */}
-                  {contentTypes.map((type, index) => (
-                    <span
-                      key={`type-${index}`}
-                      className="inline-block px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded"
-                    >
-                      {type}
-                    </span>
-                  ))}
-                  {/* 关键词标签 */}
-                  {keywords.map((keyword, index) => (
-                    <span
-                      key={`keyword-${index}`}
-                      className="inline-block px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded"
-                    >
-                      {keyword}
-                    </span>
-                  ))}
+                  {contentTypes.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="text-xs text-gray-500 mr-1">内容类型:</span>
+                      {contentTypes.map((type, index) => (
+                        <span
+                          key={`type-${index}`}
+                          className="inline-block px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded"
+                        >
+                          {type}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {/* 主题标签 */}
+                  {keywords.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="text-xs text-gray-500 mr-1">主题标签:</span>
+                      {keywords.map((keyword, index) => (
+                        <span
+                          key={`keyword-${index}`}
+                          className="inline-block px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 rounded"
+                        >
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

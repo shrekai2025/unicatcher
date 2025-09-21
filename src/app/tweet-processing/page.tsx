@@ -41,11 +41,11 @@ const TIME_PRESETS = [
 const DEFAULT_SYSTEM_PROMPT = `你是一个专业的推文内容分析助手。请分析推文的价值和内容，并按以下要求输出结果：
 
 **分析规则：**
-1. 剔除无信息价值的推文：
-   - 纯粹的打招呼、问候、感谢
-   - 个人日常生活分享（如吃饭、睡觉、心情等）
-   - 无实质内容的互动（如单纯的表情、"赞"、"转发"等）
-   - 营销推广、广告内容
+1. 提取关键词：
+   - 从推文中提取3-8个最重要的关键词
+   - 关键词应该是名词、技术术语、产品名称等实质性内容
+   - 避免提取停用词、介词、助词等无意义词汇
+   - 关键词应该有助于理解推文的核心内容
 
 2. 匹配主题标签：
    如果推文内容与以下主题相关，请列出匹配的标签：
@@ -66,9 +66,15 @@ const DEFAULT_SYSTEM_PROMPT = `你是一个专业的推文内容分析助手。�
    - 观点分析：个人观点、行业分析
    - 工具推荐：软件工具、资源推荐
 
+**重要：价值判断标准**
+- 如果推文匹配到任何一种内容类型，则视为有价值（isValueless: false）
+- 如果推文不匹配任何内容类型，则视为无价值（isValueless: true）
+- 价值判断完全基于是否命中内容类型，而非推文内容的主观判断
+
 **输出格式（必须是有效的JSON）：**
 {
   "isValueless": false,
+  "keywords": ["关键词1", "关键词2", "关键词3"],
   "topicTags": ["匹配的主题标签1", "匹配的主题标签2"],
   "contentTypes": ["匹配的内容类型1", "匹配的内容类型2"]
 }
@@ -76,26 +82,17 @@ const DEFAULT_SYSTEM_PROMPT = `你是一个专业的推文内容分析助手。�
 请确保输出是严格的JSON格式，不要包含任何额外的文本。`;
 
 export default function TweetProcessingPage() {
+  // 避免hydration错误的mounted状态
+  const [isMounted, setIsMounted] = useState(false);
+
   // 筛选状态
-  const [filterConfig, setFilterConfig] = useState<FilterConfig>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('tweet-processing-filter-config');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (error) {
-          console.error('解析筛选配置失败:', error);
-        }
-      }
-    }
-    return {
-      listIds: [],
-      usernames: [],
-      publishedAfter: undefined,
-      isExtracted: 'all',
-      aiProcessStatus: 'all',
-      sortOrder: 'desc',
-    };
+  const [filterConfig, setFilterConfig] = useState<FilterConfig>({
+    listIds: [],
+    usernames: [],
+    publishedAfter: undefined,
+    isExtracted: 'all',
+    aiProcessStatus: 'all',
+    sortOrder: 'desc',
   });
 
   // 分页状态
@@ -105,51 +102,14 @@ export default function TweetProcessingPage() {
   // 预制功能状态
   const [listIdPresets, setListIdPresets] = useState<ListIdPreset[]>([]);
   const [usernamePresets, setUsernamePresets] = useState<UsernamePreset[]>([]);
-  const [selectedListIdPresets, setSelectedListIdPresets] = useState<ListIdPreset[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('tweet-processing-selected-listid-presets');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (error) {
-          console.error('解析选择的ListId预制项失败:', error);
-        }
-      }
-    }
-    return [];
-  });
-  const [selectedUsernamePresets, setSelectedUsernamePresets] = useState<UsernamePreset[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('tweet-processing-selected-username-presets');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (error) {
-          console.error('解析选择的Username预制项失败:', error);
-        }
-      }
-    }
-    return [];
-  });
+  const [selectedListIdPresets, setSelectedListIdPresets] = useState<ListIdPreset[]>([]);
+  const [selectedUsernamePresets, setSelectedUsernamePresets] = useState<UsernamePreset[]>([]);
 
   // AI 配置状态
-  const [aiConfig, setAIConfig] = useState<AIConfig>(() => {
-    // 从 localStorage 加载配置
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('tweet-processing-ai-config');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error('解析 AI 配置失败:', e);
-        }
-      }
-    }
-    return {
-      apiKey: '',
-      provider: 'openai' as const,
-      model: 'gpt-4o',
-    };
+  const [aiConfig, setAIConfig] = useState<AIConfig>({
+    apiKey: '',
+    provider: 'openai' as const,
+    model: 'gpt-4o',
   });
 
   // 主题标签管理状态
@@ -160,10 +120,19 @@ export default function TweetProcessingPage() {
   const [newContentType, setNewContentType] = useState({ name: '', description: '' });
   const [showContentTypeForm, setShowContentTypeForm] = useState(false);
 
+  // 编辑弹窗状态
+  const [showTopicTagModal, setShowTopicTagModal] = useState(false);
+  const [showContentTypeModal, setShowContentTypeModal] = useState(false);
+  const [editingTopicTagId, setEditingTopicTagId] = useState<string | null>(null);
+  const [editingContentTypeId, setEditingContentTypeId] = useState<string | null>(null);
+
   // AI 处理状态
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentBatchId, setCurrentBatchId] = useState<string | null>(null);
   const [batchSize, setBatchSize] = useState(10);
+  
+  // 批量处理模式状态
+  const [batchProcessingMode, setBatchProcessingMode] = useState<'optimized' | 'traditional'>('optimized');
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [showProcessingModal, setShowProcessingModal] = useState(false);
   const [showAIConfigModal, setShowAIConfigModal] = useState(false);
@@ -176,6 +145,56 @@ export default function TweetProcessingPage() {
   const [showUsernameForm, setShowUsernameForm] = useState(false);
   const [newListIdPreset, setNewListIdPreset] = useState({ name: '', listId: '' });
   const [newUsernamePreset, setNewUsernamePreset] = useState({ name: '', username: '' });
+
+  // 客户端挂载后加载localStorage数据，避免hydration错误
+  useEffect(() => {
+    setIsMounted(true);
+    
+    // 加载筛选配置
+    const savedFilterConfig = localStorage.getItem('tweet-processing-filter-config');
+    if (savedFilterConfig) {
+      try {
+        setFilterConfig(JSON.parse(savedFilterConfig));
+      } catch (error) {
+        console.error('解析筛选配置失败:', error);
+      }
+    }
+    
+    // 加载选择的预制项
+    const savedListIdPresets = localStorage.getItem('tweet-processing-selected-listid-presets');
+    if (savedListIdPresets) {
+      try {
+        setSelectedListIdPresets(JSON.parse(savedListIdPresets));
+      } catch (error) {
+        console.error('解析选择的ListId预制项失败:', error);
+      }
+    }
+    
+    const savedUsernamePresets = localStorage.getItem('tweet-processing-selected-username-presets');
+    if (savedUsernamePresets) {
+      try {
+        setSelectedUsernamePresets(JSON.parse(savedUsernamePresets));
+      } catch (error) {
+        console.error('解析选择的Username预制项失败:', error);
+      }
+    }
+    
+    // 加载AI配置
+    const savedAIConfig = localStorage.getItem('tweet-processing-ai-config');
+    if (savedAIConfig) {
+      try {
+        setAIConfig(JSON.parse(savedAIConfig));
+      } catch (error) {
+        console.error('解析 AI 配置失败:', error);
+      }
+    }
+    
+    // 加载批处理模式
+    const savedBatchMode = localStorage.getItem('tweet-processing-batch-mode');
+    if (savedBatchMode) {
+      setBatchProcessingMode(savedBatchMode as 'optimized' | 'traditional');
+    }
+  }, []);
 
   // 加载预制项目
   useEffect(() => {
@@ -190,6 +209,12 @@ export default function TweetProcessingPage() {
       localStorage.setItem('tweet-processing-ai-config', JSON.stringify(aiConfig));
     }
   }, [aiConfig]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tweet-processing-batch-mode', batchProcessingMode);
+    }
+  }, [batchProcessingMode]);
 
   // 保存筛选配置到 localStorage
   useEffect(() => {
@@ -239,6 +264,37 @@ export default function TweetProcessingPage() {
   // 获取处理记录
   const { data: processRecords } = api.tweetProcessing.getAIProcessRecords.useQuery({ limit: 10 });
 
+  // 使用useEffect来处理数据获取后的操作
+  useEffect(() => {
+    if (processRecords && processRecords.length > 0) {
+      console.log('[前台] 📋 获取到AI处理记录:', {
+        记录数量: processRecords.length,
+        最新记录: processRecords[0] ? {
+          批次ID: processRecords[0].batchId,
+          状态: processRecords[0].status,
+          总推文数: processRecords[0].totalTweets,
+          已处理: processRecords[0].processedTweets,
+          API调用次数: processRecords[0].responseDetails?.length || 0,
+          处理模式: processRecords[0].batchProcessingMode,
+        } : null,
+      });
+      
+      // 如果有响应详情，打印AI交互信息
+      if (processRecords[0]?.responseDetails && Array.isArray(processRecords[0].responseDetails)) {
+        processRecords[0].responseDetails.forEach((response: any, idx: number) => {
+          console.log(`[前台] 📥 第${idx + 1}次API调用详情:`, {
+            时间: new Date(response.timestamp).toLocaleString(),
+            状态: response.responseStatus === 200 ? '✅ 成功' : '❌ 失败',
+            处理时间: response.processingTime + 'ms',
+            推文数量: response.results?.length || 0,
+            成功数量: response.results?.filter((r: any) => !r.error).length || 0,
+            Token使用: response.responseData?.usage?.total_tokens || '未知',
+          });
+        });
+      }
+    }
+  }, [processRecords]);
+
   // Mutations
   const createTopicTag = api.tweetProcessing.createTopicTag.useMutation({
     onSuccess: () => {
@@ -262,6 +318,24 @@ export default function TweetProcessingPage() {
     },
   });
 
+  const updateTopicTag = api.tweetProcessing.updateTopicTag.useMutation({
+    onSuccess: () => {
+      refetchTopicTags();
+      setNewTopicTag({ name: '', description: '' });
+      setEditingTopicTagId(null);
+      setShowTopicTagModal(false);
+    },
+  });
+
+  const updateContentType = api.tweetProcessing.updateContentType.useMutation({
+    onSuccess: () => {
+      refetchContentTypes();
+      setNewContentType({ name: '', description: '' });
+      setEditingContentTypeId(null);
+      setShowContentTypeModal(false);
+    },
+  });
+
   const deleteContentType = api.tweetProcessing.deleteContentType.useMutation({
     onSuccess: () => {
       refetchContentTypes();
@@ -270,9 +344,17 @@ export default function TweetProcessingPage() {
 
   const startAIProcess = api.tweetProcessing.startAIBatchProcess.useMutation({
     onSuccess: (data) => {
+      console.log('[前台] ✅ AI批量处理任务启动成功:', {
+        批次ID: data.batchId,
+        记录ID: data.recordId,
+        总推文数: data.totalTweets,
+      });
       setCurrentBatchId(data.batchId);
       setIsProcessing(true);
       setShowProcessingModal(true);
+    },
+    onError: (error) => {
+      console.error('[前台] ❌ AI批量处理任务启动失败:', error);
     },
   });
 
@@ -400,7 +482,7 @@ export default function TweetProcessingPage() {
       return;
     }
 
-    startAIProcess.mutate({
+    const requestConfig = {
       filterConfig: {
         listIds: effectiveListIds.length > 0 ? effectiveListIds : undefined,
         usernames: effectiveUsernames.length > 0 ? effectiveUsernames : undefined,
@@ -408,9 +490,25 @@ export default function TweetProcessingPage() {
         isExtracted: filterConfig.isExtracted,
       },
       batchSize,
+      batchProcessingMode,
       systemPrompt: systemPrompt.trim() === DEFAULT_SYSTEM_PROMPT.trim() ? '' : systemPrompt.trim(),
       aiConfig,
+    };
+
+    console.log('[前台] 🚀 启动AI批量处理任务');
+    console.log('[前台] 请求配置:', {
+      处理模式: batchProcessingMode === 'optimized' ? '🚀 优化模式 (批量)' : '🔄 传统模式 (逐条)',
+      批次大小: batchSize,
+      筛选条件: requestConfig.filterConfig,
+      AI配置: {
+        provider: aiConfig.provider,
+        model: aiConfig.model,
+        baseURL: aiConfig.baseURL,
+      },
+      系统提示词长度: requestConfig.systemPrompt?.length || '使用默认',
     });
+    
+    startAIProcess.mutate(requestConfig);
   };
 
   return (
@@ -422,6 +520,7 @@ export default function TweetProcessingPage() {
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">推文处理</h1>
             <p className="text-gray-600 mt-1">筛选推文并使用 AI 进行关键词提取和主题标签匹配</p>
+            <p className="text-sm text-blue-600 mt-1">💡 价值判断标准：推文是否命中内容类型（未命中任何内容类型则视为无价值）</p>
           </div>
 
           {/* 筛选区域 */}
@@ -435,7 +534,7 @@ export default function TweetProcessingPage() {
                   {isFiltersCollapsed ? '▶' : '▼'}
                 </span>
                 推文筛选
-                {(selectedListIdPresets.length > 0 || selectedUsernamePresets.length > 0 || filterConfig.publishedAfter) && (
+                {isMounted && (selectedListIdPresets.length > 0 || selectedUsernamePresets.length > 0 || filterConfig.publishedAfter) && (
                   <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
                     已设置筛选条件
                   </span>
@@ -450,7 +549,7 @@ export default function TweetProcessingPage() {
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-medium text-gray-700">
                       List ID
-                      {selectedListIdPresets.length > 0 && (
+                      {isMounted && selectedListIdPresets.length > 0 && (
                         <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
                           {selectedListIdPresets.length} 项已选
                         </span>
@@ -528,7 +627,7 @@ export default function TweetProcessingPage() {
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-medium text-gray-700">
                       发推人用户名
-                      {selectedUsernamePresets.length > 0 && (
+                      {isMounted && selectedUsernamePresets.length > 0 && (
                         <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
                           {selectedUsernamePresets.length} 项已选
                         </span>
@@ -605,7 +704,7 @@ export default function TweetProcessingPage() {
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     发推时间
-                    {filterConfig.publishedAfter && (
+                    {isMounted && filterConfig.publishedAfter && (
                       <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">
                         已设置
                       </span>
@@ -628,7 +727,7 @@ export default function TweetProcessingPage() {
                   清除
                 </button>
               </div>
-                  {filterConfig.publishedAfter && (
+                  {isMounted && filterConfig.publishedAfter && (
                     <div className="text-sm text-gray-600">
                       筛选 {new Date(filterConfig.publishedAfter).toLocaleString()} 之后的推文
                     </div>
@@ -739,8 +838,18 @@ export default function TweetProcessingPage() {
                       )}
                     </div>
                     <button
+                      onClick={() => {
+                        setNewTopicTag({ name: tag.name, description: tag.description || '' });
+                        setEditingTopicTagId(tag.id);
+                        setShowTopicTagModal(true);
+                      }}
+                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 ml-2 flex-shrink-0"
+                    >
+                      编辑
+                    </button>
+                    <button
                       onClick={() => deleteTopicTag.mutate({ id: tag.id })}
-                      className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 ml-2 flex-shrink-0"
+                      className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 ml-1 flex-shrink-0"
                     >
                       删除
                     </button>
@@ -799,8 +908,18 @@ export default function TweetProcessingPage() {
                       )}
                     </div>
                     <button
+                      onClick={() => {
+                        setNewContentType({ name: type.name, description: type.description || '' });
+                        setEditingContentTypeId(type.id);
+                        setShowContentTypeModal(true);
+                      }}
+                      className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 ml-2 flex-shrink-0"
+                    >
+                      编辑
+                    </button>
+                    <button
                       onClick={() => deleteContentType.mutate({ id: type.id })}
-                      className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 ml-2 flex-shrink-0"
+                      className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 ml-1 flex-shrink-0"
                     >
                       删除
                     </button>
@@ -809,12 +928,25 @@ export default function TweetProcessingPage() {
               </div>
           </div>
 
+
           {/* AI 批处理控制区域 */}
           <div className="bg-white shadow-sm rounded-lg p-4 mb-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-medium">AI 批处理</h3>
-                <p className="text-xs text-gray-500">自动处理符合筛选条件的推文</p>
+              <div className="flex items-center space-x-3">
+                <div>
+                  <h3 className="text-base font-medium">AI 批处理</h3>
+                  <p className="text-xs text-gray-500">自动处理符合筛选条件的推文</p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded ${
+                  batchProcessingMode === 'optimized' 
+                    ? 'bg-green-100 text-green-700' 
+                    : 'bg-yellow-100 text-yellow-700'
+                }`}>
+                  {batchProcessingMode === 'optimized' ? '优化模式' : '传统模式'}
+                </span>
+                {batchProcessingMode === 'optimized' && (
+                  <span className="text-xs text-green-600" title="优化模式可提高5-10倍处理速度">⚡ 高效处理</span>
+                )}
               </div>
               <div className="flex gap-2">
                 <button
@@ -916,9 +1048,19 @@ export default function TweetProcessingPage() {
                             </span>
                           </div>
 
-                          {/* 主题标签和内容类型 */}
-                          {(tweet.topicTags || tweet.contentTypes) && (
+                          {/* AI分析结果：关键词、主题标签和内容类型 */}
+                          {(tweet.keywords || tweet.topicTags || tweet.contentTypes) && (
                             <div className="space-y-2">
+                              {tweet.keywords && tweet.keywords.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-1">
+                                  <span className="text-xs text-gray-500 mr-1">关键词:</span>
+                                  {tweet.keywords.map((keyword: string, idx: number) => (
+                                    <span key={idx} className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full whitespace-nowrap">
+                                      {keyword}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               {tweet.topicTags && tweet.topicTags.length > 0 && (
                                 <div className="flex flex-wrap items-center gap-1">
                                   <span className="text-xs text-gray-500 mr-1">主题标签:</span>
@@ -1005,28 +1147,30 @@ export default function TweetProcessingPage() {
             </div>
             
             <div className="space-y-4">
-              <h4 className="font-medium">最近处理记录</h4>
+              <h4 className="font-medium">最近处理记录 (最多保存10条)</h4>
               {processRecords && processRecords.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {processRecords.map((record) => (
-                    <div key={record.id} className="border border-gray-200 rounded p-3">
-                      <div className="flex items-center justify-between mb-2">
+                    <div key={record.id} className="border border-gray-200 rounded p-4">
+                      <div className="flex items-center justify-between mb-3">
                         <span className="font-medium">批次 {record.batchId}</span>
                         <span className={`px-2 py-1 rounded text-xs ${
                           record.status === 'completed' ? 'bg-green-100 text-green-800' :
                           record.status === 'processing' ? 'bg-blue-100 text-blue-800' :
                           record.status === 'failed' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
+                          'bg-yellow-100 text-yellow-800'
                         }`}>
                           {record.status === 'completed' ? '已完成' :
                            record.status === 'processing' ? '处理中' :
                            record.status === 'failed' ? '失败' :
-                           record.status === 'cancelled' ? '已取消' :
-                           record.status}
+                           record.status === 'cancelled' ? '已取消' : record.status}
                         </span>
                       </div>
-                      <div className="text-sm text-gray-600">
+                      
+                      <div className="text-sm text-gray-600 space-y-1 mb-3">
                         <div>总数: {record.totalTweets} | 已处理: {record.processedTweets} | 失败: {record.failedTweets}</div>
+                        <div>模式: <span className="font-medium">{record.batchProcessingMode === 'optimized' ? '优化模式' : '传统模式'}</span></div>
+                        <div>模型: {record.aiProvider} / {record.aiModel}</div>
                         <div>开始时间: {new Date(record.startedAt).toLocaleString()}</div>
                         {record.completedAt && (
                           <div>完成时间: {new Date(record.completedAt).toLocaleString()}</div>
@@ -1035,12 +1179,468 @@ export default function TweetProcessingPage() {
                           <div className="text-red-600">错误: {record.errorMessage}</div>
                         )}
                       </div>
+
+                      {/* AI交互核心信息 */}
+                      <div className="mt-3 space-y-4">
+                        {/* API调用统计 */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+                          <h5 className="font-semibold text-blue-800 mb-3 flex items-center">
+                            🔄 API调用情况
+                            <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                              {record.responseDetails?.length || 0} 次调用
+                            </span>
+                          </h5>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="text-gray-600">处理模式:</span>
+                              <span className="ml-2 font-medium text-blue-700">
+                                {record.batchProcessingMode === 'optimized' ? '🚀 优化模式 (批量)' : '🔄 传统模式 (逐条)'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">每批推文数:</span>
+                              <span className="ml-2 font-medium">{record.requestDetails?.batchSize || '-'}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">总推文数:</span>
+                              <span className="ml-2 font-medium text-green-600">{record.totalTweets}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">成功处理:</span>
+                              <span className="ml-2 font-medium text-green-600">{record.processedTweets - record.failedTweets}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* AI请求与响应详情 */}
+                        {record.responseDetails && Array.isArray(record.responseDetails) && record.responseDetails.length > 0 && (
+                          <div>
+                            <h5 className="font-semibold text-gray-800 mb-3">💬 AI交互详情</h5>
+                            <div className="space-y-3">
+                              {record.responseDetails.map((response: any, idx: number) => (
+                                <div key={idx} className="border border-gray-200 rounded-lg overflow-hidden">
+                                  {/* 请求头部信息 */}
+                                  <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
+                                    <div className="flex items-center space-x-3">
+                                      <span className="font-medium text-gray-800">第 {idx + 1} 次API调用</span>
+                                      <span className={`px-2 py-1 rounded text-xs ${
+                                        response.responseStatus === 200 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                      }`}>
+                                        {response.responseStatus === 200 ? '✅ 成功' : '❌ 失败'}
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        {response.processingTime}ms
+                                      </span>
+                                    </div>
+                                    <span className="text-xs text-gray-500">
+                                      {new Date(response.timestamp).toLocaleString()}
+                                    </span>
+                                  </div>
+
+                                  <div className="p-4 space-y-4">
+                                    {/* 发送给AI的内容 */}
+                                    <div>
+                                      <h6 className="font-medium text-green-700 mb-2 flex items-center">
+                                        📤 发送给AI
+                                        <span className="ml-2 text-xs text-gray-500">
+                                          ({response.results?.length || 0} 条推文)
+                                        </span>
+                                      </h6>
+                                      <div className="bg-green-50 p-3 rounded border border-green-200">
+                                        {record.requestDetails?.tweets && (
+                                          <div className="space-y-2 max-h-32 overflow-y-auto">
+                                            {record.requestDetails.tweets.slice(0, 3).map((tweet: any, tweetIdx: number) => (
+                                              <div key={tweetIdx} className="text-xs p-2 bg-white rounded border">
+                                                <div className="font-medium text-gray-600">推文 ID: {tweet.id}</div>
+                                                <div className="text-gray-700 mt-1">
+                                                  {tweet.content.length > 100 ? `${tweet.content.substring(0, 100)}...` : tweet.content}
+                                                </div>
+                                              </div>
+                                            ))}
+                                            {record.requestDetails.tweets.length > 3 && (
+                                              <div className="text-xs text-gray-500 text-center py-1">
+                                                ... 还有 {record.requestDetails.tweets.length - 3} 条推文
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                        
+                                        {/* 系统提示词概览 */}
+                                        {record.requestDetails?.systemPrompt && (
+                                          <details className="mt-3">
+                                            <summary className="cursor-pointer text-green-600 hover:text-green-800 text-xs font-medium">
+                                              📝 查看系统提示词
+                                            </summary>
+                                            <div className="mt-2 p-2 bg-white border rounded text-xs max-h-24 overflow-y-auto whitespace-pre-wrap">
+                                              {record.requestDetails.systemPrompt.substring(0, 500)}
+                                              {record.requestDetails.systemPrompt.length > 500 && '...'}
+                                            </div>
+                                          </details>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* AI返回的内容 */}
+                                    <div>
+                                      <h6 className="font-medium text-blue-700 mb-2 flex items-center">
+                                        📥 AI返回结果
+                                        {response.responseData?.usage && (
+                                          <span className="ml-2 text-xs text-gray-500">
+                                            ({response.responseData.usage.total_tokens} tokens)
+                                          </span>
+                                        )}
+                                      </h6>
+                                      <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                                        {response.responseData?.error ? (
+                                          <div className="text-red-600 text-sm">
+                                            <strong>错误:</strong> {response.responseData.error}
+                                          </div>
+                                        ) : (
+                                          <>
+                                            {/* 解析后的结果摘要 */}
+                                            {response.results && response.results.length > 0 && (
+                                              <div className="space-y-2">
+                                                <div className="text-sm font-medium text-blue-800 mb-2">
+                                                  解析结果摘要:
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4 text-xs">
+                                                  <div>
+                                                    <span className="text-gray-600">有价值推文:</span>
+                                                    <span className="ml-1 font-medium text-green-600">
+                                                      {response.results.filter((r: any) => !r.result?.isValueless).length}
+                                                    </span>
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-gray-600">无价值推文:</span>
+                                                    <span className="ml-1 font-medium text-orange-600">
+                                                      {response.results.filter((r: any) => r.result?.isValueless).length}
+                                                    </span>
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-gray-600">处理失败:</span>
+                                                    <span className="ml-1 font-medium text-red-600">
+                                                      {response.results.filter((r: any) => r.error).length}
+                                                    </span>
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-gray-600">成功率:</span>
+                                                    <span className="ml-1 font-medium">
+                                                      {Math.round((response.results.filter((r: any) => !r.error).length / response.results.length) * 100)}%
+                                                    </span>
+                                                  </div>
+                                                </div>
+
+                                                {/* 详细结果展示 */}
+                                                <details className="mt-3">
+                                                  <summary className="cursor-pointer text-blue-600 hover:text-blue-800 text-xs font-medium">
+                                                    📊 查看每条推文的分析结果 ({response.results.length}条)
+                                                  </summary>
+                                                  <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                                                    {response.results.map((result: any, resultIdx: number) => (
+                                                      <div key={resultIdx} className="p-2 bg-white border rounded text-xs">
+                                                        <div className="flex justify-between items-start">
+                                                          <div className="flex-1">
+                                                            <div><strong>推文ID:</strong> {result.tweetId}</div>
+                                                            {result.error ? (
+                                                              <div className="text-red-600"><strong>错误:</strong> {result.error}</div>
+                                                            ) : result.result ? (
+                                                              <>
+                                                                <div><strong>价值判断:</strong> {result.result.isValueless ? '❌ 无价值' : '✅ 有价值'}</div>
+                                                                {result.result.keywords?.length > 0 && (
+                                                                  <div><strong>关键词:</strong> {result.result.keywords.join(', ')}</div>
+                                                                )}
+                                                                {result.result.contentTypes?.length > 0 && (
+                                                                  <div><strong>内容类型:</strong> {result.result.contentTypes.join(', ')}</div>
+                                                                )}
+                                                                {result.result.topicTags?.length > 0 && (
+                                                                  <div><strong>主题标签:</strong> {result.result.topicTags.join(', ')}</div>
+                                                                )}
+                                                              </>
+                                                            ) : (
+                                                              <div className="text-gray-500">无结果数据</div>
+                                                            )}
+                                                          </div>
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                </details>
+                                              </div>
+                                            )}
+
+                                            {/* AI原始响应内容 */}
+                                            {response.responseData?.choices?.[0]?.message?.content && (
+                                              <details className="mt-3">
+                                                <summary className="cursor-pointer text-blue-600 hover:text-blue-800 text-xs font-medium">
+                                                  🔍 查看AI原始响应内容
+                                                </summary>
+                                                <div className="mt-2 p-2 bg-white border rounded text-xs max-h-32 overflow-auto whitespace-pre-wrap">
+                                                  {response.responseData.choices[0].message.content}
+                                                </div>
+                                              </details>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 处理日志（简化显示） */}
+                      {record.processingLogs && record.processingLogs.length > 0 && (
+                        <details className="mt-4 border-t pt-3">
+                          <summary className="cursor-pointer text-gray-600 hover:text-gray-800 text-sm font-medium">
+                            📋 查看处理日志 ({record.processingLogs.length} 条)
+                          </summary>
+                          <div className="mt-3 space-y-1 max-h-32 overflow-y-auto">
+                            {record.processingLogs.map((log: any, idx: number) => (
+                              <div key={idx} className={`text-xs p-2 rounded ${
+                                log.level === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-gray-50 text-gray-700 border border-gray-200'
+                              }`}>
+                                <span className="font-medium">{new Date(log.timestamp).toLocaleTimeString()}</span> - {log.message}
+                                {log.data?.processingTime && (
+                                  <span className="ml-2 text-gray-500">({log.data.processingTime}ms)</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      )}
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-gray-500">暂无处理记录</div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 主题标签编辑弹窗 */}
+      {showTopicTagModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">
+                {editingTopicTagId ? '编辑主题标签' : '管理主题标签'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowTopicTagModal(false);
+                  setEditingTopicTagId(null);
+                  setNewTopicTag({ name: '', description: '' });
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 编辑/添加标签表单 */}
+            <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+              <h4 className="font-medium mb-3">
+                {editingTopicTagId ? '编辑标签信息' : '添加新主题标签'}
+              </h4>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">标签名称</label>
+                  <input
+                    type="text"
+                    value={newTopicTag.name}
+                    onChange={(e) => setNewTopicTag(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="例如：人工智能"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">标签描述</label>
+                  <textarea
+                    value={newTopicTag.description}
+                    onChange={(e) => setNewTopicTag(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="详细描述此标签的含义和适用范围，帮助AI做出更准确的判断"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (newTopicTag.name.trim()) {
+                      if (editingTopicTagId) {
+                        updateTopicTag.mutate({
+                          id: editingTopicTagId,
+                          data: {
+                            name: newTopicTag.name.trim(),
+                            description: newTopicTag.description.trim() || undefined,
+                          },
+                        });
+                      } else {
+                        createTopicTag.mutate(newTopicTag);
+                      }
+                    }
+                  }}
+                  disabled={!newTopicTag.name.trim() || createTopicTag.isPending || updateTopicTag.isPending}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300"
+                >
+                  {(createTopicTag.isPending || updateTopicTag.isPending) 
+                    ? (editingTopicTagId ? '更新中...' : '添加中...') 
+                    : (editingTopicTagId ? '更新标签' : '添加标签')}
+                </button>
+              </div>
+            </div>
+
+            {/* 现有标签列表 */}
+            <div>
+              <h4 className="font-medium mb-3">现有主题标签</h4>
+              {topicTags && topicTags.length > 0 ? (
+                <div className="space-y-2">
+                  {topicTags.map((tag) => (
+                    <div key={tag.id} className="flex items-center justify-between p-3 border border-gray-200 rounded">
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{tag.name}</div>
+                        {tag.description && (
+                          <div className="text-xs text-gray-500 mt-1">{tag.description}</div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => deleteTopicTag.mutate({ id: tag.id })}
+                        disabled={deleteTopicTag.isPending}
+                        className="ml-3 px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-300"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-gray-500 text-center py-4">暂无主题标签</div>
+              )}
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowTopicTagModal(false)}
+                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+              >
+                完成
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 内容类型编辑弹窗 */}
+      {showContentTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">
+                {editingContentTypeId ? '编辑内容类型' : '管理内容类型'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowContentTypeModal(false);
+                  setEditingContentTypeId(null);
+                  setNewContentType({ name: '', description: '' });
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 编辑/添加类型表单 */}
+            <div className="mb-6 p-4 bg-green-50 rounded-lg">
+              <h4 className="font-medium mb-3">
+                {editingContentTypeId ? '编辑类型信息' : '添加新内容类型'}
+              </h4>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">类型名称</label>
+                  <input
+                    type="text"
+                    value={newContentType.name}
+                    onChange={(e) => setNewContentType(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="例如：教程"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">类型描述</label>
+                  <textarea
+                    value={newContentType.description}
+                    onChange={(e) => setNewContentType(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="详细描述此内容类型的特征和判断标准，帮助AI准确识别"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (newContentType.name.trim()) {
+                      if (editingContentTypeId) {
+                        updateContentType.mutate({
+                          id: editingContentTypeId,
+                          data: {
+                            name: newContentType.name.trim(),
+                            description: newContentType.description.trim() || undefined,
+                          },
+                        });
+                      } else {
+                        createContentType.mutate(newContentType);
+                      }
+                    }
+                  }}
+                  disabled={!newContentType.name.trim() || createContentType.isPending || updateContentType.isPending}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300"
+                >
+                  {(createContentType.isPending || updateContentType.isPending) 
+                    ? (editingContentTypeId ? '更新中...' : '添加中...') 
+                    : (editingContentTypeId ? '更新类型' : '添加类型')}
+                </button>
+              </div>
+            </div>
+
+            {/* 现有类型列表 */}
+            <div>
+              <h4 className="font-medium mb-3">现有内容类型</h4>
+              {contentTypes && contentTypes.length > 0 ? (
+                <div className="space-y-2">
+                  {contentTypes.map((type) => (
+                    <div key={type.id} className="flex items-center justify-between p-3 border border-gray-200 rounded">
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{type.name}</div>
+                        {type.description && (
+                          <div className="text-xs text-gray-500 mt-1">{type.description}</div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => deleteContentType.mutate({ id: type.id })}
+                        disabled={deleteContentType.isPending}
+                        className="ml-3 px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-300"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-gray-500 text-center py-4">暂无内容类型</div>
+              )}
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowContentTypeModal(false)}
+                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+              >
+                完成
+              </button>
             </div>
           </div>
         </div>
@@ -1117,16 +1717,41 @@ export default function TweetProcessingPage() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">批量处理模式</label>
+                <select
+                  value={batchProcessingMode}
+                  onChange={(e) => setBatchProcessingMode(e.target.value as 'optimized' | 'traditional')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="optimized">优化模式（推荐）- 单次调用批量处理多条推文</option>
+                  <option value="traditional">传统模式 - 逐条调用AI处理</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {batchProcessingMode === 'optimized' 
+                    ? '优化模式可显著提高处理速度并降低API成本，同时保持处理质量'
+                    : '传统模式逐条处理，速度较慢但兼容性更好'
+                  }
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">单次处理推文数量</label>
                 <select
                   value={batchSize}
                   onChange={(e) => setBatchSize(Number(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
+                  <option value={5}>5</option>
                   <option value={10}>10</option>
-                  <option value={30}>30</option>
-                  <option value={50}>50</option>
+                  <option value={15}>15</option>
+                  <option value={20}>20</option>
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {batchProcessingMode === 'optimized' 
+                    ? '优化模式下，该数量指每次AI调用处理的推文数（推荐10-15条）'
+                    : '传统模式下，该数量指每个批次处理的推文数'
+                  }
+                </p>
               </div>
 
               <div>

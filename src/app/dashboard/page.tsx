@@ -55,6 +55,16 @@ export default function DashboardPage() {
     },
   });
 
+  const deleteHiddenTweets = api.system.deleteHiddenTweets.useMutation({
+    onSuccess: (data) => {
+      alert(data.message);
+      systemStatus.refetch();
+    },
+    onError: (error) => {
+      alert(`删除失败: ${error.message}`);
+    },
+  });
+
   useEffect(() => {
     if (systemStatus.data?.data) {
       setStats(prev => ({
@@ -81,6 +91,13 @@ export default function DashboardPage() {
     }
     if (confirm(`确定要删除 ${new Date(selectedDate).toLocaleString()} 之前的所有推文吗？此操作不可恢复！`)) {
       cleanOldTweets.mutate({ beforeDate: selectedDate });
+    }
+  };
+
+  // 处理删除隐藏推文
+  const handleDeleteHiddenTweets = () => {
+    if (confirm('确定要永久删除所有隐藏推文吗？此操作不可恢复！')) {
+      deleteHiddenTweets.mutate();
     }
   };
 
@@ -207,7 +224,7 @@ export default function DashboardPage() {
               <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
                 数据库清理
               </h3>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {/* 清除无价值推文 */}
                 <div className="border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center">
@@ -228,6 +245,30 @@ export default function DashboardPage() {
                       className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {cleanValuelessTweets.isPending ? '删除中...' : '立即删除'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 删除隐藏推文 */}
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                        <span className="text-white text-sm">👁️</span>
+                      </div>
+                    </div>
+                    <div className="ml-4 flex-1">
+                      <h4 className="text-sm font-medium text-gray-900">删除隐藏推文</h4>
+                      <p className="text-sm text-gray-500">永久删除所有被标记为隐藏的推文</p>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      onClick={handleDeleteHiddenTweets}
+                      disabled={deleteHiddenTweets.isPending}
+                      className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {deleteHiddenTweets.isPending ? '删除中...' : '立即删除'}
                     </button>
                   </div>
                 </div>

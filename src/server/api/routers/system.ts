@@ -133,4 +133,44 @@ export const systemRouter = createTRPCRouter({
         );
       }
     }),
+
+  /**
+   * 删除隐藏推文
+   */
+  deleteHiddenTweets: protectedProcedure
+    .mutation(async () => {
+      try {
+        // 先查询要删除的隐藏推文数量
+        const hiddenCount = await db.tweet.count({
+          where: {
+            isDeleted: true,
+          },
+        });
+
+        if (hiddenCount === 0) {
+          return {
+            success: true,
+            message: "没有找到隐藏的推文",
+            deletedCount: 0,
+          };
+        }
+
+        // 永久删除所有被标记为隐藏(isDeleted: true)的推文
+        const result = await db.tweet.deleteMany({
+          where: {
+            isDeleted: true,
+          },
+        });
+
+        return {
+          success: true,
+          message: `成功永久删除 ${result.count} 条隐藏推文`,
+          deletedCount: result.count,
+        };
+      } catch (error) {
+        throw new Error(
+          error instanceof Error ? error.message : "删除隐藏推文失败"
+        );
+      }
+    }),
 }); 

@@ -222,6 +222,12 @@ model AIProcessRecord {
   aiProvider    String    @default("openai") // AI提供商
   aiModel       String    @default("gpt-4o") // AI模型
   systemPrompt  String?   // 系统提示词
+  batchProcessingMode String? @default("optimized") // 批量处理模式
+  
+  // 详细记录 - 新增字段
+  requestDetails String?  // AI请求详情（JSON格式，包含完整请求参数）
+  responseDetails String? // AI响应详情（JSON格式，包含原始响应和解析结果）
+  processingLogs String?  // 处理日志（JSON数组格式，记录关键步骤）
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -229,4 +235,5 @@ model AIProcessRecord {
   @@index([status])
   @@index([startedAt])
   @@index([batchId])
+  @@index([createdAt])
 }
