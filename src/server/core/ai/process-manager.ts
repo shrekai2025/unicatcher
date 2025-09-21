@@ -52,32 +52,19 @@ export class AIProcessManager {
    * 检查是否有AI处理任务正在运行
    */
   async isGlobalProcessing(): Promise<{ isProcessing: boolean; currentBatchId?: string; status?: any }> {
-    // 先检查内存状态
-    if (this.globalProcessingLock && this.currentGlobalBatchId) {
-      const status = await this.getBatchStatus(this.currentGlobalBatchId);
-      if (status && status.status === 'processing') {
-        return { 
-          isProcessing: true, 
-          currentBatchId: this.currentGlobalBatchId,
-          status 
-        };
-      } else {
-        // 内存状态和数据库状态不一致，清理内存状态
-        this.globalProcessingLock = false;
-        this.currentGlobalBatchId = null;
-      }
-    }
-
-    // 检查数据库中是否有正在处理的任务
+    // 先检查数据库中是否有正在处理的任务（数据库为准）
     const runningRecord = await db.aIProcessRecord.findFirst({
       where: { status: 'processing' },
       orderBy: { startedAt: 'desc' }
     });
 
     if (runningRecord) {
-      // 更新内存状态
-      this.globalProcessingLock = true;
-      this.currentGlobalBatchId = runningRecord.batchId;
+      // 数据库显示有任务在运行，同步内存状态
+      if (!this.globalProcessingLock || this.currentGlobalBatchId !== runningRecord.batchId) {
+        console.log(`[AI处理] 同步内存状态到数据库状态: ${runningRecord.batchId}`);
+        this.globalProcessingLock = true;
+        this.currentGlobalBatchId = runningRecord.batchId;
+      }
       
       const status = await this.getBatchStatus(runningRecord.batchId);
       return { 
@@ -85,6 +72,13 @@ export class AIProcessManager {
         currentBatchId: runningRecord.batchId,
         status 
       };
+    }
+
+    // 数据库中没有处理中的任务，检查内存状态是否需要清理
+    if (this.globalProcessingLock || this.currentGlobalBatchId) {
+      console.log('[AI处理] 数据库无处理中任务，清理内存状态');
+      this.globalProcessingLock = false;
+      this.currentGlobalBatchId = null;
     }
 
     return { isProcessing: false };
@@ -442,5 +436,34 @@ export class AIProcessManager {
    */
   getActiveProcesses(): string[] {
     return Array.from(this.activeProcesses.keys());
+  }
+
+  /**
+   * 强制重置所有状态
+   * 用于清理僵尸状态，当系统状态异常时使用
+   */
+  async forceReset(): Promise<void> {
+    console.log('[AI处理管理器] 开始强制重置状态');
+    
+    // 1. 清理内存状态
+    this.globalProcessingLock = false;
+    this.currentGlobalBatchId = null;
+    
+    // 2. 取消所有活跃的处理任务
+    const activeProcessIds = Array.from(this.activeProcesses.keys());
+    for (const processId of activeProcessIds) {
+      const process = this.activeProcesses.get(processId);
+      if (process) {
+        console.log(`[AI处理管理器] 取消活跃任务: ${processId}`);
+        process.cancel();
+        // 不等待Promise完成，直接移除
+        this.activeProcesses.delete(processId);
+      }
+    }
+    
+    console.log('[AI处理管理器] 强制重置完成', {
+      clearedProcesses: activeProcessIds.length,
+      timestamp: new Date().toISOString()
+    });
   }
 }
