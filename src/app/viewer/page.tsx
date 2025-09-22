@@ -42,6 +42,7 @@ export default function ViewerPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'masonry' | 'compact' | 'compact-image'>('masonry');
+  const [isMounted, setIsMounted] = useState(false);
   
   // 浮动播放器状态
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
@@ -52,40 +53,62 @@ export default function ViewerPage() {
   const [selectedPresets, setSelectedPresets] = useState<FilterPreset[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 加载预制项目和本地存储的设置
+  // 初始化组件并加载本地存储的设置
   useEffect(() => {
+    setIsMounted(true);
     setPresets(PresetManager.getPresets());
     
     // 从本地存储加载设置
     const savedViewMode = localStorage.getItem('viewer-viewMode') as 'masonry' | 'compact' | 'compact-image';
-    const savedListId = localStorage.getItem('viewer-listId');
-    
     if (savedViewMode && ['masonry', 'compact', 'compact-image'].includes(savedViewMode)) {
       setViewMode(savedViewMode);
     }
     
+    const savedListId = localStorage.getItem('viewer-listId');
     if (savedListId) {
       setListId(savedListId);
+    }
+
+    // 从本地存储加载选中的预制项目
+    const savedSelectedPresets = localStorage.getItem('viewer-selectedPresets');
+    if (savedSelectedPresets) {
+      try {
+        const parsedPresets = JSON.parse(savedSelectedPresets) as FilterPreset[];
+        setSelectedPresets(parsedPresets);
+      } catch (error) {
+        console.error('加载选中的预制项目失败:', error);
+      }
     }
   }, []);
 
   // 保存viewMode到本地存储
   useEffect(() => {
-    localStorage.setItem('viewer-viewMode', viewMode);
-  }, [viewMode]);
+    if (isMounted) {
+      localStorage.setItem('viewer-viewMode', viewMode);
+    }
+  }, [viewMode, isMounted]);
 
   // 保存listId到本地存储（延迟保存，避免频繁写入）
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (listId.trim()) {
-        localStorage.setItem('viewer-listId', listId);
-      } else {
-        localStorage.removeItem('viewer-listId');
-      }
-    }, 500); // 延迟500ms保存
+    if (isMounted) {
+      const timeoutId = setTimeout(() => {
+        if (listId.trim()) {
+          localStorage.setItem('viewer-listId', listId);
+        } else {
+          localStorage.removeItem('viewer-listId');
+        }
+      }, 500); // 延迟500ms保存
 
-    return () => clearTimeout(timeoutId);
-  }, [listId]);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [listId, isMounted]);
+
+  // 保存选中的预制项目到本地存储
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem('viewer-selectedPresets', JSON.stringify(selectedPresets));
+    }
+  }, [selectedPresets, isMounted]);
 
   // 计算有效的listIds
   const effectiveListIds = selectedPresets.length > 0 

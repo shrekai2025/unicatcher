@@ -623,32 +623,37 @@ export default function TweetProcessingPage() {
                 </div>
                   )}
 
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                     {listIdPresets.map((preset) => (
-                  <div key={preset.id} className="flex items-center justify-between p-3 border border-gray-200 rounded">
-                    <div className="flex items-center space-x-3">
+                  <div key={preset.id} className="flex items-center justify-between py-2 px-3 bg-gradient-to-r from-indigo-50 to-indigo-100 border border-indigo-200 rounded-lg shadow-sm hover:shadow-md hover:from-indigo-100 hover:to-indigo-200 transition-all duration-200">
+                    <div className="flex items-center space-x-2 flex-1 min-w-0">
                       <input
                         type="checkbox"
                         checked={selectedListIdPresets.some(p => p.id === preset.id)}
                         onChange={() => handleToggleListIdPreset(preset)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 flex-shrink-0"
                       />
-                      <div>
-                        <div className="font-medium">{preset.name}</div>
-                        <div className="text-sm text-gray-600">{preset.listId}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-sm text-indigo-900 truncate">{preset.name}</div>
+                        <div className="text-xs text-indigo-700 truncate">{preset.listId}</div>
                       </div>
                     </div>
                     <button
                       onClick={() => handleDeleteListIdPreset(preset.id)}
-                      className="text-red-500 hover:text-red-700 text-sm"
+                      className="p-1 text-red-600 hover:text-red-800 hover:bg-white rounded transition-colors flex-shrink-0 ml-1"
+                      title="删除"
                     >
-                      删除
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2h8a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 102 0v-1a1 1 0 10-2 0v1zm4 0a1 1 0 102 0v-1a1 1 0 10-2 0v1z" clipRule="evenodd" />
+                      </svg>
                     </button>
                   </div>
                     ))}
                     {listIdPresets.length === 0 && (
-                      <div className="text-gray-500 text-center py-4">
-                        暂无 List ID 预制项，点击"添加"创建
+                      <div className="col-span-full text-gray-500 text-center py-4 bg-gray-50 rounded border-2 border-dashed border-gray-200">
+                        <div className="text-2xl mb-2">📋</div>
+                        <div>暂无 List ID 预制项</div>
+                        <div className="text-xs mt-1">点击上方"添加"创建第一个预制项</div>
                       </div>
                     )}
                   </div>
@@ -701,32 +706,37 @@ export default function TweetProcessingPage() {
                 </div>
                   )}
 
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                     {usernamePresets.map((preset) => (
-                  <div key={preset.id} className="flex items-center justify-between p-3 border border-gray-200 rounded">
-                    <div className="flex items-center space-x-3">
+                  <div key={preset.id} className="flex items-center justify-between py-2 px-3 bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-200 rounded-lg shadow-sm hover:shadow-md hover:from-emerald-100 hover:to-emerald-200 transition-all duration-200">
+                    <div className="flex items-center space-x-2 flex-1 min-w-0">
                       <input
                         type="checkbox"
                         checked={selectedUsernamePresets.some(p => p.id === preset.id)}
                         onChange={() => handleToggleUsernamePreset(preset)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 flex-shrink-0"
                       />
-                      <div>
-                        <div className="font-medium">{preset.name}</div>
-                        <div className="text-sm text-gray-600">@{preset.username}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-sm text-emerald-900 truncate">{preset.name}</div>
+                        <div className="text-xs text-emerald-700 truncate">@{preset.username}</div>
                       </div>
                     </div>
                     <button
                       onClick={() => handleDeleteUsernamePreset(preset.id)}
-                      className="text-red-500 hover:text-red-700 text-sm"
+                      className="p-1 text-red-600 hover:text-red-800 hover:bg-white rounded transition-colors flex-shrink-0 ml-1"
+                      title="删除"
                     >
-                      删除
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2h8a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 102 0v-1a1 1 0 10-2 0v1zm4 0a1 1 0 102 0v-1a1 1 0 10-2 0v1z" clipRule="evenodd" />
+                      </svg>
                     </button>
                   </div>
                     ))}
                     {usernamePresets.length === 0 && (
-                      <div className="text-gray-500 text-center py-4">
-                        暂无用户名预制项，点击"添加"创建
+                      <div className="col-span-full text-gray-500 text-center py-4 bg-gray-50 rounded border-2 border-dashed border-gray-200">
+                        <div className="text-2xl mb-2">👤</div>
+                        <div>暂无用户名预制项</div>
+                        <div className="text-xs mt-1">点击上方"添加"创建第一个预制项</div>
                       </div>
                     )}
                   </div>
