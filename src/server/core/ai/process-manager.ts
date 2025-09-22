@@ -446,6 +446,7 @@ export class AIProcessManager {
       
       if (batchProcessingMode === 'optimized') {
         console.log(`[AI处理] 🚀 使用优化模式处理单批次 - 一次API调用处理 ${tweets.length} 条推文`);
+        console.log(`[AI处理] ⚠️ 注意：批量处理失败时不再自动降级，将直接报错以便暴露问题`);
         results = await aiService.analyzeTweetsBatchOptimized(
           tweets,
           topicTags,
@@ -459,7 +460,7 @@ export class AIProcessManager {
         );
       } else {
         console.log(`[AI处理] 🔄 使用传统模式处理单批次 - 逐条调用API处理 ${tweets.length} 条推文`);
-        results = await aiService.analyzeTweetsBatchFallback(
+        results = await aiService.analyzeTweetsBatchTraditional(
           tweets,
           topicTags,
           contentTypes,

@@ -308,7 +308,7 @@ export class OpenAIService {
       return batchResults;
 
     } catch (error) {
-      console.error(`[AI API 批量] ❌ 批量分析失败，降级为单条处理:`, error);
+      console.error(`[AI API 批量] ❌ 批量分析失败，不再自动降级:`, error);
       console.error(`[AI API 批量] 失败原因:`, {
         错误类型: error instanceof Error ? error.constructor.name : typeof error,
         错误消息: error instanceof Error ? error.message : String(error),
@@ -326,12 +326,12 @@ export class OpenAIService {
           processingTime: Date.now() - startTime,
           results: [],
         };
-        await this.saveProcessingDetails(batchId, undefined, errorDetails, 'fallback');
+        await this.saveProcessingDetails(batchId, undefined, errorDetails, 'error');
       }
       
-      // 批量失败时降级为单条处理
-      console.log(`[AI API 批量] ⬇️ 开始降级处理，将逐条处理 ${tweets.length} 条推文`);
-      return this.analyzeTweetsBatchFallback(tweets, topicTags, contentTypes, systemPrompt, onProgress);
+      // 🔥 移除自动降级：让批量处理失败真实暴露问题
+      console.log(`[AI API 批量] ⚠️ 批量处理失败，不再自动降级以便暴露真实问题`);
+      throw error; // 直接抛出错误，不进行降级处理
     }
   }
 
@@ -342,7 +342,7 @@ export class OpenAIService {
     batchId: string, 
     requestDetails?: AIRequestDetails, 
     responseDetails?: AIResponseDetails,
-    logType: 'success' | 'error' | 'fallback' = 'success'
+    logType: 'success' | 'error' = 'success'
   ): Promise<void> {
     try {
       const { db } = await import('~/server/db');
@@ -393,9 +393,7 @@ export class OpenAIService {
       const newLog = {
         timestamp: new Date().toISOString(),
         level: logType === 'error' ? 'error' : 'info',
-        message: logType === 'success' ? 'AI批量处理成功' : 
-                logType === 'error' ? 'AI批量处理失败' : 
-                'AI批量处理降级为单条模式',
+        message: logType === 'success' ? 'AI批量处理成功' : 'AI批量处理失败',
         data: responseDetails ? {
           processingTime: responseDetails.processingTime,
           responseStatus: responseDetails.responseStatus,
@@ -417,7 +415,7 @@ export class OpenAIService {
   }
 
   /**
-   * 批量分析推文 - 兼容旧版本，保留降级处理
+   * 批量分析推文 - 🔥 移除自动降级，明确使用批量处理
    */
   async analyzeTweetsBatch(
     tweets: Array<{ id: string; content: string }>,
@@ -426,21 +424,22 @@ export class OpenAIService {
     systemPrompt?: string,
     onProgress?: (stats: ProcessingStats) => void
   ): Promise<Array<{ tweetId: string; result: TweetAnalysisResult | null; error?: string }>> {
-    // 优先使用批量优化处理
+    // 🔥 直接使用批量优化处理，不再自动降级
+    console.log(`[AI API 批量] 明确使用批量处理模式，不自动降级`);
     return this.analyzeTweetsBatchOptimized(tweets, topicTags, contentTypes, systemPrompt, onProgress);
   }
 
   /**
-   * 降级处理：逐条分析推文（公开方法供外部调用）
+   * 传统单条处理模式：逐条分析推文（仅在明确选择traditional模式时使用）
    */
-  async analyzeTweetsBatchFallback(
+  async analyzeTweetsBatchTraditional(
     tweets: Array<{ id: string; content: string }>,
     topicTags: Array<{name: string, description?: string}>,
     contentTypes: Array<{name: string, description?: string}>,
     systemPrompt?: string,
     onProgress?: (stats: ProcessingStats) => void
   ): Promise<Array<{ tweetId: string; result: TweetAnalysisResult | null; error?: string }>> {
-    console.log(`[AI API 降级] 使用单条处理模式分析 ${tweets.length} 条推文`);
+    console.log(`[AI API 传统] 使用传统单条处理模式分析 ${tweets.length} 条推文`);
     
     const results: Array<{ tweetId: string; result: TweetAnalysisResult | null; error?: string }> = [];
     const stats: ProcessingStats = {
@@ -452,9 +451,9 @@ export class OpenAIService {
 
     for (const tweet of tweets) {
       try {
-        console.log(`[AI API 降级] 开始分析推文 ${tweet.id}: ${tweet.content.substring(0, 100)}...`);
+        console.log(`[AI API 传统] 开始分析推文 ${tweet.id}: ${tweet.content.substring(0, 100)}...`);
         const result = await this.analyzeTweet(tweet.content, topicTags, contentTypes, systemPrompt);
-        console.log(`[AI API 降级] 推文 ${tweet.id} 分析完成 - 无价值: ${result.isValueless}, 主题标签: ${result.topicTags.length}, 内容类型: ${result.contentTypes.length}`);
+        console.log(`[AI API 传统] 推文 ${tweet.id} 分析完成 - 无价值: ${result.isValueless}, 主题标签: ${result.topicTags.length}, 内容类型: ${result.contentTypes.length}`);
         
         results.push({
           tweetId: tweet.id,
@@ -466,7 +465,7 @@ export class OpenAIService {
           stats.valueless++;
         }
       } catch (error) {
-        console.error(`[AI API 降级] 分析推文 ${tweet.id} 失败:`, error);
+        console.error(`[AI API 传统] 分析推文 ${tweet.id} 失败:`, error);
         results.push({
           tweetId: tweet.id,
           result: null,
