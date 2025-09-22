@@ -1206,6 +1206,278 @@ const apiEndpoints: ApiEndpoint[] = [
       "model": "gpt-4o"
     }
   }'`
+  },
+
+  // AI批处理清除接口
+  {
+    id: 'ai-batch-clear-post',
+    method: 'POST',
+    path: '/api/external/ai-batch/clear',
+    title: '清除所有AI批处理任务',
+    description: '🧹 强制清除所有AI批处理任务和状态（快速清理模式）',
+    params: [],
+    responses: [
+      {
+        status: 200,
+        description: '清除成功',
+        example: {
+          success: true,
+          message: "所有AI批处理任务已成功清除",
+          data: {
+            clearTime: "2025-09-22T11:48:00.000Z",
+            beforeClear: {
+              hasGlobalTask: true,
+              currentBatchId: "batch_1758539874517_hyqk4w",
+              activeProcessesCount: 1,
+              processingRecordsCount: 1
+            },
+            afterClear: {
+              hasGlobalTask: false,
+              currentBatchId: null,
+              activeProcessesCount: 0,
+              processingRecordsCount: 0
+            },
+            clearedTasks: {
+              processingRecords: 1,
+              activeProcesses: 1,
+              databaseUpdates: 1
+            }
+          }
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: true
+          },
+          {
+            name: 'message',
+            type: 'string',
+            description: '操作结果消息',
+            example: '所有AI批处理任务已成功清除'
+          },
+          {
+            name: 'data.clearTime',
+            type: 'string',
+            description: '清除操作时间（ISO 8601格式）',
+            example: '2025-09-22T11:48:00.000Z'
+          },
+          {
+            name: 'data.beforeClear',
+            type: 'object',
+            description: '清除前的状态信息',
+            example: { hasGlobalTask: true, activeProcessesCount: 1 }
+          },
+          {
+            name: 'data.afterClear',
+            type: 'object',
+            description: '清除后的状态信息',
+            example: { hasGlobalTask: false, activeProcessesCount: 0 }
+          },
+          {
+            name: 'data.clearedTasks',
+            type: 'object',
+            description: '清除的任务统计信息',
+            example: { processingRecords: 1, activeProcesses: 1 }
+          }
+        ]
+      },
+      {
+        status: 500,
+        description: '清除失败',
+        example: {
+          success: false,
+          error: "清除操作失败",
+          details: "具体错误信息",
+          timestamp: "2025-09-22T11:48:00.000Z"
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: false
+          },
+          {
+            name: 'error',
+            type: 'string',
+            description: '错误信息',
+            example: '清除操作失败'
+          },
+          {
+            name: 'details',
+            type: 'string',
+            description: '详细错误信息',
+            example: '具体错误信息'
+          }
+        ]
+      }
+    ],
+    example: `curl -X POST http://43.153.84.145:3067/api/external/ai-batch/clear \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: unicatcher-api-key-demo" \\
+  -d '{}'`
+  },
+
+  {
+    id: 'ai-batch-clear-get',
+    method: 'GET',
+    path: '/api/external/ai-batch/clear',
+    title: '预览清除操作',
+    description: '🔍 预览清除操作（查看将要清除的任务，不执行实际清除）',
+    responses: [
+      {
+        status: 200,
+        description: '预览成功',
+        example: {
+          success: true,
+          message: "发现 1 个任务待清除",
+          data: {
+            needsClear: true,
+            currentStatus: {
+              hasGlobalTask: true,
+              currentBatchId: "batch_1758539874517_hyqk4w",
+              globalMessage: "AI批处理任务正在运行中"
+            },
+            activeProcesses: {
+              count: 1,
+              batchIds: ["batch_1758539874517_hyqk4w"]
+            },
+            processingRecords: {
+              count: 1,
+              tasks: [
+                {
+                  batchId: "batch_1758539874517_hyqk4w",
+                  startedAt: "2025-09-22T11:17:54.000Z",
+                  progress: "10/710",
+                  aiProvider: "openai-badger",
+                  aiModel: "gpt-4o",
+                  duration: "1800秒"
+                }
+              ]
+            },
+            estimation: {
+              tasksToCancel: 1,
+              memoryToReset: 1,
+              globalStateToReset: true
+            },
+            timestamp: "2025-09-22T11:48:00.000Z"
+          }
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: true
+          },
+          {
+            name: 'message',
+            type: 'string',
+            description: '预览结果描述',
+            example: '发现 1 个任务待清除'
+          },
+          {
+            name: 'data.needsClear',
+            type: 'boolean',
+            description: '是否需要清除',
+            example: true
+          },
+          {
+            name: 'data.currentStatus',
+            type: 'object',
+            description: '当前全局状态',
+            example: { hasGlobalTask: true, currentBatchId: "batch_xxx" }
+          },
+          {
+            name: 'data.activeProcesses',
+            type: 'object',
+            description: '活跃进程信息',
+            example: { count: 1, batchIds: ["batch_xxx"] }
+          },
+          {
+            name: 'data.processingRecords',
+            type: 'object',
+            description: '数据库中的处理记录',
+            example: { count: 1, tasks: [] }
+          },
+          {
+            name: 'data.estimation',
+            type: 'object',
+            description: '清除操作预估',
+            example: { tasksToCancel: 1, memoryToReset: 1 }
+          }
+        ]
+      }
+    ],
+    example: `curl -H "X-API-Key: unicatcher-api-key-demo" \\
+     http://43.153.84.145:3067/api/external/ai-batch/clear`
+  },
+
+  {
+    id: 'ai-batch-reset',
+    method: 'POST',
+    path: '/api/external/ai-batch/reset',
+    title: '重置AI批处理状态',
+    description: '🔧 智能重置AI批处理状态（状态修复模式，支持强制和温和模式）',
+    params: [
+      {
+        name: 'force',
+        type: 'boolean',
+        required: true,
+        description: '重置模式：true为强制重置，false为温和重置',
+        example: true
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '重置成功',
+        example: {
+          success: true,
+          message: "强制重置完成",
+          data: {
+            previousStatus: {
+              hasActiveTask: true,
+              currentBatchId: "batch_xxx"
+            },
+            updatedRecords: 1,
+            resetAt: "2025-09-22T11:48:00.000Z"
+          }
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: true
+          },
+          {
+            name: 'message',
+            type: 'string',
+            description: '重置结果描述',
+            example: '强制重置完成'
+          },
+          {
+            name: 'data.previousStatus',
+            type: 'object',
+            description: '重置前的状态',
+            example: { hasActiveTask: true }
+          },
+          {
+            name: 'data.updatedRecords',
+            type: 'number',
+            description: '更新的记录数量',
+            example: 1
+          }
+        ]
+      }
+    ],
+    example: `curl -X POST http://43.153.84.145:3067/api/external/ai-batch/reset \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: unicatcher-api-key-demo" \\
+  -d '{"force": true}'`
   }
 ];
 
