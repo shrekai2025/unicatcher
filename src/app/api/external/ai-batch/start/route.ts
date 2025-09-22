@@ -101,7 +101,30 @@ export async function POST(request: NextRequest) {
       where.publishedAt = { gte: BigInt(validatedData.publishedAfter.getTime()) };
     }
 
+    // 🔥 修复：添加 isExtracted 过滤逻辑
+    if (validatedData.isExtracted && validatedData.isExtracted !== 'all') {
+      if (validatedData.isExtracted === 'true') {
+        // 只处理已被外部系统提取过的推文
+        where.analysisStatus = { in: ['synced', 'analyzed'] };
+      } else if (validatedData.isExtracted === 'false') {
+        // 只处理未被外部系统提取过的推文
+        where.analysisStatus = { notIn: ['synced', 'analyzed'] };
+      }
+    }
+
+    console.log('[AI批处理API] 启动任务查询条件:', JSON.stringify(where, null, 2));
+    
     const totalTweets = await db.tweet.count({ where });
+    
+    console.log('[AI批处理API] 启动任务查询结果:', {
+      totalTweets,
+      appliedFilters: {
+        listIds: validatedData.listIds,
+        usernames: validatedData.usernames,
+        publishedAfter: validatedData.publishedAfter?.toISOString(),
+        isExtracted: validatedData.isExtracted,
+      }
+    });
 
     if (totalTweets === 0) {
       return NextResponse.json({

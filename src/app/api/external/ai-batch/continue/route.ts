@@ -51,7 +51,12 @@ export async function POST(request: NextRequest) {
       previousBatchId: validatedData.previousBatchId,
       listIds: validatedData.listIds,
       usernames: validatedData.usernames,
+      publishedAfter: validatedData.publishedAfter,
+      isExtracted: validatedData.isExtracted,
       batchSize: validatedData.batchSize,
+      batchProcessingMode: validatedData.batchProcessingMode,
+      aiProvider: validatedData.aiConfig.provider,
+      aiModel: validatedData.aiConfig.model,
       timestamp: new Date().toISOString()
     });
 
@@ -80,8 +85,32 @@ export async function POST(request: NextRequest) {
       where.publishedAt = { gte: BigInt(validatedData.publishedAfter.getTime()) };
     }
 
+    // 🔥 修复：添加 isExtracted 过滤逻辑
+    if (validatedData.isExtracted && validatedData.isExtracted !== 'all') {
+      if (validatedData.isExtracted === 'true') {
+        // 只处理已被外部系统提取过的推文
+        where.analysisStatus = { in: ['synced', 'analyzed'] };
+      } else if (validatedData.isExtracted === 'false') {
+        // 只处理未被外部系统提取过的推文
+        where.analysisStatus = { notIn: ['synced', 'analyzed'] };
+      }
+    }
+
+    // 🔥 增强调试：输出查询条件和结果
+    console.log('[AI批处理API] 查询条件:', JSON.stringify(where, null, 2));
+    
     // 检查是否还有待处理的推文
     const remainingTweets = await db.tweet.count({ where });
+    
+    console.log('[AI批处理API] 查询结果:', {
+      remainingTweets,
+      queryConditions: {
+        hasListIds: !!validatedData.listIds?.length,
+        hasUsernames: !!validatedData.usernames?.length,
+        hasPublishedAfter: !!validatedData.publishedAfter,
+        isExtracted: validatedData.isExtracted,
+      }
+    });
 
     if (remainingTweets === 0) {
       return NextResponse.json({
@@ -89,7 +118,13 @@ export async function POST(request: NextRequest) {
         error: '没有更多符合条件的推文需要处理',
         data: {
           remainingTweets: 0,
-          message: '所有符合条件的推文已处理完成'
+          message: '所有符合条件的推文已处理完成',
+          appliedFilters: {
+            listIds: validatedData.listIds,
+            usernames: validatedData.usernames,
+            publishedAfter: validatedData.publishedAfter?.toISOString(),
+            isExtracted: validatedData.isExtracted,
+          }
         }
       }, { status: 404 });
     }
