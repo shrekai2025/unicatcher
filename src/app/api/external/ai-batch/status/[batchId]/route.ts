@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AIProcessManager } from '~/server/core/ai/process-manager';
+import { db } from '~/server/db';
 
 const processManager = AIProcessManager.getInstance();
 
@@ -39,25 +40,54 @@ export async function GET(
 
     console.log('[AI批处理API] 查询批次状态:', batchId);
 
-    // 获取批次状态
-    const status = await processManager.getBatchStatus(batchId);
+    // 🔥 增强调试：提供详细的调试信息
+    try {
+      // 直接查询数据库记录
+      const dbRecord = await db.aIProcessRecord.findUnique({
+        where: { batchId },
+      });
+      
+      console.log('[AI批处理API] 数据库查询结果:', dbRecord ? {
+        batchId: dbRecord.batchId,
+        status: dbRecord.status,
+        startedAt: dbRecord.startedAt,
+        completedAt: dbRecord.completedAt,
+        totalTweets: dbRecord.totalTweets,
+        processedTweets: dbRecord.processedTweets,
+        failedTweets: dbRecord.failedTweets,
+      } : '记录不存在');
+      
+      // 检查活跃任务
+      const activeProcesses = processManager.getActiveProcesses();
+      console.log('[AI批处理API] 当前活跃任务:', activeProcesses);
+      console.log('[AI批处理API] 目标批次是否活跃:', activeProcesses.includes(batchId));
+      
+      // 获取批次状态
+      const status = await processManager.getBatchStatus(batchId);
 
-    if (!status) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: `批次 ${batchId} 不存在` 
-        },
-        { status: 404 }
-      );
-    }
+      if (!status) {
+        return NextResponse.json(
+          { 
+            success: false,
+            error: `批次 ${batchId} 不存在`,
+            debug: {
+              dbRecord: dbRecord ? 'exists' : 'not_found',
+              isActive: activeProcesses.includes(batchId),
+              activeProcessCount: activeProcesses.length,
+              searchedBatchId: batchId,
+              timestamp: new Date().toISOString()
+            }
+          },
+          { status: 404 }
+        );
+      }
 
-    // 计算进度百分比
-    const progressPercentage = status.progress.total > 0 
-      ? Math.round((status.progress.processed / status.progress.total) * 100)
-      : 0;
+      // 计算进度百分比
+      const progressPercentage = status.progress.total > 0 
+        ? Math.round((status.progress.processed / status.progress.total) * 100)
+        : 0;
 
-    const responseData = {
+      const responseData = {
       batchId: status.batchId,
       status: status.status,
       progress: {
@@ -72,20 +102,30 @@ export async function GET(
       message: getStatusMessage(status.status, progressPercentage)
     };
 
-    console.log('[AI批处理API] 批次状态查询结果:', {
-      batchId,
-      status: status.status,
-      progress: `${status.progress.processed}/${status.progress.total}`,
-      percentage: progressPercentage
-    });
+      console.log('[AI批处理API] 批次状态查询结果:', {
+        batchId,
+        status: status.status,
+        progress: `${status.progress.processed}/${status.progress.total}`,
+        percentage: progressPercentage
+      });
 
-    return NextResponse.json({
-      success: true,
-      data: responseData
-    });
+      return NextResponse.json({
+        success: true,
+        data: responseData
+      });
 
+    } catch (error) {
+      console.error('[AI批处理API] 查询状态失败:', error);
+      return NextResponse.json(
+        { 
+          success: false,
+          error: error instanceof Error ? error.message : 'Internal Server Error' 
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error('[AI批处理API] 查询状态失败:', error);
+    console.error('[AI批处理API] 外层异常:', error);
     return NextResponse.json(
       { 
         success: false,

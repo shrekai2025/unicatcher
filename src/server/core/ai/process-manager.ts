@@ -261,17 +261,46 @@ export class AIProcessManager {
 
   /**
    * 获取批处理状态
+   * 🔥 增强版：支持查找历史记录和活跃任务
    */
   async getBatchStatus(batchId: string): Promise<ProcessStatus | null> {
+    console.log(`[AI处理] 🔍 查询批次状态: ${batchId}`);
+    
+    // 首先查询数据库记录
     const record = await db.aIProcessRecord.findUnique({
       where: { batchId },
     });
 
     if (!record) {
+      console.warn(`[AI处理] ⚠️ 数据库中未找到批次记录: ${batchId}`);
+      
+      // 🔥 增强：检查是否为活跃任务（可能记录还未创建）
+      const isActive = this.activeProcesses.has(batchId);
+      if (isActive) {
+        console.log(`[AI处理] 📋 在活跃任务中找到: ${batchId}`);
+        return {
+          batchId,
+          status: 'processing',
+          progress: {
+            total: 0,
+            processed: 0,
+            succeeded: 0,
+            failed: 0,
+            valueless: 0,
+            currentBatch: 0,
+            totalBatches: 0,
+          },
+          error: undefined,
+        };
+      }
+      
+      console.error(`[AI处理] ❌ 批次 ${batchId} 完全不存在（数据库和内存中都没有）`);
       return null;
     }
 
     const isActive = this.activeProcesses.has(batchId);
+    
+    console.log(`[AI处理] ✅ 找到批次记录: ${batchId}, 状态: ${record.status}, 活跃: ${isActive}`);
 
     return {
       batchId: record.batchId,
