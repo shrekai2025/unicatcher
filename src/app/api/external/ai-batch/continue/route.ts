@@ -55,20 +55,6 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     });
 
-    // 检查是否有任务正在运行
-    const globalStatus = await processManager.getGlobalStatus();
-    if (globalStatus.hasActiveTask) {
-      return NextResponse.json({
-        success: false,
-        error: 'AI批处理任务正在运行中',
-        data: {
-          status: 'processing',
-          currentBatchId: globalStatus.currentBatchId,
-          message: globalStatus.message
-        }
-      }, { status: 409 });
-    }
-
     // 生成新的批次ID
     const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
@@ -81,6 +67,10 @@ export async function POST(request: NextRequest) {
         { aiProcessStatus: 'failed', aiRetryCount: { lt: 3 } },
       ],
     };
+
+    if (validatedData.listIds && validatedData.listIds.length > 0) {
+      where.listId = { in: validatedData.listIds };
+    }
 
     if (validatedData.usernames && validatedData.usernames.length > 0) {
       where.userUsername = { in: validatedData.usernames };
@@ -104,62 +94,63 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
-    // 创建新的处理记录
-    const processRecord = await db.aIProcessRecord.create({
-      data: {
+    // 🔥 重构：使用processManager统一启动任务，避免竞态条件
+    // 不再手动创建数据库记录，让processManager内部处理
+    try {
+      await processManager.startBatchProcess({
         batchId: newBatchId,
-        status: 'processing',
-        totalTweets: remainingTweets,
-        filterConfig: JSON.stringify({
+        filterConfig: {
+          listIds: validatedData.listIds,
           usernames: validatedData.usernames,
           publishedAfter: validatedData.publishedAfter,
           isExtracted: validatedData.isExtracted,
-          previousBatchId: validatedData.previousBatchId,
-        }),
-        aiProvider: validatedData.aiConfig.provider,
-        aiModel: validatedData.aiConfig.model,
-        systemPrompt: validatedData.systemPrompt,
+        },
+        batchSize: validatedData.batchSize,
         batchProcessingMode: validatedData.batchProcessingMode,
-      },
-    });
+        systemPrompt: validatedData.systemPrompt,
+        aiConfig: validatedData.aiConfig,
+      });
 
-    // 启动新的批处理任务
-    await processManager.startBatchProcess({
-      batchId: newBatchId,
-      filterConfig: {
-        listIds: validatedData.listIds,
-        usernames: validatedData.usernames,
-        publishedAfter: validatedData.publishedAfter,
-        isExtracted: validatedData.isExtracted,
-      },
-      batchSize: validatedData.batchSize,
-      batchProcessingMode: validatedData.batchProcessingMode,
-      systemPrompt: validatedData.systemPrompt,
-      aiConfig: validatedData.aiConfig,
-    });
-
-    console.log('[AI批处理API] 继续处理任务启动成功:', {
-      newBatchId,
-      previousBatchId: validatedData.previousBatchId,
-      remainingTweets,
-      batchSize: validatedData.batchSize,
-      timestamp: new Date().toISOString()
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: '继续处理任务启动成功',
-      data: {
-        batchId: newBatchId,
+      console.log('[AI批处理API] 继续处理任务启动成功:', {
+        newBatchId,
         previousBatchId: validatedData.previousBatchId,
-        status: 'processing',
         remainingTweets,
         batchSize: validatedData.batchSize,
-        estimatedBatches: Math.ceil(remainingTweets / validatedData.batchSize),
-        mode: validatedData.batchProcessingMode,
-        startedAt: new Date().toISOString()
+        timestamp: new Date().toISOString()
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: '继续处理任务启动成功',
+        data: {
+          batchId: newBatchId,
+          previousBatchId: validatedData.previousBatchId,
+          status: 'processing',
+          remainingTweets,
+          batchSize: validatedData.batchSize,
+          estimatedBatches: Math.ceil(remainingTweets / validatedData.batchSize),
+          mode: validatedData.batchProcessingMode,
+          startedAt: new Date().toISOString()
+        }
+      }, { status: 201 });
+
+    } catch (startError) {
+      // 🔥 改进错误处理：如果启动失败，返回具体错误信息
+      console.error('[AI批处理API] 启动任务失败:', startError);
+      
+      if (startError instanceof Error && startError.message.includes('正在运行中')) {
+        return NextResponse.json({
+          success: false,
+          error: 'AI批处理任务正在运行中',
+          data: {
+            status: 'processing',
+            message: startError.message
+          }
+        }, { status: 409 });
       }
-    }, { status: 201 });
+      
+      throw startError;
+    }
 
   } catch (error) {
     console.error('[AI批处理API] 继续处理任务失败:', error);

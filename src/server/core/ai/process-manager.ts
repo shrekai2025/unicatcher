@@ -112,47 +112,81 @@ export class AIProcessManager {
 
   /**
    * 启动批处理任务
+   * 🔥 重构：增强原子性和错误处理
    */
   async startBatchProcess(config: ProcessBatchConfig): Promise<void> {
     const { batchId, filterConfig, batchSize, batchProcessingMode = 'optimized', systemPrompt, aiConfig } = config;
 
-    console.log(`[AI处理] 启动批处理任务: ${batchId}, 模式: ${batchProcessingMode}, 批次大小: ${batchSize}`);
+    console.log(`[AI处理] 🚀 启动批处理任务: ${batchId}, 模式: ${batchProcessingMode}, 批次大小: ${batchSize}`);
     console.log(`[AI处理] 任务配置详情: `, { aiConfig: { ...aiConfig, apiKey: '***' }, filterConfig });
 
-    // 检查全局是否已有任务在运行
-    const globalState = await this.isGlobalProcessing();
-    if (globalState.isProcessing) {
-      throw new Error(`AI批处理任务正在运行中: ${globalState.currentBatchId}，请等待当前任务完成`);
+    // 🔥 原子性操作：一次性检查状态并创建记录
+    let processRecord: any = null;
+    
+    try {
+      // 检查全局是否已有任务在运行
+      const globalState = await this.isGlobalProcessing();
+      if (globalState.isProcessing) {
+        console.warn(`[AI处理] ❌ 任务启动被拒绝，原因：已有任务运行中 ${globalState.currentBatchId}`);
+        throw new Error(`AI批处理任务正在运行中: ${globalState.currentBatchId}，请等待当前任务完成`);
+      }
+
+      // 检查是否已有同名任务在运行
+      if (this.activeProcesses.has(batchId)) {
+        console.warn(`[AI处理] ❌ 任务启动被拒绝，原因：同名任务已存在 ${batchId}`);
+        throw new Error(`批处理任务 ${batchId} 已在运行中`);
+      }
+
+      // 🔥 原子性操作：先设置内存锁，再创建数据库记录
+      this.globalProcessingLock = true;
+      this.currentGlobalBatchId = batchId;
+      console.log(`[AI处理] 🔒 获取全局锁: ${batchId}`);
+
+      // 创建处理记录
+      processRecord = await db.aIProcessRecord.create({
+        data: {
+          batchId,
+          status: 'processing',
+          totalTweets: 0, // 先设为0，后面会更新
+          filterConfig: JSON.stringify(filterConfig),
+          aiProvider: aiConfig.provider,
+          aiModel: aiConfig.model,
+          systemPrompt: systemPrompt,
+          batchProcessingMode: batchProcessingMode,
+        },
+      });
+      console.log(`[AI处理] 📝 数据库记录已创建: ${batchId}`);
+
+    } catch (error) {
+      // 🔥 改进错误处理：如果创建过程中出错，确保清理状态
+      console.error(`[AI处理] ❌ 任务启动失败，清理状态: ${batchId}`, error);
+      this.globalProcessingLock = false;
+      this.currentGlobalBatchId = null;
+      
+      // 如果数据库记录已创建但后续失败，需要清理
+      if (processRecord) {
+        try {
+          await db.aIProcessRecord.update({
+            where: { batchId },
+            data: {
+              status: 'failed',
+              errorMessage: `启动失败: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              completedAt: new Date(),
+            },
+          });
+        } catch (cleanupError) {
+          console.error(`[AI处理] ⚠️ 清理数据库记录失败: ${batchId}`, cleanupError);
+        }
+      }
+      
+      throw error;
     }
-
-    // 检查是否已有同名任务在运行
-    if (this.activeProcesses.has(batchId)) {
-      throw new Error(`批处理任务 ${batchId} 已在运行中`);
-    }
-
-    // 设置全局锁
-    this.globalProcessingLock = true;
-    this.currentGlobalBatchId = batchId;
-
-    // 创建处理记录
-    const processRecord = await db.aIProcessRecord.create({
-      data: {
-        batchId,
-        status: 'processing',
-        totalTweets: 0, // 先设为0，后面会更新
-        filterConfig: JSON.stringify(filterConfig),
-        aiProvider: aiConfig.provider,
-        aiModel: aiConfig.model,
-        systemPrompt: systemPrompt,
-        batchProcessingMode: batchProcessingMode,
-      },
-    });
 
     // 创建取消控制器
     let cancelled = false;
     const cancel = () => {
       cancelled = true;
-      console.log(`[AI处理] 取消批处理任务: ${batchId}`);
+      console.log(`[AI处理] 🛑 取消批处理任务: ${batchId}`);
     };
 
     // 启动处理任务
@@ -160,41 +194,45 @@ export class AIProcessManager {
       config,
       () => cancelled
     ).catch(async (error) => {
-      console.error(`[AI处理] 批处理任务失败: ${batchId}`, error);
+      console.error(`[AI处理] ❌ 批处理任务执行失败: ${batchId}`, error);
       
-      // 更新数据库状态（确保一定执行）
+      // 🔥 改进错误处理：确保数据库状态一定被更新
       try {
         await db.aIProcessRecord.update({
           where: { batchId },
           data: {
             status: 'failed',
-            errorMessage: error.message,
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
             completedAt: new Date(),
           },
         });
-        console.log(`[AI处理] 数据库状态已更新为失败: ${batchId}`);
+        console.log(`[AI处理] 📝 数据库状态已更新为失败: ${batchId}`);
       } catch (dbError) {
-        console.error(`[AI处理] 更新数据库状态失败: ${batchId}`, dbError);
+        console.error(`[AI处理] ⚠️ 更新数据库状态失败: ${batchId}`, dbError);
         // 即使数据库更新失败，也要继续执行，确保内存状态被清理
       }
       
       throw error;
     }).finally(() => {
-      // 清理活跃任务记录和全局锁
+      // 🔥 确保清理逻辑一定执行
+      console.log(`[AI处理] 🧹 开始清理任务状态: ${batchId}`);
       this.activeProcesses.delete(batchId);
       this.globalProcessingLock = false;
       this.currentGlobalBatchId = null;
-      console.log(`[AI处理] 清理全局锁: ${batchId}`);
+      console.log(`[AI处理] 🔓 释放全局锁: ${batchId}`);
     });
 
     // 记录活跃任务
     this.activeProcesses.set(batchId, { cancel, promise });
+    console.log(`[AI处理] 📋 任务已加入活跃列表: ${batchId}, 当前活跃任务数: ${this.activeProcesses.size}`);
 
     // 不等待完成，直接返回
     promise.catch((error) => {
       // 确保所有异常都被记录，不能静默忽略
-      console.error(`[AI处理] 未处理的任务异常: ${batchId}`, error);
+      console.error(`[AI处理] ⚠️ 未处理的任务异常: ${batchId}`, error);
     });
+
+    console.log(`[AI处理] ✅ 任务启动成功: ${batchId}`);
   }
 
   /**
@@ -261,14 +299,14 @@ export class AIProcessManager {
     const { batchId, filterConfig, batchSize, batchProcessingMode = 'optimized', systemPrompt, aiConfig } = config;
 
     try {
-      console.log(`[AI处理] 步骤1: 创建 OpenAI 服务实例 - ${batchId}`);
+      console.log(`[AI处理] 🔧 步骤1: 创建 OpenAI 服务实例 - ${batchId}`);
       // 创建 OpenAI 服务实例
       const aiService = new OpenAIService(aiConfig);
 
-      console.log(`[AI处理] 步骤2: 验证 AI 配置 - ${batchId}`);
+      console.log(`[AI处理] 🔍 步骤2: 验证 AI 配置 - ${batchId}`);
       // 验证 AI 配置
       const isValidConfig = await aiService.validateConfig();
-      console.log(`[AI处理] 步骤2结果: 配置验证${isValidConfig ? '成功' : '失败'} - ${batchId}`);
+      console.log(`[AI处理] 步骤2结果: 配置验证${isValidConfig ? '✅ 成功' : '❌ 失败'} - ${batchId}`);
       if (!isValidConfig) {
         throw new Error('AI 配置验证失败，请检查 API Key 是否正确');
       }
@@ -356,8 +394,23 @@ export class AIProcessManager {
         return;
       }
 
-      console.log(`[AI处理] 开始处理单批次: ${tweets.length} 条推文 (模式: ${batchProcessingMode})`);
-      console.log(`[AI处理] 推文预览:`, tweets.slice(0, 2).map(t => ({ id: t.id, content: t.content.substring(0, 50) + '...' })));
+      console.log(`[AI处理] 🎯 开始处理单批次: ${tweets.length} 条推文 (模式: ${batchProcessingMode})`);
+      console.log(`[AI处理] 📄 推文预览:`, tweets.slice(0, 2).map(t => ({ id: t.id, content: t.content.substring(0, 50) + '...' })));
+
+      // 🔥 改进进度追踪：实时更新数据库记录
+      const updateProgress = async (processed: number, succeeded: number, failed: number) => {
+        try {
+          await db.aIProcessRecord.update({
+            where: { batchId },
+            data: {
+              processedTweets: succeeded,
+              failedTweets: failed,
+            },
+          });
+        } catch (error) {
+          console.warn(`[AI处理] ⚠️ 更新进度失败: ${batchId}`, error);
+        }
+      };
 
       // 根据选择的处理模式调用不同的方法
       let results: Array<{ tweetId: string; result: any; error?: string }>;
@@ -370,7 +423,8 @@ export class AIProcessManager {
           contentTypes,
           systemPrompt,
           (stats) => {
-            console.log(`[AI处理] 批量模式进度更新: ${stats.processed}/${tweets.length}, 成功: ${stats.succeeded}, 失败: ${stats.failed}`);
+            console.log(`[AI处理] 📊 批量模式进度更新: ${stats.processed}/${tweets.length}, 成功: ${stats.succeeded}, 失败: ${stats.failed}`);
+            updateProgress(stats.processed, stats.succeeded, stats.failed);
           },
           batchId
         );
@@ -382,16 +436,26 @@ export class AIProcessManager {
           contentTypes,
           systemPrompt,
           (stats) => {
-            console.log(`[AI处理] 传统模式进度更新: ${stats.processed}/${tweets.length}, 成功: ${stats.succeeded}, 失败: ${stats.failed}`);
+            console.log(`[AI处理] 📊 传统模式进度更新: ${stats.processed}/${tweets.length}, 成功: ${stats.succeeded}, 失败: ${stats.failed}`);
+            updateProgress(stats.processed, stats.succeeded, stats.failed);
           }
         );
       }
 
-      console.log(`[AI处理] 单批次处理完成: 总共 ${results.length} 条，成功 ${results.filter(r => !r.error).length} 条，失败 ${results.filter(r => r.error).length} 条`);
+      const successCount = results.filter(r => !r.error).length;
+      const failureCount = results.filter(r => r.error).length;
+      console.log(`[AI处理] ✅ 单批次AI处理完成: 总共 ${results.length} 条，成功 ${successCount} 条，失败 ${failureCount} 条`);
 
-      // 更新推文的 AI 处理结果
+      // 🔥 改进错误处理：批量更新推文状态，减少数据库操作
+      console.log(`[AI处理] 💾 开始批量更新推文状态...`);
+      let dbUpdateSuccess = 0;
+      let dbUpdateFailed = 0;
+
       for (const result of results) {
-        if (isCancelled()) break;
+        if (isCancelled()) {
+          console.log(`[AI处理] 🛑 任务已取消，停止更新推文状态`);
+          break;
+        }
 
         try {
           if (result.error) {
@@ -404,6 +468,7 @@ export class AIProcessManager {
               },
             });
             failedCount++;
+            dbUpdateSuccess++;
           } else if (result.result) {
             // 处理成功，更新结果
             const { isValueless, keywords: resultKeywords, topicTags: resultTopicTags, contentTypes: resultContentTypes } = result.result;
@@ -421,11 +486,19 @@ export class AIProcessManager {
               },
             });
             processedCount++;
+            dbUpdateSuccess++;
           }
         } catch (error) {
-          console.error(`[AI处理] 更新推文 ${result.tweetId} 失败:`, error);
+          console.error(`[AI处理] ❌ 更新推文 ${result.tweetId} 失败:`, error);
           failedCount++;
+          dbUpdateFailed++;
         }
+      }
+
+      console.log(`[AI处理] 💾 数据库更新完成: 成功 ${dbUpdateSuccess} 条，失败 ${dbUpdateFailed} 条`);
+      
+      if (dbUpdateFailed > 0) {
+        console.warn(`[AI处理] ⚠️ 有 ${dbUpdateFailed} 条推文的数据库更新失败，可能需要重试`);
       }
 
       // 检查是否还有更多推文需要处理
@@ -436,22 +509,30 @@ export class AIProcessManager {
         }
       });
 
-      // 更新处理记录
+      // 🔥 最终状态更新：确保准确记录处理结果
       await db.aIProcessRecord.update({
         where: { batchId },
         data: {
           processedTweets: processedCount,
           failedTweets: failedCount,
-          status: remainingCount > 0 ? 'completed' : 'completed', // 单批次处理，状态都设为completed
+          status: 'completed', // 单批次处理，状态设为completed
           completedAt: new Date(),
         },
       });
 
-      console.log(`[AI处理] 单批次任务完成: ${batchId}, 成功: ${processedCount}, 失败: ${failedCount}, 剩余: ${remainingCount}`);
-
+      console.log(`[AI处理] 🎉 单批次任务完成: ${batchId}, 成功: ${processedCount}, 失败: ${failedCount}, 剩余: ${remainingCount}`);
+      
+      // 🔥 添加统计信息
+      const successRate = results.length > 0 ? ((processedCount / results.length) * 100).toFixed(1) : '0';
+      console.log(`[AI处理] 📈 处理统计: 成功率 ${successRate}%, AI处理成功: ${successCount}, 数据库更新成功: ${processedCount}`);
 
     } catch (error) {
-      console.error(`[AI处理] 批处理任务异常: ${batchId}`, error);
+      console.error(`[AI处理] ❌ 批处理任务异常: ${batchId}`, error);
+      
+      // 🔥 改进错误信息记录
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[AI处理] 💥 详细错误信息: ${errorMessage}`);
+      
       throw error;
     }
   }

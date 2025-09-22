@@ -403,12 +403,6 @@ export const tweetProcessingRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { filterConfig, batchSize, batchProcessingMode, systemPrompt, aiConfig } = input;
       
-      // 首先检查是否有任务正在运行
-      const globalStatus = await processManager.getGlobalStatus();
-      if (globalStatus.hasActiveTask) {
-        throw new Error(`AI批处理任务正在运行中: ${globalStatus.currentBatchId}，请等待当前任务完成`);
-      }
-
       // 生成批次ID
       const batchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
@@ -440,44 +434,11 @@ export const tweetProcessingRouter = createTRPCRouter({
         throw new Error('没有符合条件的推文需要处理');
       }
 
-      // 创建处理记录
-      const processRecord = await db.aIProcessRecord.create({
-        data: {
-          batchId,
-          status: 'processing',
-          totalTweets,
-          filterConfig: JSON.stringify(filterConfig),
-          systemPrompt,
-          aiProvider: aiConfig.provider,
-          aiModel: aiConfig.model,
-          batchProcessingMode,
-          requestDetails: JSON.stringify({
-            filterConfig,
-            batchSize,
-            batchProcessingMode,
-            aiConfig: {
-              provider: aiConfig.provider,
-              model: aiConfig.model,
-              baseURL: aiConfig.baseURL,
-            },
-            systemPrompt,
-            timestamp: new Date().toISOString(),
-          }),
-          processingLogs: JSON.stringify([
-            {
-              timestamp: new Date().toISOString(),
-              level: 'info',
-              message: `批处理任务启动: ${batchId}`,
-              data: { totalTweets, batchSize, mode: batchProcessingMode }
-            }
-          ]),
-        },
-      });
-
       // 清理旧记录，保留最近10条
       await cleanupOldAIRecords();
 
-      // 启动异步 AI 处理任务
+      // 🔥 重构：使用processManager统一启动任务，避免竞态条件
+      // 不再手动创建数据库记录，让processManager内部处理
       try {
         await processManager.startBatchProcess({
           batchId,
@@ -487,29 +448,27 @@ export const tweetProcessingRouter = createTRPCRouter({
           systemPrompt,
           aiConfig,
         });
-      } catch (error) {
-        // 如果启动失败，更新记录状态
-        await db.aIProcessRecord.update({
-          where: { batchId },
-          data: {
-            status: 'failed',
-            errorMessage: error instanceof Error ? error.message : '启动失败',
-            completedAt: new Date(),
-          },
-        });
-        throw error;
-      }
 
-      return {
-        batchId,
-        recordId: processRecord.id,
-        totalTweets,
-        batchSize,
-        estimatedBatches: Math.ceil(totalTweets / batchSize),
-        mode: batchProcessingMode,
-        status: 'processing',
-        message: 'AI批处理任务启动成功（单批次模式）',
-      };
+        return {
+          batchId,
+          totalTweets,
+          batchSize,
+          estimatedBatches: Math.ceil(totalTweets / batchSize),
+          mode: batchProcessingMode,
+          status: 'processing',
+          message: 'AI批处理任务启动成功（单批次模式）',
+        };
+      } catch (error) {
+        // 🔥 改进错误处理：如果启动失败，返回具体错误信息
+        console.error('[tRPC AI批处理] 启动任务失败:', error);
+        
+        if (error instanceof Error && error.message.includes('正在运行中')) {
+          // 保持原有的错误格式，让前端能够识别
+          throw error;
+        }
+        
+        throw new Error(`启动AI批处理任务失败: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }),
 
   // 停止 AI 批处理
@@ -538,12 +497,6 @@ export const tweetProcessingRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { previousBatchId, filterConfig, batchSize, batchProcessingMode, systemPrompt, aiConfig } = input;
       
-      // 检查是否有任务正在运行
-      const globalStatus = await processManager.getGlobalStatus();
-      if (globalStatus.hasActiveTask) {
-        throw new Error(`AI批处理任务正在运行中: ${globalStatus.currentBatchId}，请等待当前任务完成`);
-      }
-
       // 生成新的批次ID
       const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
@@ -575,24 +528,8 @@ export const tweetProcessingRouter = createTRPCRouter({
         throw new Error('没有更多符合条件的推文需要处理');
       }
 
-      // 创建处理记录
-      const processRecord = await db.aIProcessRecord.create({
-        data: {
-          batchId: newBatchId,
-          status: 'processing',
-          totalTweets: remainingTweets,
-          filterConfig: JSON.stringify({
-            ...filterConfig,
-            previousBatchId,
-          }),
-          systemPrompt,
-          aiProvider: aiConfig.provider,
-          aiModel: aiConfig.model,
-          batchProcessingMode,
-        },
-      });
-
-      // 启动新的批处理任务
+      // 🔥 重构：使用processManager统一启动任务，避免竞态条件
+      // 不再手动创建数据库记录，让processManager内部处理
       try {
         await processManager.startBatchProcess({
           batchId: newBatchId,
@@ -602,30 +539,28 @@ export const tweetProcessingRouter = createTRPCRouter({
           systemPrompt,
           aiConfig,
         });
-      } catch (error) {
-        // 如果启动失败，更新记录状态
-        await db.aIProcessRecord.update({
-          where: { batchId: newBatchId },
-          data: {
-            status: 'failed',
-            errorMessage: error instanceof Error ? error.message : '启动失败',
-            completedAt: new Date(),
-          },
-        });
-        throw error;
-      }
 
-      return {
-        batchId: newBatchId,
-        previousBatchId,
-        recordId: processRecord.id,
-        remainingTweets,
-        batchSize,
-        estimatedBatches: Math.ceil(remainingTweets / batchSize),
-        mode: batchProcessingMode,
-        status: 'processing',
-        message: '继续处理任务启动成功',
-      };
+        return {
+          batchId: newBatchId,
+          previousBatchId,
+          remainingTweets,
+          batchSize,
+          estimatedBatches: Math.ceil(remainingTweets / batchSize),
+          mode: batchProcessingMode,
+          status: 'processing',
+          message: '继续处理任务启动成功',
+        };
+      } catch (error) {
+        // 🔥 改进错误处理：如果启动失败，返回具体错误信息
+        console.error('[tRPC AI批处理] 继续处理任务失败:', error);
+        
+        if (error instanceof Error && error.message.includes('正在运行中')) {
+          // 保持原有的错误格式，让前端能够识别
+          throw error;
+        }
+        
+        throw new Error(`继续AI批处理任务失败: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }),
 
   // 获取批处理状态
