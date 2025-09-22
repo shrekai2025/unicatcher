@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Navigation } from '~/components/navigation';
 import { FloatingVideoPlayer } from '~/components/floating-video-player';
 import { PresetModal } from '~/components/preset-modal';
 import { PresetButton } from '~/components/preset-button';
@@ -53,10 +52,40 @@ export default function ViewerPage() {
   const [selectedPresets, setSelectedPresets] = useState<FilterPreset[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 加载预制项目
+  // 加载预制项目和本地存储的设置
   useEffect(() => {
     setPresets(PresetManager.getPresets());
+    
+    // 从本地存储加载设置
+    const savedViewMode = localStorage.getItem('viewer-viewMode') as 'masonry' | 'compact' | 'compact-image';
+    const savedListId = localStorage.getItem('viewer-listId');
+    
+    if (savedViewMode && ['masonry', 'compact', 'compact-image'].includes(savedViewMode)) {
+      setViewMode(savedViewMode);
+    }
+    
+    if (savedListId) {
+      setListId(savedListId);
+    }
   }, []);
+
+  // 保存viewMode到本地存储
+  useEffect(() => {
+    localStorage.setItem('viewer-viewMode', viewMode);
+  }, [viewMode]);
+
+  // 保存listId到本地存储（延迟保存，避免频繁写入）
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (listId.trim()) {
+        localStorage.setItem('viewer-listId', listId);
+      } else {
+        localStorage.removeItem('viewer-listId');
+      }
+    }, 500); // 延迟500ms保存
+
+    return () => clearTimeout(timeoutId);
+  }, [listId]);
 
   // 计算有效的listIds
   const effectiveListIds = selectedPresets.length > 0 
@@ -455,10 +484,9 @@ export default function ViewerPage() {
   };
 
   return (
-    <>
-      <Navigation />
-      <div className="p-4">
-        <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      <div className="py-6 lg:py-10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* 过滤区域 */}
         <div className="bg-white shadow-sm rounded p-3 mb-4">
           <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-3">
@@ -622,68 +650,67 @@ export default function ViewerPage() {
             <p className="text-gray-500">没有找到相关数据</p>
           </div>
         )}
+          {/* 样式定义 */}
+          <style jsx>{`
+            .line-clamp-6 {
+              display: -webkit-box;
+              -webkit-line-clamp: 6;
+              -webkit-box-orient: vertical;
+              overflow: hidden;
+            }
+            
+            .masonry-container {
+              column-count: 2;
+              column-gap: 12px;
+              column-fill: balance;
+            }
+            
+            @media (min-width: 768px) {
+              .masonry-container {
+                column-count: 3;
+              }
+            }
+            
+            @media (min-width: 1024px) {
+              .masonry-container {
+                column-count: 4;
+              }
+            }
+            
+            @media (min-width: 1280px) {
+              .masonry-container {
+                column-count: 5;
+              }
+            }
+            
+            @media (min-width: 1536px) {
+              .masonry-container {
+                column-count: 6;
+              }
+            }
+            
+            .masonry-item {
+              break-inside: avoid;
+              page-break-inside: avoid;
+              margin-bottom: 12px;
+            }
+          `}</style>
         </div>
 
-        {/* 样式定义 */}
-        <style jsx>{`
-          .line-clamp-6 {
-            display: -webkit-box;
-            -webkit-line-clamp: 6;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-          }
-          
-          .masonry-container {
-            column-count: 2;
-            column-gap: 12px;
-            column-fill: balance;
-          }
-          
-          @media (min-width: 768px) {
-            .masonry-container {
-              column-count: 3;
-            }
-          }
-          
-          @media (min-width: 1024px) {
-            .masonry-container {
-              column-count: 4;
-            }
-          }
-          
-          @media (min-width: 1280px) {
-            .masonry-container {
-              column-count: 5;
-            }
-          }
-          
-          @media (min-width: 1536px) {
-            .masonry-container {
-              column-count: 6;
-            }
-          }
-          
-          .masonry-item {
-            break-inside: avoid;
-            page-break-inside: avoid;
-            margin-bottom: 12px;
-          }
-        `}</style>
+        {/* 预制弹窗 */}
+        <PresetModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSave={handleSavePreset}
+        />
+
+        {/* 浮动视频播放器 */}
+        <FloatingVideoPlayer
+          isOpen={isPlayerOpen}
+          videoData={currentVideo}
+          onClose={closePlayer}
+        />
       </div>
-
-      {/* 预制弹窗 */}
-      <PresetModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSavePreset}
-      />
-
-      {/* 浮动视频播放器 */}
-      <FloatingVideoPlayer
-        isOpen={isPlayerOpen}
-        videoData={currentVideo}
-        onClose={closePlayer}
-      />
-    </>
+    </div>
   );
 }

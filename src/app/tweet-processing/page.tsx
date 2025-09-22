@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '~/trpc/react';
-import { Navigation } from '~/components/navigation';
+import { DashboardLayout } from '~/components/dashboard-layout';
 import { TweetFilterPresets, type ListIdPreset, type UsernamePreset } from '~/lib/tweet-filter-presets';
 
 // AI 配置接口
@@ -553,16 +553,7 @@ export default function TweetProcessingPage() {
   };
 
   return (
-    <>
-      <Navigation />
-      <div className="p-4">
-        <div className="max-w-7xl mx-auto">
-          {/* 页面标题 */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">推文处理</h1>
-            <p className="text-gray-600 mt-1">筛选推文并使用 AI 进行关键词提取和主题标签匹配</p>
-            <p className="text-sm text-blue-600 mt-1">💡 价值判断标准：推文是否命中内容类型（未命中任何内容类型则视为无价值）</p>
-          </div>
+    <DashboardLayout>
 
           {/* 筛选区域 */}
           <div className="bg-white shadow-sm rounded-lg p-6 mb-6">
@@ -1178,8 +1169,6 @@ export default function TweetProcessingPage() {
               </>
             )}
           </div>
-        </div>
-      </div>
 
       {/* 处理状态弹窗 */}
       {showProcessingModal && (
@@ -1837,6 +1826,6 @@ export default function TweetProcessingPage() {
           </div>
         </div>
       )}
-    </>
+    </DashboardLayout>
   );
 }

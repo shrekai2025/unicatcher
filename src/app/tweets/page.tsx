@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Navigation } from '~/components/navigation';
+import { DashboardLayout } from '~/components/dashboard-layout';
 import { api } from '~/trpc/react';
 import { getSession } from '~/lib/simple-auth';
 
@@ -88,17 +88,17 @@ export default function TweetsPage() {
     );
   };
 
-  const handleExport = () => {
+  const handleExportCSV = () => {
     exportTweets.mutate(
-      { format: 'json' },
+      { format: 'csv' },
       {
         onSuccess: (data: any) => {
           // 创建下载链接
-          const blob = new Blob([data.data], { type: 'application/json' });
+          const blob = new Blob([data.data], { type: 'text/csv;charset=utf-8' });
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `tweets_${new Date().toISOString().split('T')[0]}.json`;
+          a.download = `tweets_${new Date().toISOString().split('T')[0]}.csv`;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -117,354 +117,270 @@ export default function TweetsPage() {
     return text.substring(0, maxLength) + '...';
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Navigation />
-      
-      <div className="py-10">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          {/* 页面头部 */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold leading-tight text-gray-900">
-              推文数据管理
-            </h1>
-            <p className="mt-2 text-gray-600">
-              查看、搜索和管理采集到的推文数据
-            </p>
-          </div>
-
-          {/* 搜索和操作栏 */}
-          <div className="mb-6 flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 flex">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜索推文内容、用户名..."
-                className="block w-full px-3 py-2 border border-gray-300 rounded-l-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              />
-              <button
-                onClick={handleSearch}
-                disabled={tweetsQuery.isPending}
-                className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 rounded-r-md shadow-sm text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                🔍 搜索
-              </button>
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={handleExport}
-                disabled={exportTweets.isPending}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                📥 导出数据
-              </button>
-              {selectedTweets.length > 0 && (
-                <button
-                  onClick={handleBatchDelete}
-                  disabled={batchDeleteTweets.isPending}
-                  className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-                >
-                  🙈 批量隐藏 ({selectedTweets.length})
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* 推文列表 */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-md">
-            {tweetsQuery.data?.data?.tweets && tweetsQuery.data.data.tweets.length > 0 ? (
-              <>
-                {/* 表头 */}
-                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={selectedTweets.length === tweetsQuery.data.data.tweets.length}
-                      onChange={handleSelectAll}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span className="ml-3 text-sm font-medium text-gray-900">
-                      全选 ({tweetsQuery.data.data.tweets.length} 条推文)
-                    </span>
-                  </div>
-                </div>
-
-                {/* 推文列表 */}
-                <ul className="divide-y divide-gray-200">
-                  {tweetsQuery.data.data.tweets.map((tweet: any) => (
-                    <li key={tweet.id} className={`${selectedTweets.includes(tweet.id) ? 'bg-blue-50' : ''}`}>
-                      <div className="px-4 py-4 sm:px-6">
-                        <div className="flex items-start space-x-4">
-                          <input
-                            type="checkbox"
-                            checked={selectedTweets.includes(tweet.id)}
-                            onChange={() => handleSelectTweet(tweet.id)}
-                            className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div className="flex-shrink-0">
-                                  {tweet.profileImageUrl ? (
-                                    <img
-                                      src={tweet.profileImageUrl}
-                                      alt={`${tweet.userNickname} 的头像`}
-                                      className="h-8 w-8 rounded-full object-cover border border-gray-200"
-                                      onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        const parent = target.parentElement!;
-                                        parent.innerHTML = '<div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center"><span class="text-blue-600 text-sm">🐦</span></div>';
-                                      }}
-                                      style={{
-                                        minHeight: '32px',
-                                        minWidth: '32px',
-                                        backgroundColor: '#dbeafe'
-                                      }}
-                                    />
-                                  ) : (
-                                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                      <span className="text-blue-600 text-sm">🐦</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium text-gray-900">
-                                    {tweet.userNickname}
-                                  </p>
-                                  <p className="text-sm text-gray-500">
-                                    @{tweet.userUsername}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                {/* 推文类型标识 */}
-                                {tweet.isRT && (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                                    🔄 转推
-                                  </span>
-                                )}
-                                {tweet.isReply && (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                    💬 回复
-                                  </span>
-                                )}
-                                
-                                <a
-                                  href={tweet.tweetUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-800 text-sm"
-                                >
-                                  查看原文
-                                </a>
-                                <button
-                                  onClick={() => handleDeleteTweet(tweet.id)}
-                                  disabled={deleteTweet.isPending}
-                                  className="text-red-600 hover:text-red-800 text-sm disabled:opacity-50"
-                                >
-                                  隐藏
-                                </button>
-                              </div>
-                            </div>
-                            <div className="mt-2">
-                              <p className="text-sm text-gray-900">
-                                {expandedTweets.includes(tweet.id) ? tweet.content : truncateText(tweet.content)}
-                              </p>
-                              {tweet.content.length > 100 && (
-                                <button 
-                                  onClick={() => handleToggleExpand(tweet.id)}
-                                  className="text-blue-600 hover:text-blue-800 text-sm mt-1"
-                                >
-                                  {expandedTweets.includes(tweet.id) ? '收起' : '展开全文'}
-                                </button>
-                              )}
-                            </div>
-                            <div className="mt-3 flex items-center justify-between">
-                              <div className="flex items-center space-x-6 text-sm text-gray-500">
-                                <span className="flex items-center">
-                                  💬 {tweet.replyCount}
-                                </span>
-                                <span className="flex items-center">
-                                  🔄 {tweet.retweetCount}
-                                </span>
-                                <span className="flex items-center">
-                                  👍 {tweet.likeCount}
-                                </span>
-                                {tweet.viewCount && (
-                                  <span className="flex items-center">
-                                    👁️ {tweet.viewCount}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                <span>发布: {formatDate(new Date(tweet.publishedAt).toISOString())}</span>
-                                <span className="ml-4">采集: {formatDate(tweet.createdAt)}</span>
-                              </div>
-                            </div>
-                            {/* 推文配图展示 */}
-                            {tweet.imageUrls && tweet.imageUrls.length > 0 && (
-                              <div className="mt-3">
-                                <p className="text-sm text-gray-500 mb-2">
-                                  📸 推文配图 ({tweet.imageUrls.length} 张):
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {tweet.imageUrls.slice(0, 6).map((image: string, index: number) => (
-                                    <div key={index} className="relative bg-gray-100 rounded border border-gray-300 overflow-hidden">
-                                      <img
-                                        src={image}
-                                        alt={`推文图片 ${index + 1}`}
-                                        className="w-20 h-20 object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                                        onClick={() => window.open(image, '_blank')}
-                                        onError={(e) => {
-                                          const target = e.target as HTMLImageElement;
-                                          const parent = target.parentElement!;
-                                          parent.innerHTML = `<div class="w-20 h-20 flex items-center justify-center text-xs text-gray-500 cursor-pointer" onclick="window.open('${image}', '_blank')">图片加载失败<br/>点击查看</div>`;
-                                        }}
-                                        loading="lazy"
-                                        style={{
-                                          minHeight: '80px',
-                                          minWidth: '80px',
-                                          backgroundColor: '#f3f4f6'
-                                        }}
-                                      />
-                                    </div>
-                                  ))}
-                                  {tweet.imageUrls.length > 6 && (
-                                    <div className="w-20 h-20 bg-gray-100 rounded border border-gray-300 flex items-center justify-center text-xs text-gray-500">
-                                      +{tweet.imageUrls.length - 6}<br/>张图片
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                            {/* 视频内容展示 */}
-                            {tweet.videoUrls && (
-                              <div className="mt-3">
-                                <p className="text-sm text-gray-500 mb-2">
-                                  🎬 视频内容:
-                                </p>
-                                <div className="bg-gray-50 rounded-lg p-3 space-y-3">
-                                  {tweet.videoUrls.preview && (
-                                    <div>
-                                      <p className="text-xs text-gray-600 mb-2 font-medium">📸 视频预览图:</p>
-                                      <div className="relative inline-block bg-gray-100 rounded border border-gray-300 overflow-hidden">
-                                        <img
-                                          src={tweet.videoUrls.preview}
-                                          alt="视频预览"
-                                          className="w-48 h-32 object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                                          onClick={() => window.open(tweet.videoUrls.preview, '_blank')}
-                                          onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
-                                            const parent = target.parentElement!;
-                                            parent.innerHTML = `<div class="w-48 h-32 flex items-center justify-center text-sm text-gray-500 cursor-pointer" onclick="window.open('${tweet.videoUrls.preview}', '_blank')">🎬<br/>预览图加载失败<br/>点击查看原图</div><div class="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">🎥 视频</div>`;
-                                          }}
-                                          loading="lazy"
-                                          style={{
-                                            minHeight: '128px',
-                                            minWidth: '192px',
-                                            backgroundColor: '#f3f4f6'
-                                          }}
-                                        />
-                                        <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
-                                          🎥 视频
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                  
-                                  {tweet.videoUrls.video && (
-                                    <div>
-                                      <p className="text-xs text-gray-600 mb-2 font-medium">🔗 视频文件:</p>
-                                      <div className="bg-white rounded-md p-2 border border-gray-200">
-                                        <div className="flex items-center space-x-2">
-                                          <span className="text-sm text-gray-700 flex-1 break-all">
-                                            {tweet.videoUrls.video.length > 80 
-                                              ? `${tweet.videoUrls.video.substring(0, 80)}...` 
-                                              : tweet.videoUrls.video}
-                                          </span>
-                                          <div className="flex space-x-1">
-                                            <a
-                                              href={tweet.videoUrls.video}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-                                            >
-                                              📱 播放
-                                            </a>
-                                            <button
-                                              onClick={() => navigator.clipboard?.writeText(tweet.videoUrls.video)}
-                                              className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                                            >
-                                              📋 复制
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                  
-                                  {/* 视频信息摘要 */}
-                                  <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-200">
-                                    <span>
-                                      {tweet.videoUrls.preview && tweet.videoUrls.video 
-                                        ? "✅ 预览图和视频文件已采集" 
-                                        : tweet.videoUrls.preview 
-                                        ? "⚠️ 仅采集到预览图" 
-                                        : "⚠️ 仅采集到视频文件"}
-                                    </span>
-                                    {tweet.videoUrls.video?.includes('.mp4') && (
-                                      <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                                        MP4 格式
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <div className="px-4 py-8 text-center text-gray-500">
-                <div className="text-4xl mb-4">🐦</div>
-                <p>暂无推文数据</p>
-                <p className="text-sm mt-2">
-                  {searchQuery ? '未找到匹配的推文' : '请先创建爬取任务来获取推文数据'}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* 分页 */}
-          {tweetsQuery.data?.data?.hasMore && (
-            <div className="mt-6 flex justify-center">
-              <button
-                onClick={() => setCurrentPage(prev => prev + 1)}
-                disabled={tweetsQuery.isPending}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                加载更多
-              </button>
-            </div>
-          )}
-
-          {/* 统计信息 */}
-          {tweetsQuery.data?.data?.total && (
-            <div className="mt-6 text-center text-sm text-gray-500">
-              共 {tweetsQuery.data.data.total} 条推文
-              {selectedTweets.length > 0 && (
-                <span className="ml-2">，已选择 {selectedTweets.length} 条</span>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+  const headerActions = (
+    <div className="flex items-center space-x-3">
+      <button
+        onClick={handleExportCSV}
+        disabled={exportTweets.isPending}
+        className="inline-flex items-center px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        <span className="mr-2">📥</span>
+        {exportTweets.isPending ? '导出中...' : '导出CSV'}
+      </button>
+      {selectedTweets.length > 0 && (
+        <button
+          onClick={handleBatchDelete}
+          disabled={batchDeleteTweets.isPending}
+          className="inline-flex items-center px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <span className="mr-2">🗑️</span>
+          {batchDeleteTweets.isPending ? '删除中...' : `删除选中 (${selectedTweets.length})`}
+        </button>
+      )}
     </div>
   );
-} 
+
+  return (
+    <DashboardLayout actions={headerActions}>
+      {/* 搜索和操作区域 */}
+      <div className="mb-6 bg-white shadow rounded-lg p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex-1 max-w-lg">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              placeholder="搜索推文内容、用户名..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={handleSearch}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            >
+              搜索
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 推文列表 */}
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
+              推文列表
+            </h3>
+            <div className="flex items-center space-x-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={selectedTweets.length === tweetsQuery.data?.data?.tweets?.length && tweetsQuery.data?.data?.tweets?.length > 0}
+                  onChange={handleSelectAll}
+                  className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                />
+                <span className="ml-2 text-sm text-gray-700">全选</span>
+              </label>
+              {selectedTweets.length > 0 && (
+                <span className="text-sm text-gray-500">
+                  已选择 {selectedTweets.length} 条
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 表格 */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  选择
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  用户
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  推文内容
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  发布时间
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  统计数据
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  操作
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {tweetsQuery.data?.data?.tweets?.map((tweet: any) => (
+                <tr key={tweet.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={selectedTweets.includes(tweet.id)}
+                      onChange={() => handleSelectTweet(tweet.id)}
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10">
+                        {tweet.profileImageUrl ? (
+                          <img
+                            className="h-10 w-10 rounded-full"
+                            src={tweet.profileImageUrl}
+                            alt={tweet.userNickname}
+                          />
+                        ) : (
+                          <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                            <span className="text-gray-600 text-sm">
+                              {tweet.userNickname?.[0] || '?'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {tweet.userNickname}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          @{tweet.userUsername}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900 max-w-md">
+                      {expandedTweets.includes(tweet.id) ? (
+                        <div>
+                          {tweet.content}
+                          <button
+                            onClick={() => handleToggleExpand(tweet.id)}
+                            className="ml-2 text-blue-600 hover:text-blue-800"
+                          >
+                            收起
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          {truncateText(tweet.content)}
+                          {tweet.content.length > 100 && (
+                            <button
+                              onClick={() => handleToggleExpand(tweet.id)}
+                              className="ml-2 text-blue-600 hover:text-blue-800"
+                            >
+                              展开
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {tweet.url && (
+                      <a
+                        href={tweet.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        查看原推文 ↗
+                      </a>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {formatDate(tweet.publishedAt)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div className="space-y-1">
+                      <div>❤️ {tweet.likeCount || 0}</div>
+                      <div>🔄 {tweet.retweetCount || 0}</div>
+                      <div>💬 {tweet.replyCount || 0}</div>
+                      <div>👁️ {tweet.viewCount || 0}</div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
+                      onClick={() => handleDeleteTweet(tweet.id)}
+                      disabled={deleteTweet.isPending}
+                      className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                    >
+                      隐藏
+                    </button>
+                  </td>
+                </tr>
+              )) || (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    {tweetsQuery.isLoading ? '加载中...' : '暂无推文数据'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 分页 */}
+        {tweetsQuery.data?.data?.tweets && tweetsQuery.data.data.tweets.length > 0 && (
+          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+            <div className="flex-1 flex justify-between sm:hidden">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                上一页
+              </button>
+              <button
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={!tweetsQuery.data?.data?.hasMore}
+                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                下一页
+              </button>
+            </div>
+            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  显示第 <span className="font-medium">{(currentPage - 1) * 10 + 1}</span> 到{' '}
+                  <span className="font-medium">
+                    {Math.min(currentPage * 10, tweetsQuery.data?.data?.total || 0)}
+                  </span>{' '}
+                  条，共 <span className="font-medium">{tweetsQuery.data?.data?.total || 0}</span> 条结果
+                  {selectedTweets.length > 0 && (
+                    <span className="ml-2">，已选择 {selectedTweets.length} 条</span>
+                  )}
+                </p>
+              </div>
+              <div>
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    上一页
+                  </button>
+                  <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                    {currentPage}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={!tweetsQuery.data?.data?.hasMore}
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    下一页
+                  </button>
+                </nav>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}

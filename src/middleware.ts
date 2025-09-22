@@ -7,8 +7,8 @@ const protectedPaths = ['/dashboard', '/tasks', '/tweets', '/extracts', '/tweet-
 // 仅admin可访问的路径
 const adminOnlyPaths = ['/dashboard', '/tasks', '/tweets', '/extracts', '/tweet-processing', '/x-login'];
 
-// 仅viewer可访问的路径
-const viewerOnlyPaths = ['/viewer'];
+// 仅viewer可访问的路径（admin也可以访问）
+const viewerAccessPaths = ['/viewer'];
 
 // 公开路径（不需要认证）
 const publicPaths = ['/login', '/api/health', '/api/external'];
@@ -52,9 +52,9 @@ export function middleware(request: NextRequest) {
       // 检查角色权限
       const userRole = auth.role;
       const isAdminOnlyPath = adminOnlyPaths.some(path => pathname.startsWith(path));
-      const isViewerOnlyPath = viewerOnlyPaths.some(path => pathname.startsWith(path));
+      const isViewerAccessPath = viewerAccessPaths.some(path => pathname.startsWith(path));
 
-      console.log(`[Middleware] Role check:`, { userRole, isAdminOnlyPath, isViewerOnlyPath });
+      console.log(`[Middleware] Role check:`, { userRole, isAdminOnlyPath, isViewerAccessPath });
 
       // 如果role未定义或无效，清除认证并重定向到登录页
       if (!userRole || (userRole !== 'admin' && userRole !== 'viewer')) {
@@ -65,6 +65,7 @@ export function middleware(request: NextRequest) {
         return response;
       }
 
+      // 只有admin可以访问的路径
       if (isAdminOnlyPath && userRole !== 'admin') {
         // viewer用户访问admin页面，重定向到viewer页面
         console.log(`[Middleware] Non-admin accessing admin path, redirecting to viewer`);
@@ -72,7 +73,8 @@ export function middleware(request: NextRequest) {
         return NextResponse.redirect(viewerUrl);
       }
 
-      if (isViewerOnlyPath && userRole !== 'viewer' && userRole !== 'admin') {
+      // viewer访问路径：admin和viewer都可以访问
+      if (isViewerAccessPath && userRole !== 'viewer' && userRole !== 'admin') {
         // 这个条件现在不应该触发，因为上面已经检查了role的有效性
         console.log(`[Middleware] Invalid role for viewer path, redirecting to login`);
         const loginUrl = new URL('/login', request.url);
