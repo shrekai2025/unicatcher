@@ -175,7 +175,15 @@ export default function ViewerPage() {
   // 删除推文
   const deleteTweet = api.tweets.delete.useMutation({
     onSuccess: () => {
-      refetch();
+      // 保存当前滚动位置
+      const scrollY = window.scrollY;
+      
+      refetch().then(() => {
+        // 恢复滚动位置
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollY);
+        });
+      });
     },
   });
 
@@ -332,13 +340,13 @@ export default function ViewerPage() {
             </div>
           )}
 
-          {/* 隐藏按钮 */}
+          {/* 删除按钮 */}
           <button
             onClick={() => handleDelete(card.tweetId)}
-            className="absolute top-2 right-12 bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-2 right-12 bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded transition-colors"
             disabled={deleteTweet.isPending}
           >
-            隐藏
+            {deleteTweet.isPending ? '...' : '删除'}
           </button>
 
           {/* Hover显示用户信息 */}
@@ -393,10 +401,11 @@ export default function ViewerPage() {
                 e.stopPropagation();
                 handleDelete(card.tweetId);
               }}
-              className="text-red-500 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 flex-shrink-0"
+              className="text-red-500 hover:text-red-600 transition-colors p-1 flex-shrink-0"
               disabled={deleteTweet.isPending}
+              title="删除推文"
             >
-              ✕
+              {deleteTweet.isPending ? '⏳' : '🗑️'}
             </button>
           </div>
           
@@ -510,10 +519,11 @@ export default function ViewerPage() {
                     e.stopPropagation();
                     handleDelete(card.tweetId);
                   }}
-                  className="text-red-500 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 flex-shrink-0"
+                  className="text-red-500 hover:text-red-600 transition-colors p-1 flex-shrink-0"
                   disabled={deleteTweet.isPending}
+                  title="删除推文"
                 >
-                  ✕
+                  {deleteTweet.isPending ? '⏳' : '🗑️'}
                 </button>
               </div>
               
