@@ -114,26 +114,7 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
-    // 创建处理记录
-    const processRecord = await db.aIProcessRecord.create({
-      data: {
-        batchId,
-        status: 'processing',
-        totalTweets,
-        filterConfig: JSON.stringify({
-          listIds: validatedData.listIds,
-          usernames: validatedData.usernames,
-          publishedAfter: validatedData.publishedAfter,
-          isExtracted: validatedData.isExtracted,
-        }),
-        aiProvider: validatedData.aiConfig.provider,
-        aiModel: validatedData.aiConfig.model,
-        systemPrompt: validatedData.systemPrompt,
-        batchProcessingMode: validatedData.batchProcessingMode,
-      },
-    });
-
-    // 启动批处理任务
+    // 启动批处理任务（这会内部检查全局状态并创建记录）
     await processManager.startBatchProcess({
       batchId,
       filterConfig: {

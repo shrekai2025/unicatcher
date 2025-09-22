@@ -11,7 +11,7 @@ const adminOnlyPaths = ['/dashboard', '/tasks', '/tweets', '/extracts', '/tweet-
 const viewerOnlyPaths = ['/viewer'];
 
 // 公开路径（不需要认证）
-const publicPaths = ['/login', '/api/health', '/api/external', '/debug-auth'];
+const publicPaths = ['/login', '/api/health', '/api/external'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

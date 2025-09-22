@@ -117,6 +117,7 @@ export class AIProcessManager {
     const { batchId, filterConfig, batchSize, batchProcessingMode = 'optimized', systemPrompt, aiConfig } = config;
 
     console.log(`[AI处理] 启动批处理任务: ${batchId}, 模式: ${batchProcessingMode}, 批次大小: ${batchSize}`);
+    console.log(`[AI处理] 任务配置详情: `, { aiConfig: { ...aiConfig, apiKey: '***' }, filterConfig });
 
     // 检查全局是否已有任务在运行
     const globalState = await this.isGlobalProcessing();
@@ -133,6 +134,20 @@ export class AIProcessManager {
     this.globalProcessingLock = true;
     this.currentGlobalBatchId = batchId;
 
+    // 创建处理记录
+    const processRecord = await db.aIProcessRecord.create({
+      data: {
+        batchId,
+        status: 'processing',
+        totalTweets: 0, // 先设为0，后面会更新
+        filterConfig: JSON.stringify(filterConfig),
+        aiProvider: aiConfig.provider,
+        aiModel: aiConfig.model,
+        systemPrompt: systemPrompt,
+        batchProcessingMode: batchProcessingMode,
+      },
+    });
+
     // 创建取消控制器
     let cancelled = false;
     const cancel = () => {
@@ -147,15 +162,21 @@ export class AIProcessManager {
     ).catch(async (error) => {
       console.error(`[AI处理] 批处理任务失败: ${batchId}`, error);
       
-      // 更新数据库状态
-      await db.aIProcessRecord.update({
-        where: { batchId },
-        data: {
-          status: 'failed',
-          errorMessage: error.message,
-          completedAt: new Date(),
-        },
-      });
+      // 更新数据库状态（确保一定执行）
+      try {
+        await db.aIProcessRecord.update({
+          where: { batchId },
+          data: {
+            status: 'failed',
+            errorMessage: error.message,
+            completedAt: new Date(),
+          },
+        });
+        console.log(`[AI处理] 数据库状态已更新为失败: ${batchId}`);
+      } catch (dbError) {
+        console.error(`[AI处理] 更新数据库状态失败: ${batchId}`, dbError);
+        // 即使数据库更新失败，也要继续执行，确保内存状态被清理
+      }
       
       throw error;
     }).finally(() => {
@@ -170,8 +191,9 @@ export class AIProcessManager {
     this.activeProcesses.set(batchId, { cancel, promise });
 
     // 不等待完成，直接返回
-    promise.catch(() => {
-      // 错误已在上面处理，这里防止 unhandled rejection
+    promise.catch((error) => {
+      // 确保所有异常都被记录，不能静默忽略
+      console.error(`[AI处理] 未处理的任务异常: ${batchId}`, error);
     });
   }
 
@@ -239,11 +261,14 @@ export class AIProcessManager {
     const { batchId, filterConfig, batchSize, batchProcessingMode = 'optimized', systemPrompt, aiConfig } = config;
 
     try {
+      console.log(`[AI处理] 步骤1: 创建 OpenAI 服务实例 - ${batchId}`);
       // 创建 OpenAI 服务实例
       const aiService = new OpenAIService(aiConfig);
 
+      console.log(`[AI处理] 步骤2: 验证 AI 配置 - ${batchId}`);
       // 验证 AI 配置
       const isValidConfig = await aiService.validateConfig();
+      console.log(`[AI处理] 步骤2结果: 配置验证${isValidConfig ? '成功' : '失败'} - ${batchId}`);
       if (!isValidConfig) {
         throw new Error('AI 配置验证失败，请检查 API Key 是否正确');
       }
@@ -298,6 +323,13 @@ export class AIProcessManager {
         console.log(`[AI处理] 任务被取消: ${batchId}`);
         return;
       }
+
+      // 先获取总数并更新记录
+      const totalCount = await db.tweet.count({ where });
+      await db.aIProcessRecord.update({
+        where: { batchId },
+        data: { totalTweets: totalCount },
+      });
 
       // 获取一批推文进行处理
       const tweets = await db.tweet.findMany({
