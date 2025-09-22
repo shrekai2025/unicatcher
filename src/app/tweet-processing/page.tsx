@@ -346,8 +346,10 @@ export default function TweetProcessingPage() {
     onSuccess: (data) => {
       console.log('[前台] ✅ AI批量处理任务启动成功:', {
         批次ID: data.batchId,
-        记录ID: data.recordId,
         总推文数: data.totalTweets,
+        批次大小: data.batchSize,
+        预估批次数: data.estimatedBatches,
+        处理模式: data.mode,
       });
       setCurrentBatchId(data.batchId);
       setIsProcessing(true);
