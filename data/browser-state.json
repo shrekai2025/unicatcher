@@ -5,7 +5,7 @@
       "value": "v1%3A175334063137680436",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1793032987.761694,
+      "expires": 1793120171.335753,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
@@ -15,7 +15,7 @@
       "value": "v1%3A175334063137680436",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1793032987.761651,
+      "expires": 1793120171.335713,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
@@ -125,7 +125,7 @@
       "value": "u%3D1097029752966266880",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1790008987.761757,
+      "expires": 1790096171.335772,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
@@ -135,7 +135,7 @@
       "value": "fd7381e13e9646e6aa4adedc74324a07",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1793032986,
+      "expires": 1793120170,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"
@@ -152,20 +152,10 @@
     },
     {
       "name": "__cf_bm",
-      "value": "icKh.r5YinhhSJfInroDiJcqhorWeD5Z.rl4Jdx5fz0-1758472988-1.0.1.1-LK1W3yfGhWisvafBUM5gyeMYDgUaRFtJg2QbCy1xooryT2NRbdb74b2qiICurtP.zZqRnTb.iXYkeqedO8z52Cqfi2n71tP..8OTIeu4Ys0",
-      "domain": ".twitter.com",
-      "path": "/",
-      "expires": 1758474788.247866,
-      "httpOnly": true,
-      "secure": true,
-      "sameSite": "None"
-    },
-    {
-      "name": "__cf_bm",
-      "value": "COO2ifjW1_WGNCui3F.rTv6rijVgy.AqZer4u4Sc3ck-1758472988-1.0.1.1-.V5hUrUqAshwwdZ.aUE6KHyLqyj1qsISr_Equf6murJAdbApznT8lOXHLQBgEA0cZ2EM2z8hdXyrGgO8vmdCQgzN146bGpsBElS44fAAaBg",
+      "value": "ZpgFof6vOG9I_OQGXk0sbW32e6y09AKcQfDNF.x9Ojs-1758560172-1.0.1.1-5oxkYq4fBWeS13.5koYQpf7.qE.zO3QsXrYaxX_o3NBxVdRUEdWUP4N4pXUTqDHDervprrU2cYGWLKl0AIiqObPeX5GCXH2lC3yVEUz6yms",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1758474788.721964,
+      "expires": 1758561972.449992,
       "httpOnly": true,
       "secure": true,
       "sameSite": "None"

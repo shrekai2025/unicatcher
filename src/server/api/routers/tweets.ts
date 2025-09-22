@@ -439,6 +439,7 @@ export const tweetsRouter = createTRPCRouter({
         listIds: z.array(z.string()).optional(), // 支持多个listId
         page: z.number().int().min(1).default(1),
         limit: z.number().int().min(1).max(100).default(100),
+        excludeUnprocessed: z.boolean().default(true), // 排除未经AI处理的推文
       })
     )
     .query(async ({ input }) => {
@@ -447,7 +448,8 @@ export const tweetsRouter = createTRPCRouter({
         const result = await storageService.getTweetsByListIds(
           input.listIds,
           1,
-          10000 // 先获取大量数据，然后处理成媒体卡片
+          10000, // 先获取大量数据，然后处理成媒体卡片
+          input.excludeUnprocessed
         );
 
         // 将推文转换为媒体卡片数据

@@ -39,6 +39,7 @@ export default function ViewerPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'masonry' | 'compact' | 'compact-image'>('masonry');
+  const [excludeUnprocessed, setExcludeUnprocessed] = useState(true); // 默认勾选，排除未经AI处理的推文
   const [isMounted, setIsMounted] = useState(false);
   
   // 浮动播放器状态
@@ -66,6 +67,11 @@ export default function ViewerPage() {
       setListId(savedListId);
     }
 
+    const savedExcludeUnprocessed = localStorage.getItem('viewer-excludeUnprocessed');
+    if (savedExcludeUnprocessed !== null) {
+      setExcludeUnprocessed(savedExcludeUnprocessed === 'true');
+    }
+
     // 从本地存储加载选中的数据库ListId记录
     const savedSelectedDbListIds = localStorage.getItem('viewer-selectedDbListIds');
     if (savedSelectedDbListIds) {
@@ -84,6 +90,13 @@ export default function ViewerPage() {
       localStorage.setItem('viewer-viewMode', viewMode);
     }
   }, [viewMode, isMounted]);
+
+  // 保存excludeUnprocessed到本地存储
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem('viewer-excludeUnprocessed', excludeUnprocessed.toString());
+    }
+  }, [excludeUnprocessed, isMounted]);
 
   // 保存listId到本地存储（延迟保存，避免频繁写入）
   useEffect(() => {
@@ -145,6 +158,7 @@ export default function ViewerPage() {
     listIds: effectiveListIds,
     page: currentPage,
     limit: 100,
+    excludeUnprocessed,
   });
 
   // 创建listId记录
@@ -633,6 +647,19 @@ export default function ViewerPage() {
                   <span>🖼️</span>
                   <span className="hidden lg:inline">紧凑图</span>
                 </button>
+              </div>
+              
+              {/* AI处理状态筛选 */}
+              <div className="flex items-center gap-2 pl-3 border-l border-gray-300">
+                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={excludeUnprocessed}
+                    onChange={(e) => setExcludeUnprocessed(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  />
+                  <span className="select-none">排除未经AI处理</span>
+                </label>
               </div>
             </div>
           </div>

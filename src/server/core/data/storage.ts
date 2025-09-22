@@ -356,7 +356,8 @@ export class StorageService {
   async getTweetsByListIds(
     listIds?: string[],
     page = 1,
-    limit = 20
+    limit = 20,
+    excludeUnprocessed = false
   ): Promise<{
     tweets: any[];
     total: number;
@@ -371,6 +372,11 @@ export class StorageService {
       // 如果提供了listIds数组且不为空，则添加IN查询条件
       if (listIds && listIds.length > 0) {
         where.listId = { in: listIds };
+      }
+
+      // 如果需要排除未经AI处理的推文
+      if (excludeUnprocessed) {
+        where.aiProcessStatus = 'completed';
       }
 
       const skip = (page - 1) * limit;
