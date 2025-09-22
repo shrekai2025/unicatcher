@@ -173,4 +173,128 @@ export const systemRouter = createTRPCRouter({
         );
       }
     }),
+
+  /**
+   * 获取数据分析统计
+   */
+  getAnalyticsStats: protectedProcedure
+    .input(
+      z.object({
+        timeRange: z.enum(['12h', '24h', '7d', '30d']).default('30d'),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        // 计算时间范围
+        const now = new Date();
+        const timeRangeHours = {
+          '12h': 12,
+          '24h': 24,
+          '7d': 24 * 7,
+          '30d': 24 * 30,
+        };
+        
+        const startTime = new Date(now.getTime() - timeRangeHours[input.timeRange] * 60 * 60 * 1000);
+        const startTimestamp = BigInt(startTime.getTime());
+
+        // 查询符合条件的推文
+        const tweets = await db.tweet.findMany({
+          where: {
+            isDeleted: false,
+            isValueless: { not: true }, // 排除无价值推文
+            publishedAt: { gte: startTimestamp },
+            aiProcessStatus: 'completed', // 只统计已完成AI处理的推文
+          },
+          select: {
+            keywords: true,
+            topicTags: true,
+            contentTypes: true,
+          },
+        });
+
+        // 统计关键词
+        const keywordMap = new Map<string, number>();
+        tweets.forEach(tweet => {
+          if (tweet.keywords) {
+            try {
+              const keywords = JSON.parse(tweet.keywords) as string[];
+              keywords.forEach(keyword => {
+                if (keyword && keyword.trim()) {
+                  const normalizedKeyword = keyword.trim();
+                  keywordMap.set(normalizedKeyword, (keywordMap.get(normalizedKeyword) || 0) + 1);
+                }
+              });
+            } catch (error) {
+              // 忽略无法解析的JSON
+            }
+          }
+        });
+
+        // 统计内容类型
+        const contentTypeMap = new Map<string, number>();
+        tweets.forEach(tweet => {
+          if (tweet.contentTypes) {
+            try {
+              const contentTypes = JSON.parse(tweet.contentTypes) as string[];
+              contentTypes.forEach(type => {
+                if (type && type.trim()) {
+                  const normalizedType = type.trim();
+                  contentTypeMap.set(normalizedType, (contentTypeMap.get(normalizedType) || 0) + 1);
+                }
+              });
+            } catch (error) {
+              // 忽略无法解析的JSON
+            }
+          }
+        });
+
+        // 统计主题标签
+        const topicTagMap = new Map<string, number>();
+        tweets.forEach(tweet => {
+          if (tweet.topicTags) {
+            try {
+              const topicTags = JSON.parse(tweet.topicTags) as string[];
+              topicTags.forEach(tag => {
+                if (tag && tag.trim()) {
+                  const normalizedTag = tag.trim();
+                  topicTagMap.set(normalizedTag, (topicTagMap.get(normalizedTag) || 0) + 1);
+                }
+              });
+            } catch (error) {
+              // 忽略无法解析的JSON
+            }
+          }
+        });
+
+        // 转换为数组并排序
+        const keywords = Array.from(keywordMap.entries())
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10); // 只取前10名
+
+        const contentTypes = Array.from(contentTypeMap.entries())
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count);
+
+        const topicTags = Array.from(topicTagMap.entries())
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count);
+
+        return {
+          success: true,
+          data: {
+            timeRange: input.timeRange,
+            lastUpdated: now.toISOString(),
+            totalTweets: tweets.length,
+            keywords,
+            contentTypes,
+            topicTags,
+          },
+        };
+      } catch (error) {
+        throw new Error(
+          error instanceof Error ? error.message : "获取统计数据失败"
+        );
+      }
+    }),
 }); 
