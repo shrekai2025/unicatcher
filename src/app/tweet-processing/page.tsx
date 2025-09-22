@@ -367,6 +367,45 @@ export default function TweetProcessingPage() {
     },
   });
 
+  // 清理状态
+  const [isClearingTasks, setIsClearingTasks] = useState(false);
+
+  // 清理AI批处理任务
+  const clearAITasks = async () => {
+    if (!confirm('🗑️ 确定要清理所有AI批处理任务吗？\n\n这将强制停止所有正在运行的任务并清理状态。')) {
+      return;
+    }
+
+    setIsClearingTasks(true);
+    try {
+      const response = await fetch('/api/external/ai-batch/reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'unicatcher-api-key-demo',
+        },
+        body: JSON.stringify({ force: true }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('[前台] ✅ AI批处理任务清理成功:', result);
+        setIsProcessing(false);
+        setCurrentBatchId(null);
+        alert('✅ AI批处理任务已清理完成！');
+      } else {
+        console.error('[前台] ❌ AI批处理任务清理失败:', result);
+        alert('❌ 清理失败: ' + result.error);
+      }
+    } catch (error) {
+      console.error('[前台] ❌ AI批处理任务清理异常:', error);
+      alert('❌ 清理异常: ' + (error instanceof Error ? error.message : '未知错误'));
+    } finally {
+      setIsClearingTasks(false);
+    }
+  };
+
   // 处理筛选
   const handleFilter = () => {
     setCurrentPage(1);
@@ -979,6 +1018,14 @@ export default function TweetProcessingPage() {
                   className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
                   状态
+                </button>
+                <button
+                  onClick={clearAITasks}
+                  disabled={isClearingTasks}
+                  className="px-3 py-1 text-sm bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-300"
+                  title="清理所有AI批处理任务，解决任务卡住问题"
+                >
+                  {isClearingTasks ? '清理中...' : '🗑️ 清理'}
                 </button>
               </div>
             </div>
