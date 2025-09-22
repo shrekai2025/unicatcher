@@ -2,12 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { FloatingVideoPlayer } from '~/components/floating-video-player';
-import { PresetModal } from '~/components/preset-modal';
-import { PresetButton } from '~/components/preset-button';
 import { api } from '~/trpc/react';
 import { formatCount } from '~/lib/format';
 import { getSession } from '~/lib/simple-auth';
-import { PresetManager, type FilterPreset } from '~/lib/preset-manager';
 
 interface MediaCard {
   id: string;
@@ -47,16 +44,16 @@ export default function ViewerPage() {
   // 浮动播放器状态
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
   const [currentVideo, setCurrentVideo] = useState<VideoData | null>(null);
-  
-  // 预制功能状态
-  const [presets, setPresets] = useState<FilterPreset[]>([]);
-  const [selectedPresets, setSelectedPresets] = useState<FilterPreset[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // 数据库中的listId记录
+  const [dbListIds, setDbListIds] = useState<{id: string, listId: string, name: string}[]>([]);
+  const [selectedDbListIds, setSelectedDbListIds] = useState<{id: string, listId: string, name: string}[]>([]);
+  const [showAddListIdForm, setShowAddListIdForm] = useState(false);
+  const [newListIdForm, setNewListIdForm] = useState({ listId: '', name: '' });
 
   // 初始化组件并加载本地存储的设置
   useEffect(() => {
     setIsMounted(true);
-    setPresets(PresetManager.getPresets());
     
     // 从本地存储加载设置
     const savedViewMode = localStorage.getItem('viewer-viewMode') as 'masonry' | 'compact' | 'compact-image';
@@ -69,14 +66,14 @@ export default function ViewerPage() {
       setListId(savedListId);
     }
 
-    // 从本地存储加载选中的预制项目
-    const savedSelectedPresets = localStorage.getItem('viewer-selectedPresets');
-    if (savedSelectedPresets) {
+    // 从本地存储加载选中的数据库ListId记录
+    const savedSelectedDbListIds = localStorage.getItem('viewer-selectedDbListIds');
+    if (savedSelectedDbListIds) {
       try {
-        const parsedPresets = JSON.parse(savedSelectedPresets) as FilterPreset[];
-        setSelectedPresets(parsedPresets);
+        const parsedSelectedDbListIds = JSON.parse(savedSelectedDbListIds) as {id: string, listId: string, name: string}[];
+        setSelectedDbListIds(parsedSelectedDbListIds);
       } catch (error) {
-        console.error('加载选中的预制项目失败:', error);
+        console.error('加载选中的数据库ListId记录失败:', error);
       }
     }
   }, []);
@@ -103,16 +100,44 @@ export default function ViewerPage() {
     }
   }, [listId, isMounted]);
 
-  // 保存选中的预制项目到本地存储
+
+  // 获取数据库中的listId记录
+  const { data: dbListIdsData, refetch: refetchDbListIds } = api.listIds.getAll.useQuery();
+
+  // 更新数据库中的listId记录到本地状态
+  useEffect(() => {
+    if (dbListIdsData?.data) {
+      setDbListIds(dbListIdsData.data);
+      
+      // 检查本地存储的选中项是否仍然存在于数据库中，如果不存在则清理
+      if (isMounted) {
+        setSelectedDbListIds(prev => {
+          const filteredSelection = prev.filter(selected => 
+            dbListIdsData.data.some(dbItem => dbItem.id === selected.id)
+          );
+          
+          // 如果过滤后的选择与之前不同，更新本地存储
+          if (filteredSelection.length !== prev.length) {
+            localStorage.setItem('viewer-selectedDbListIds', JSON.stringify(filteredSelection));
+            return filteredSelection;
+          }
+          
+          return prev;
+        });
+      }
+    }
+  }, [dbListIdsData, isMounted]);
+
+  // 保存选中的数据库ListId记录到本地存储
   useEffect(() => {
     if (isMounted) {
-      localStorage.setItem('viewer-selectedPresets', JSON.stringify(selectedPresets));
+      localStorage.setItem('viewer-selectedDbListIds', JSON.stringify(selectedDbListIds));
     }
-  }, [selectedPresets, isMounted]);
+  }, [selectedDbListIds, isMounted]);
 
   // 计算有效的listIds
-  const effectiveListIds = selectedPresets.length > 0 
-    ? selectedPresets.map(preset => preset.listId)
+  const effectiveListIds = selectedDbListIds.length > 0 
+    ? selectedDbListIds.map(item => item.listId)
     : listId ? [listId] : undefined;
 
   // 获取媒体卡片数据
@@ -122,10 +147,30 @@ export default function ViewerPage() {
     limit: 100,
   });
 
-  // 监听预制选择变化，触发数据重新获取
+  // 创建listId记录
+  const createListId = api.listIds.create.useMutation({
+    onSuccess: () => {
+      refetchDbListIds();
+      setNewListIdForm({ listId: '', name: '' });
+      setShowAddListIdForm(false);
+    },
+  });
+
+  // 删除listId记录
+  const deleteListId = api.listIds.delete.useMutation({
+    onSuccess: () => {
+      refetchDbListIds();
+      // 从选中项中移除被删除的项
+      setSelectedDbListIds(prev => prev.filter(item => 
+        !dbListIdsData?.data.find(db => db.id === item.id)
+      ));
+    },
+  });
+
+  // 监听数据库选择变化，触发数据重新获取
   useEffect(() => {
     refetch();
-  }, [selectedPresets, refetch]);
+  }, [selectedDbListIds, refetch]);
 
   // 删除推文
   const deleteTweet = api.tweets.delete.useMutation({
@@ -136,9 +181,39 @@ export default function ViewerPage() {
 
   const handleSearch = () => {
     setCurrentPage(1);
-    // 清空预制选择，使用手动输入的listId
-    setSelectedPresets([]);
+    // 清空数据库选择，使用手动输入的listId
+    setSelectedDbListIds([]);
     refetch();
+  };
+
+  // 处理数据库listId选择
+  const handleToggleDbListId = (item: {id: string, listId: string, name: string}) => {
+    setSelectedDbListIds(prev => {
+      const isSelected = prev.some(p => p.id === item.id);
+      if (isSelected) {
+        return prev.filter(p => p.id !== item.id);
+      } else {
+        return [...prev, item];
+      }
+    });
+    setCurrentPage(1); // 重置到第一页
+  };
+
+  // 创建新的listId记录
+  const handleCreateListId = () => {
+    if (newListIdForm.listId.trim() && newListIdForm.name.trim()) {
+      createListId.mutate({
+        listId: newListIdForm.listId.trim(),
+        name: newListIdForm.name.trim(),
+      });
+    }
+  };
+
+  // 删除listId记录
+  const handleDeleteListId = (id: string) => {
+    if (confirm('确定要删除这个List ID记录吗？')) {
+      deleteListId.mutate({ id });
+    }
   };
 
   const handleDelete = async (tweetId: string) => {
@@ -178,30 +253,6 @@ export default function ViewerPage() {
     setCurrentVideo(null);
   };
 
-  // 预制管理函数
-  const handleSavePreset = (presetData: Omit<FilterPreset, 'id' | 'createdAt'>) => {
-    const newPreset = PresetManager.addPreset(presetData);
-    setPresets(PresetManager.getPresets());
-  };
-
-  const handleDeletePreset = (presetId: string) => {
-    PresetManager.deletePreset(presetId);
-    setPresets(PresetManager.getPresets());
-    // 如果删除的预制项目正在被选中，则从选中列表中移除
-    setSelectedPresets(prev => prev.filter(preset => preset.id !== presetId));
-  };
-
-  const handleTogglePreset = (preset: FilterPreset) => {
-    setSelectedPresets(prev => {
-      const isSelected = prev.some(p => p.id === preset.id);
-      if (isSelected) {
-        return prev.filter(p => p.id !== preset.id);
-      } else {
-        return [...prev, preset];
-      }
-    });
-    setCurrentPage(1); // 重置到第一页
-  };
 
   // 瀑布流卡片组件
   const MediaCardComponent = ({ card }: { card: MediaCard }) => {
@@ -525,20 +576,14 @@ export default function ViewerPage() {
                 onChange={(e) => setListId(e.target.value)}
                 placeholder="输入List ID进行过滤"
                 className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                disabled={selectedPresets.length > 0}
+                disabled={selectedDbListIds.length > 0}
               />
               <button
                 onClick={handleSearch}
-                disabled={selectedPresets.length > 0}
+                disabled={selectedDbListIds.length > 0}
                 className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-3 py-1.5 text-sm rounded transition-colors whitespace-nowrap"
               >
                 筛选
-              </button>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 text-sm rounded transition-colors whitespace-nowrap"
-              >
-                预制
               </button>
             </div>
 
@@ -582,28 +627,96 @@ export default function ViewerPage() {
             </div>
           </div>
 
-          {/* 预制项目列表 */}
-          {presets.length > 0 && (
-            <div className="border-t pt-3">
-              <div className="flex flex-wrap gap-2">
-                {presets.map((preset) => (
-                  <PresetButton
-                    key={preset.id}
-                    preset={preset}
-                    isSelected={selectedPresets.some(p => p.id === preset.id)}
-                    onToggle={handleTogglePreset}
-                    onDelete={handleDeletePreset}
+          {/* 数据库中的List ID记录 */}
+          <div className="border-t pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-700">
+                已保存的List ID
+                {isMounted && selectedDbListIds.length > 0 && (
+                  <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                    {selectedDbListIds.length} 项已选
+                  </span>
+                )}
+              </label>
+              <button
+                onClick={() => setShowAddListIdForm(!showAddListIdForm)}
+                className="text-sm px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+              >
+                {showAddListIdForm ? '取消' : '添加'}
+              </button>
+            </div>
+
+            {showAddListIdForm && (
+              <div className="mb-3 p-3 border border-gray-200 rounded bg-gray-50">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                  <input
+                    type="text"
+                    value={newListIdForm.listId}
+                    onChange={(e) => setNewListIdForm(prev => ({ ...prev, listId: e.target.value }))}
+                    placeholder="List ID（纯数字）"
+                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
-                ))}
+                  <input
+                    type="text"
+                    value={newListIdForm.name}
+                    onChange={(e) => setNewListIdForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="名称"
+                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  onClick={handleCreateListId}
+                  disabled={!newListIdForm.listId.trim() || !newListIdForm.name.trim() || createListId.isPending}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300"
+                >
+                  {createListId.isPending ? '保存中...' : '保存'}
+                </button>
               </div>
-              {selectedPresets.length > 0 && (
-                <div className="mt-2 text-xs text-gray-500">
-                  已选择 {selectedPresets.length} 个预制项目：
-                  {selectedPresets.map(p => p.name).join(', ')}
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto mb-3">
+              {dbListIds.map((item) => (
+                <div key={item.id} className="flex items-center justify-between py-2 px-3 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg shadow-sm hover:shadow-md hover:from-blue-100 hover:to-blue-200 transition-all duration-200">
+                  <div className="flex items-center space-x-2 flex-1 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={selectedDbListIds.some(p => p.id === item.id)}
+                      onChange={() => handleToggleDbListId(item)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 flex-shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-sm text-blue-900 truncate">{item.name}</div>
+                      <div className="text-xs text-blue-700 truncate">ID: {item.listId}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteListId(item.id)}
+                    disabled={deleteListId.isPending}
+                    className="p-1 text-red-600 hover:text-red-800 hover:bg-white rounded transition-colors flex-shrink-0 ml-1"
+                    title="删除"
+                  >
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2h8a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 102 0v-1a1 1 0 10-2 0v1zm4 0a1 1 0 102 0v-1a1 1 0 10-2 0v1z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              {dbListIds.length === 0 && (
+                <div className="col-span-full text-gray-500 text-center py-4 bg-gray-50 rounded border-2 border-dashed border-gray-200">
+                  <div className="text-2xl mb-2">📋</div>
+                  <div>暂无已保存的List ID</div>
+                  <div className="text-xs mt-1">点击上方"添加"创建第一个记录</div>
                 </div>
               )}
             </div>
-          )}
+            {selectedDbListIds.length > 0 && (
+              <div className="text-xs text-gray-500">
+                已选择 {selectedDbListIds.length} 个List ID：
+                {selectedDbListIds.map(p => p.name).join(', ')}
+              </div>
+            )}
+          </div>
+
         </div>
 
         {/* 加载状态 */}
@@ -719,13 +832,6 @@ export default function ViewerPage() {
             }
           `}</style>
         </div>
-
-        {/* 预制弹窗 */}
-        <PresetModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onSave={handleSavePreset}
-        />
 
         {/* 浮动视频播放器 */}
         <FloatingVideoPlayer

@@ -237,3 +237,16 @@ model AIProcessRecord {
   @@index([batchId])
   @@index([createdAt])
 }
+
+// List ID记录表 - 存储用户创建的List ID和名称
+model ListIdRecord {
+  id        String   @id @default(cuid())
+  listId    String   // Twitter List ID
+  name      String   // 用户自定义的名称
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([listId]) // 确保同一个listId不会重复
+  @@index([listId])
+  @@index([createdAt])
+}
