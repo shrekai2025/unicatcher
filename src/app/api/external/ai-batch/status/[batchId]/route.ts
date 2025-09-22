@@ -26,7 +26,10 @@ export async function GET(
       );
     }
 
-    const { batchId } = await params;
+    const { batchId: rawBatchId } = await params;
+    
+    // 🔥 修复：清理 batchId 的前后空格
+    const batchId = rawBatchId?.trim();
 
     if (!batchId) {
       return NextResponse.json(
@@ -38,7 +41,11 @@ export async function GET(
       );
     }
 
-    console.log('[AI批处理API] 查询批次状态:', batchId);
+    console.log('[AI批处理API] 查询批次状态:', {
+      原始batchId: JSON.stringify(rawBatchId),
+      清理后batchId: JSON.stringify(batchId),
+      长度对比: `${rawBatchId?.length} -> ${batchId?.length}`
+    });
 
     // 🔥 增强调试：提供详细的调试信息
     try {
