@@ -860,31 +860,36 @@ export default function TweetProcessingPage() {
                 </div>
               )}
 
-              <div className="space-y-1 max-h-48 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                 {topicTags?.map((tag) => (
-                  <div key={tag.id} className="flex items-center justify-between p-2 border border-gray-200 rounded text-sm">
+                  <div key={tag.id} className="flex items-center justify-between py-2 px-3 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg shadow-sm hover:shadow-md hover:from-blue-100 hover:to-blue-200 transition-all duration-200">
                     <div className="flex-1 min-w-0">
-                      <span className="font-medium text-sm">{tag.name}</span>
-                      {tag.description && (
-                        <span className="text-xs text-gray-500 ml-2">({tag.description})</span>
-                      )}
+                      <div className="font-semibold text-sm text-blue-900">{tag.name}</div>
                     </div>
-                    <button
-                      onClick={() => {
-                        setNewTopicTag({ name: tag.name, description: tag.description || '' });
-                        setEditingTopicTagId(tag.id);
-                        setShowTopicTagModal(true);
-                      }}
-                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 ml-2 flex-shrink-0"
-                    >
-                      编辑
-                    </button>
-                    <button
-                      onClick={() => deleteTopicTag.mutate({ id: tag.id })}
-                      className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 ml-1 flex-shrink-0"
-                    >
-                      删除
-                    </button>
+                    <div className="flex items-center space-x-1 ml-2">
+                      <button
+                        onClick={() => {
+                          setNewTopicTag({ name: tag.name, description: tag.description || '' });
+                          setEditingTopicTagId(tag.id);
+                          setShowTopicTagModal(true);
+                        }}
+                        className="p-1 text-blue-600 hover:text-blue-800 hover:bg-white rounded transition-colors"
+                        title="编辑"
+                      >
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => deleteTopicTag.mutate({ id: tag.id })}
+                        className="p-1 text-red-600 hover:text-red-800 hover:bg-white rounded transition-colors"
+                        title="删除"
+                      >
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2h8a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 102 0v-1a1 1 0 10-2 0v1zm4 0a1 1 0 102 0v-1a1 1 0 10-2 0v1z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -930,31 +935,36 @@ export default function TweetProcessingPage() {
                 </div>
               )}
 
-              <div className="space-y-1 max-h-48 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                 {contentTypes?.map((type) => (
-                  <div key={type.id} className="flex items-center justify-between p-2 border border-gray-200 rounded text-sm">
+                  <div key={type.id} className="flex items-center justify-between py-2 px-3 bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg shadow-sm hover:shadow-md hover:from-green-100 hover:to-green-200 transition-all duration-200">
                     <div className="flex-1 min-w-0">
-                      <span className="font-medium text-sm">{type.name}</span>
-                      {type.description && (
-                        <span className="text-xs text-gray-500 ml-2">({type.description})</span>
-                      )}
+                      <div className="font-semibold text-sm text-green-900">{type.name}</div>
                     </div>
-                    <button
-                      onClick={() => {
-                        setNewContentType({ name: type.name, description: type.description || '' });
-                        setEditingContentTypeId(type.id);
-                        setShowContentTypeModal(true);
-                      }}
-                      className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 ml-2 flex-shrink-0"
-                    >
-                      编辑
-                    </button>
-                    <button
-                      onClick={() => deleteContentType.mutate({ id: type.id })}
-                      className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 ml-1 flex-shrink-0"
-                    >
-                      删除
-                    </button>
+                    <div className="flex items-center space-x-1 ml-2">
+                      <button
+                        onClick={() => {
+                          setNewContentType({ name: type.name, description: type.description || '' });
+                          setEditingContentTypeId(type.id);
+                          setShowContentTypeModal(true);
+                        }}
+                        className="p-1 text-green-600 hover:text-green-800 hover:bg-white rounded transition-colors"
+                        title="编辑"
+                      >
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => deleteContentType.mutate({ id: type.id })}
+                        className="p-1 text-red-600 hover:text-red-800 hover:bg-white rounded transition-colors"
+                        title="删除"
+                      >
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2h8a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 102 0v-1a1 1 0 10-2 0v1zm4 0a1 1 0 102 0v-1a1 1 0 10-2 0v1z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1536,27 +1546,48 @@ export default function TweetProcessingPage() {
             <div>
               <h4 className="font-medium mb-3">现有主题标签</h4>
               {topicTags && topicTags.length > 0 ? (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {topicTags.map((tag) => (
-                    <div key={tag.id} className="flex items-center justify-between p-3 border border-gray-200 rounded">
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{tag.name}</div>
+                    <div key={tag.id} className="flex items-center justify-between p-3 bg-white border border-gray-300 rounded-lg shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200">
+                      <div className="flex-1 min-w-0 mr-3">
+                        <div className="font-semibold text-sm text-gray-900 truncate">{tag.name}</div>
                         {tag.description && (
-                          <div className="text-xs text-gray-500 mt-1">{tag.description}</div>
+                          <div className="text-xs text-gray-600 mt-1 line-clamp-2 leading-relaxed">{tag.description}</div>
                         )}
                       </div>
-                      <button
-                        onClick={() => deleteTopicTag.mutate({ id: tag.id })}
-                        disabled={deleteTopicTag.isPending}
-                        className="ml-3 px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-300"
-                      >
-                        删除
-                      </button>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={() => {
+                            setEditingTopicTagId(tag.id);
+                            setNewTopicTag({ name: tag.name, description: tag.description || '' });
+                          }}
+                          className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                          title="编辑"
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => deleteTopicTag.mutate({ id: tag.id })}
+                          disabled={deleteTopicTag.isPending}
+                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                          title="删除"
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2h8a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 102 0v-1a1 1 0 10-2 0v1zm4 0a1 1 0 102 0v-1a1 1 0 10-2 0v1z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-gray-500 text-center py-4">暂无主题标签</div>
+                <div className="text-gray-500 text-center py-4 bg-gray-50 rounded border-2 border-dashed border-gray-200">
+                  <div className="text-2xl mb-2">🏷️</div>
+                  <div>暂无主题标签</div>
+                  <div className="text-xs mt-1">点击上方"添加标签"创建第一个标签</div>
+                </div>
               )}
             </div>
 
@@ -1648,27 +1679,48 @@ export default function TweetProcessingPage() {
             <div>
               <h4 className="font-medium mb-3">现有内容类型</h4>
               {contentTypes && contentTypes.length > 0 ? (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {contentTypes.map((type) => (
-                    <div key={type.id} className="flex items-center justify-between p-3 border border-gray-200 rounded">
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{type.name}</div>
+                    <div key={type.id} className="flex items-center justify-between p-3 bg-white border border-gray-300 rounded-lg shadow-sm hover:shadow-md hover:border-green-300 transition-all duration-200">
+                      <div className="flex-1 min-w-0 mr-3">
+                        <div className="font-semibold text-sm text-gray-900 truncate">{type.name}</div>
                         {type.description && (
-                          <div className="text-xs text-gray-500 mt-1">{type.description}</div>
+                          <div className="text-xs text-gray-600 mt-1 line-clamp-2 leading-relaxed">{type.description}</div>
                         )}
                       </div>
-                      <button
-                        onClick={() => deleteContentType.mutate({ id: type.id })}
-                        disabled={deleteContentType.isPending}
-                        className="ml-3 px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-300"
-                      >
-                        删除
-                      </button>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={() => {
+                            setEditingContentTypeId(type.id);
+                            setNewContentType({ name: type.name, description: type.description || '' });
+                          }}
+                          className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                          title="编辑"
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => deleteContentType.mutate({ id: type.id })}
+                          disabled={deleteContentType.isPending}
+                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                          title="删除"
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2h8a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 102 0v-1a1 1 0 10-2 0v1zm4 0a1 1 0 102 0v-1a1 1 0 10-2 0v1z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-gray-500 text-center py-4">暂无内容类型</div>
+                <div className="text-gray-500 text-center py-4 bg-gray-50 rounded border-2 border-dashed border-gray-200">
+                  <div className="text-2xl mb-2">📂</div>
+                  <div>暂无内容类型</div>
+                  <div className="text-xs mt-1">点击上方"添加类型"创建第一个类型</div>
+                </div>
               )}
             </div>
 
