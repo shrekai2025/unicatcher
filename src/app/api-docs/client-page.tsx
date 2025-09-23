@@ -2207,6 +2207,169 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: unicatcher-api-key-demo" \\
   -d '{"force": true}'`
+  },
+
+  // 翻译接口
+  {
+    id: 'translate-text',
+    method: 'POST',
+    path: '/api/tweet-processor/translate',
+    title: '独立翻译接口',
+    description: '对任意文本进行AI翻译，不涉及数据库存储',
+    params: [
+      {
+        name: 'content',
+        type: 'string',
+        required: true,
+        description: '需要翻译的文本内容',
+        example: 'Hello world! This is a test message.'
+      },
+      {
+        name: 'targetLanguage',
+        type: 'string',
+        required: false,
+        description: '目标语言，默认为zh-CN',
+        options: ['zh-CN', 'en-US'],
+        example: 'zh-CN'
+      },
+      {
+        name: 'aiConfig',
+        type: 'object',
+        required: true,
+        description: 'AI服务配置',
+        example: {
+          apiKey: 'your-api-key',
+          provider: 'zhipu',
+          model: 'glm-4.5-flash',
+          baseURL: 'https://open.bigmodel.cn/api'
+        }
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '翻译成功',
+        example: {
+          success: true,
+          data: {
+            originalContent: 'Hello world! This is a test message.',
+            translatedContent: '你好世界！这是一条测试消息。',
+            originalLanguage: 'en',
+            isTranslated: true,
+            targetLanguage: 'zh-CN',
+            provider: 'zhipu',
+            model: 'glm-4.5-flash',
+            translatedAt: '2024-01-01T12:00:00.000Z'
+          }
+        }
+      },
+      {
+        status: 400,
+        description: '请求参数错误',
+        example: {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Missing or invalid content'
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/tweet-processor/translate \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "content": "Hello world! This is a test message.",
+    "targetLanguage": "zh-CN",
+    "aiConfig": {
+      "apiKey": "your-api-key",
+      "provider": "zhipu",
+      "model": "glm-4.5-flash"
+    }
+  }'`
+  },
+  {
+    id: 'translate-tweet',
+    method: 'POST',
+    path: '/api/tweet-processor/translate-tweet',
+    title: '推文翻译接口',
+    description: '翻译指定推文并保存到数据库',
+    params: [
+      {
+        name: 'tweetId',
+        type: 'string',
+        required: true,
+        description: '推文ID',
+        example: '1234567890123456789'
+      },
+      {
+        name: 'targetLanguage',
+        type: 'string',
+        required: false,
+        description: '目标语言，默认为zh-CN',
+        options: ['zh-CN', 'en-US'],
+        example: 'zh-CN'
+      },
+      {
+        name: 'aiConfig',
+        type: 'object',
+        required: true,
+        description: 'AI服务配置',
+        example: {
+          apiKey: 'your-api-key',
+          provider: 'zhipu',
+          model: 'glm-4.5-flash',
+          baseURL: 'https://open.bigmodel.cn/api'
+        }
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '翻译成功，返回更新后的推文数据',
+        example: {
+          success: true,
+          data: {
+            tweet: {
+              id: '1234567890123456789',
+              content: 'Hello world! This is a test tweet.',
+              translatedContent: '你好世界！这是一条测试推文。',
+              isTranslated: true,
+              originalLanguage: 'en',
+              translationProvider: 'zhipu',
+              translationModel: 'glm-4.5-flash',
+              translatedAt: '2024-01-01T12:00:00.000Z'
+            },
+            translation: {
+              originalLanguage: 'en',
+              translatedContent: '你好世界！这是一条测试推文。',
+              isTranslated: true
+            }
+          }
+        }
+      },
+      {
+        status: 404,
+        description: '推文不存在或已删除',
+        example: {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Tweet not found or deleted'
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/tweet-processor/translate-tweet \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "tweetId": "1234567890123456789",
+    "targetLanguage": "zh-CN",
+    "aiConfig": {
+      "apiKey": "your-api-key",
+      "provider": "zhipu",
+      "model": "glm-4.5-flash"
+    }
+  }'`
   }
 ];
 

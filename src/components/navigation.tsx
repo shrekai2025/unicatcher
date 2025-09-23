@@ -12,6 +12,7 @@ const adminNavigation = [
   { name: '任务管理', href: '/tasks', icon: '⚙️' },
   { name: '推文数据', href: '/tweets', icon: '🐦' },
   { name: '推文处理', href: '/tweet-processing', icon: '🤖' },
+  { name: 'X辅助器', href: '/x-helper', icon: '🔧' },
   { name: '数据查看', href: '/viewer', icon: '👁️' },
   { name: 'API文档', href: '/api-docs', icon: '📖' },
 ];

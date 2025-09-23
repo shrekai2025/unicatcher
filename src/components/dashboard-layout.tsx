@@ -39,6 +39,8 @@ export function DashboardLayout({
         return '数据提取';
       case '/x-login':
         return 'X 登录管理';
+      case '/x-helper':
+        return 'X辅助器';
       default:
         return 'UniCatcher';
     }
@@ -64,6 +66,8 @@ export function DashboardLayout({
         return '数据提取和导出功能';
       case '/x-login':
         return '管理X平台登录状态和无头浏览器';
+      case '/x-helper':
+        return '推文翻译和评论生成一站式工具';
       default:
         return '';
     }

@@ -61,6 +61,28 @@ export class CommentGenerator {
         }
       };
 
+      // 6. 保存AI生成评论到数据库
+      try {
+        await db.aIGeneratedComment.create({
+          data: {
+            tweetId: request.tweetId,
+            userInfo: request.userInfo || null,
+            systemPrompt: request.systemPrompt || null,
+            commentLength: request.commentLength,
+            commentCount: request.commentCount,
+            generatedComments: JSON.stringify(parsedComments),
+            basedOnExisting: request.includeExistingComments || false,
+            existingCommentsSnapshot: existingComments.length > 0 ? JSON.stringify(existingComments.slice(0, 10)) : null,
+            aiProvider: aiConfig.provider,
+            aiModel: aiConfig.model,
+          }
+        });
+        console.log(`[评论生成器] AI生成评论已保存到数据库`);
+      } catch (dbError) {
+        console.error('[评论生成器] 保存AI评论到数据库失败:', dbError);
+        // 不影响主流程，只记录错误
+      }
+
       console.log(`[评论生成器] 生成完成: ${parsedComments.length} 条评论`);
       return result;
 
