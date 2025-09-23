@@ -135,29 +135,6 @@ export function GenerateCommentDialog({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* AI配置状态显示 */}
-          <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-purple-700">AI服务配置</h4>
-              <button
-                onClick={onShowAIConfig}
-                className="text-xs text-purple-600 hover:text-purple-800"
-              >
-                配置
-              </button>
-            </div>
-            {aiConfig?.apiKey ? (
-              <div className="text-xs text-purple-600">
-                <p>供应商: {aiConfig.provider === 'openai' ? 'OpenAI' : aiConfig.provider === 'zhipu' ? '智谱AI' : 'OpenAI-Badger'}</p>
-                <p>模型: {aiConfig.model}</p>
-                <p>状态: ✅ 已配置</p>
-              </div>
-            ) : (
-              <div className="text-xs text-red-600">
-                <p>⚠️ 未配置AI服务，点击右上角"配置"按钮进行设置</p>
-              </div>
-            )}
-          </div>
 
           {/* 推文内容显示 */}
           {tweetContent && (
@@ -229,9 +206,6 @@ export function GenerateCommentDialog({
                     参考已有评论
                   </span>
                 </label>
-                <p className="text-xs text-gray-500 mt-1">
-                  勾选后会先爬取现有评论，AI会参考评论的态度和风格来生成内容
-                </p>
               </div>
             </div>
 
@@ -246,9 +220,6 @@ export function GenerateCommentDialog({
                 rows={6}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                提供额外信息可以让AI生成更符合您需求的评论
-              </p>
             </div>
           </div>
 

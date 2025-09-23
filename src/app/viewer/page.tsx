@@ -1,7 +1,16 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+
+// 为 window 对象添加类型声明
+declare global {
+  interface Window {
+    __savedScrollY?: number;
+  }
+}
 import { FloatingVideoPlayer } from '~/components/floating-video-player';
+import { GenerateCommentDialog } from '~/components/ui/generate-comment-dialog';
+import { FloatingCommentPanel } from '~/components/ui/floating-comment-panel';
 import { api } from '~/trpc/react';
 import { formatCount } from '~/lib/format';
 import { getSession } from '~/lib/simple-auth';
@@ -78,6 +87,37 @@ export default function ViewerPage() {
     };
   });
   const [translationError, setTranslationError] = useState<string>('');
+
+  // AI生成评论配置状态
+  const [showCommentAIConfigModal, setShowCommentAIConfigModal] = useState(false);
+  const [commentAIConfig, setCommentAIConfig] = useState<AIConfig>(() => {
+    // 从localStorage读取生成评论AI配置
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('unicatcher-comment-generation-ai-config');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.warn('生成评论AI配置解析失败:', e);
+        }
+      }
+    }
+    return {
+      apiKey: '',
+      provider: 'openai' as const,
+      model: 'gpt-4o',
+    };
+  });
+
+  // AI生成评论状态
+  const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
+  const [currentGenerateTweet, setCurrentGenerateTweet] = useState<{ id: string; content: string } | null>(null);
+
+  // 生成的评论存储（用于浮动面板）
+  const [generatedComments, setGeneratedComments] = useState<Record<string, Array<{content: string; reasoning?: string}>>>({});
+
+  // 爬取评论的展开状态（原有功能保留）
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
 
   // 数据库中的listId记录
   const [dbListIds, setDbListIds] = useState<{id: string, listId: string, name: string}[]>([]);
@@ -216,34 +256,58 @@ export default function ViewerPage() {
 
   // 监听数据库选择变化，触发数据重新获取
   useEffect(() => {
-    refetch();
+    // 保存当前滚动位置
+    const scrollY = window.scrollY;
+
+    refetch().then(() => {
+      // 恢复滚动位置
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollY);
+      });
+    });
   }, [selectedDbListIds, refetch]);
 
   // 删除推文
   const deleteTweet = api.tweets.delete.useMutation({
-    onSuccess: () => {
-      // 保存当前滚动位置
-      const scrollY = window.scrollY;
-      
-      refetch().then(() => {
-        // 恢复滚动位置
-        requestAnimationFrame(() => {
-          window.scrollTo(0, scrollY);
-        });
-      });
+    onMutate: () => {
+      // 在开始删除前保存滚动位置
+      window.__savedScrollY = window.scrollY;
+    },
+    onSettled: () => {
+      // 无论成功还是失败都恢复滚动位置
+      setTimeout(() => {
+        const savedScrollY = window.__savedScrollY || 0;
+        window.scrollTo({ top: savedScrollY, behavior: 'instant' });
+        delete window.__savedScrollY;
+      }, 100); // 延迟确保DOM更新完成
+
+      refetch();
     },
   });
 
   // 翻译API调用
   const translateTweet = api.tweets.translateTweet.useMutation({
+    onMutate: () => {
+      // 在开始翻译前保存滚动位置
+      window.__savedScrollY = window.scrollY;
+      setTranslationError('');
+    },
     onSuccess: (result: any) => {
       console.log('翻译成功:', result);
-      setTranslationError('');
-      refetch(); // 刷新列表以显示翻译结果
     },
     onError: (error: any) => {
       console.error('翻译失败:', error);
       setTranslationError(error.message || '翻译失败');
+    },
+    onSettled: () => {
+      // 无论成功还是失败都恢复滚动位置
+      setTimeout(() => {
+        const savedScrollY = window.__savedScrollY || 0;
+        window.scrollTo({ top: savedScrollY, behavior: 'instant' });
+        delete window.__savedScrollY;
+      }, 100); // 延迟确保DOM更新完成
+
+      refetch();
     },
   });
 
@@ -251,7 +315,16 @@ export default function ViewerPage() {
     setCurrentPage(1);
     // 清空数据库选择，使用手动输入的listId
     setSelectedDbListIds([]);
-    refetch();
+
+    // 保存当前滚动位置
+    const scrollY = window.scrollY;
+
+    refetch().then(() => {
+      // 恢复滚动位置
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollY);
+      });
+    });
   };
 
   // 处理数据库listId选择
@@ -306,7 +379,7 @@ export default function ViewerPage() {
     });
   };
 
-  // 保存AI配置到localStorage
+  // 保存翻译AI配置到localStorage
   const saveAIConfig = (config: AIConfig) => {
     setAIConfig(config);
     if (typeof window !== 'undefined') {
@@ -314,6 +387,76 @@ export default function ViewerPage() {
     }
     setShowAIConfigModal(false);
   };
+
+  // 保存生成评论AI配置到localStorage
+  const saveCommentAIConfig = (config: AIConfig) => {
+    setCommentAIConfig(config);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('unicatcher-comment-generation-ai-config', JSON.stringify(config));
+    }
+    setShowCommentAIConfigModal(false);
+  };
+
+  // 处理生成评论按钮点击
+  const handleGenerateComments = (tweetId: string, tweetContent: string) => {
+    setCurrentGenerateTweet({ id: tweetId, content: tweetContent });
+    setGenerateDialogOpen(true);
+  };
+
+  // 处理评论生成完成
+  const handleCommentsGenerated = (tweetId: string, comments: Array<{content: string; reasoning?: string}>) => {
+    setGeneratedComments(prev => ({
+      ...prev,
+      [tweetId]: comments
+    }));
+  };
+
+  // 获取推文的爬取评论（原有功能）
+  const getTweetComments = (tweetId: string): Array<{content: string; reasoning?: string}> => {
+    // 这里应该是从数据库或API获取爬取的评论
+    // 暂时返回空数组，实际应该实现爬取评论的获取逻辑
+    return [];
+  };
+
+  // 检查推文是否有爬取的评论
+  const hasTweetComments = (tweetId: string) => {
+    const comments = getTweetComments(tweetId);
+    return comments.length > 0;
+  };
+
+  // 检查爬取评论是否展开
+  const isCommentsExpanded = (tweetId: string) => {
+    return expandedComments[tweetId] || false;
+  };
+
+  // 切换爬取评论展开状态
+  const toggleComments = (tweetId: string) => {
+    setExpandedComments(prev => ({
+      ...prev,
+      [tweetId]: !prev[tweetId]
+    }));
+  };
+
+  // 为浮动面板准备数据
+  const getTweetsWithComments = () => {
+    return Object.entries(generatedComments)
+      .filter(([_, comments]) => comments.length > 0)
+      .map(([tweetId, comments]) => {
+        // 查找对应的推文内容
+        const tweet = mediaData?.data?.cards?.find(card => card.tweetId === tweetId);
+        return {
+          tweetId,
+          tweetContent: tweet?.tweetContent || '',
+          comments
+        };
+      });
+  };
+
+  // 清空所有生成的评论
+  const handleClearAllComments = () => {
+    setGeneratedComments({});
+  };
+
 
   const openTweet = (tweetUrl: string) => {
     window.open(tweetUrl, '_blank');
@@ -423,12 +566,28 @@ export default function ViewerPage() {
             </div>
           )}
 
+          {/* AI生成评论按钮 */}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleGenerateComments(card.tweetId, card.tweetContent);
+            }}
+            className="absolute top-2 right-28 bg-purple-500 hover:bg-purple-600 text-white text-xs px-2 py-1 rounded transition-colors"
+          >
+            💬
+          </button>
+
           {/* 翻译按钮 */}
           <button
-            onClick={() => handleTranslate(card.tweetId)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleTranslate(card.tweetId);
+            }}
             className={`absolute top-2 right-20 text-white text-xs px-2 py-1 rounded transition-colors ${
-              card.isTranslated 
-                ? 'bg-green-500 hover:bg-green-600' 
+              card.isTranslated
+                ? 'bg-green-500 hover:bg-green-600'
                 : 'bg-blue-500 hover:bg-blue-600'
             }`}
             disabled={translateTweet.isPending}
@@ -438,7 +597,11 @@ export default function ViewerPage() {
 
           {/* 删除按钮 */}
           <button
-            onClick={() => handleDelete(card.tweetId)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleDelete(card.tweetId);
+            }}
             className="absolute top-2 right-12 bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded transition-colors"
             disabled={deleteTweet.isPending}
           >
@@ -477,6 +640,39 @@ export default function ViewerPage() {
           {translationError && (
             <p className="text-red-500 text-xs mt-1">{translationError}</p>
           )}
+
+
+          {/* 原有评论展示区域 */}
+          {hasTweetComments(card.tweetId) && (
+            <div className="mt-3 border-t border-gray-100 pt-3">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleComments(card.tweetId);
+                }}
+                className="flex items-center justify-between w-full text-left text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                <span>爬取评论 ({getTweetComments(card.tweetId).length}条)</span>
+                <span className="text-xs">
+                  {isCommentsExpanded(card.tweetId) ? '收起 ▲' : '展开 ▼'}
+                </span>
+              </button>
+
+              {isCommentsExpanded(card.tweetId) && (
+                <div className="mt-2 space-y-2">
+                  {getTweetComments(card.tweetId).map((comment, index) => (
+                    <div key={index} className="bg-gray-50 p-2 rounded text-sm">
+                      <p className="text-gray-800">{comment.content}</p>
+                      {comment.reasoning && (
+                        <p className="text-gray-500 text-xs mt-1">理由: {comment.reasoning}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -500,12 +696,24 @@ export default function ViewerPage() {
             </span>
             <button
               onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleGenerateComments(card.tweetId, card.tweetContent);
+              }}
+              className="text-purple-500 hover:text-purple-600 transition-colors p-1 flex-shrink-0"
+              title="AI生成评论"
+            >
+              💬
+            </button>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 handleTranslate(card.tweetId);
               }}
               className={`transition-colors p-1 flex-shrink-0 ${
-                card.isTranslated 
-                  ? 'text-green-500 hover:text-green-600' 
+                card.isTranslated
+                  ? 'text-green-500 hover:text-green-600'
                   : 'text-blue-500 hover:text-blue-600'
               }`}
               disabled={translateTweet.isPending}
@@ -515,6 +723,7 @@ export default function ViewerPage() {
             </button>
             <button
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 handleDelete(card.tweetId);
               }}
@@ -554,6 +763,39 @@ export default function ViewerPage() {
                     >
                       {keyword}
                     </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+
+          {/* 原有评论展示区域 */}
+          {hasTweetComments(card.tweetId) && (
+            <div className="mt-2 border-t border-gray-100 pt-2">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleComments(card.tweetId);
+                }}
+                className="flex items-center justify-between w-full text-left text-xs text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                <span>爬取评论 ({getTweetComments(card.tweetId).length}条)</span>
+                <span className="text-xs">
+                  {isCommentsExpanded(card.tweetId) ? '收起 ▲' : '展开 ▼'}
+                </span>
+              </button>
+
+              {isCommentsExpanded(card.tweetId) && (
+                <div className="mt-2 space-y-1">
+                  {getTweetComments(card.tweetId).map((comment, index) => (
+                    <div key={index} className="bg-gray-50 p-2 rounded text-xs">
+                      <p className="text-gray-800">{comment.content}</p>
+                      {comment.reasoning && (
+                        <p className="text-gray-500 text-xs mt-1">理由: {comment.reasoning}</p>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
@@ -635,11 +877,21 @@ export default function ViewerPage() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    handleGenerateComments(card.tweetId, card.tweetContent);
+                  }}
+                  className="text-purple-500 hover:text-purple-600 transition-colors p-1 flex-shrink-0"
+                  title="AI生成评论"
+                >
+                  💬
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
                     handleTranslate(card.tweetId);
                   }}
                   className={`transition-colors p-1 flex-shrink-0 ${
-                    card.isTranslated 
-                      ? 'text-green-500 hover:text-green-600' 
+                    card.isTranslated
+                      ? 'text-green-500 hover:text-green-600'
                       : 'text-blue-500 hover:text-blue-600'
                   }`}
                   disabled={translateTweet.isPending}
@@ -693,6 +945,7 @@ export default function ViewerPage() {
                   )}
                 </div>
               )}
+
             </div>
           </div>
         </div>
@@ -800,7 +1053,14 @@ export default function ViewerPage() {
                   className="text-sm px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
                   title="翻译AI配置"
                 >
-                  🤖 AI配置
+                  🤖 翻译AI
+                </button>
+                <button
+                  onClick={() => setShowCommentAIConfigModal(true)}
+                  className="text-sm px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
+                  title="评论生成AI配置"
+                >
+                  💬 评论AI
                 </button>
                 <button
                   onClick={() => setShowAddListIdForm(!showAddListIdForm)}
@@ -1117,6 +1377,130 @@ export default function ViewerPage() {
             </div>
           </div>
         )}
+
+        {/* 生成评论弹窗 */}
+        <GenerateCommentDialog
+          tweetId={currentGenerateTweet?.id || ''}
+          tweetContent={currentGenerateTweet?.content || ''}
+          open={generateDialogOpen}
+          onOpenChange={setGenerateDialogOpen}
+          aiConfig={commentAIConfig}
+          onGenerate={(comments) => {
+            if (currentGenerateTweet?.id) {
+              handleCommentsGenerated(currentGenerateTweet.id, comments);
+            }
+          }}
+        />
+
+        {/* AI生成评论配置弹窗 */}
+        {showCommentAIConfigModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold mb-4">评论生成AI配置</h3>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const config = {
+                  apiKey: formData.get('apiKey') as string,
+                  provider: formData.get('provider') as 'openai' | 'openai-badger' | 'zhipu',
+                  model: formData.get('model') as string,
+                  baseURL: formData.get('baseURL') as string || undefined,
+                };
+                saveCommentAIConfig(config);
+                setShowCommentAIConfigModal(false);
+              }}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      API Key *
+                    </label>
+                    <input
+                      type="password"
+                      name="apiKey"
+                      defaultValue={commentAIConfig.apiKey}
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="请输入AI服务的API Key"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      AI供应商 *
+                    </label>
+                    <select
+                      name="provider"
+                      defaultValue={commentAIConfig.provider}
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="openai-badger">OpenAI-Badger</option>
+                      <option value="zhipu">智谱AI</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      模型 *
+                    </label>
+                    <select
+                      name="model"
+                      defaultValue={commentAIConfig.model}
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="gpt-3.5-turbo">GPT-3.5-Turbo</option>
+                      <option value="gpt-4">GPT-4</option>
+                      <option value="gpt-4-turbo">GPT-4-Turbo</option>
+                      <option value="gpt-4o">GPT-4o</option>
+                      <option value="gpt-4o-mini">GPT-4o-Mini</option>
+                      <option value="glm-4.5-flash">GLM-4.5-Flash</option>
+                      <option value="glm-4.5">GLM-4.5</option>
+                      <option value="glm-4.5-air">GLM-4.5-Air</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      基础URL (可选)
+                    </label>
+                    <input
+                      type="url"
+                      name="baseURL"
+                      defaultValue={commentAIConfig.baseURL || ''}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="自定义API端点URL"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowCommentAIConfigModal(false)}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-md transition-colors"
+                  >
+                    保存配置
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* 浮动评论面板 */}
+        <FloatingCommentPanel
+          tweetsWithComments={getTweetsWithComments()}
+          onClearComments={handleClearAllComments}
+        />
       </div>
     </div>
   );
