@@ -4,7 +4,8 @@
  */
 
 import { db } from '~/server/db';
-import { OpenAIService, type AIConfig, type ProcessingStats } from './openai-service';
+import { AIServiceFactory } from './ai-factory';
+import type { AIConfig, ProcessingStats } from './base/ai-types';
 import type { Prisma } from '@prisma/client';
 
 export interface ProcessBatchConfig {
@@ -328,9 +329,9 @@ export class AIProcessManager {
     const { batchId, filterConfig, batchSize, batchProcessingMode = 'optimized', systemPrompt, aiConfig } = config;
 
     try {
-      console.log(`[AI处理] 🔧 步骤1: 创建 OpenAI 服务实例 - ${batchId}`);
-      // 创建 OpenAI 服务实例
-      const aiService = new OpenAIService(aiConfig);
+      console.log(`[AI处理] 🔧 步骤1: 创建 AI 服务实例 - ${batchId}`);
+      // 创建 AI 服务实例
+      const aiService = AIServiceFactory.createService(aiConfig);
 
       console.log(`[AI处理] 🔍 步骤2: 验证 AI 配置 - ${batchId}`);
       // 验证 AI 配置
@@ -453,22 +454,23 @@ export class AIProcessManager {
           contentTypes,
           systemPrompt,
           (stats) => {
-            console.log(`[AI处理] 📊 批量模式进度更新: ${stats.processed}/${tweets.length}, 成功: ${stats.succeeded}, 失败: ${stats.failed}`);
-            updateProgress(stats.processed, stats.succeeded, stats.failed);
+            console.log(`[AI处理] 📊 批量模式进度更新: ${stats.processed}/${stats.total}, 成功: ${stats.successful}, 失败: ${stats.failed}`);
+            updateProgress(stats.processed, stats.successful, stats.failed);
           },
           batchId
         );
       } else {
         console.log(`[AI处理] 🔄 使用传统模式处理单批次 - 逐条调用API处理 ${tweets.length} 条推文`);
-        results = await aiService.analyzeTweetsBatchTraditional(
+        results = await aiService.analyzeTweetsBatch(
           tweets,
           topicTags,
           contentTypes,
           systemPrompt,
           (stats) => {
-            console.log(`[AI处理] 📊 传统模式进度更新: ${stats.processed}/${tweets.length}, 成功: ${stats.succeeded}, 失败: ${stats.failed}`);
-            updateProgress(stats.processed, stats.succeeded, stats.failed);
-          }
+            console.log(`[AI处理] 📊 传统模式进度更新: ${stats.processed}/${stats.total}, 成功: ${stats.successful}, 失败: ${stats.failed}`);
+            updateProgress(stats.processed, stats.successful, stats.failed);
+          },
+          batchId
         );
       }
 

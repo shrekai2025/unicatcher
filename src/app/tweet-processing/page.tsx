@@ -12,7 +12,7 @@ import { DashboardLayout } from '~/components/dashboard-layout';
 // AI 配置接口
 interface AIConfig {
   apiKey: string;
-  provider: 'openai' | 'openai-badger';
+  provider: 'openai' | 'openai-badger' | 'zhipu';
   model: string;
   baseURL?: string;
 }
@@ -1694,18 +1694,20 @@ export default function TweetProcessingPage() {
                 <select
                   value={aiConfig.provider}
                   onChange={(e) => {
-                    const provider = e.target.value as 'openai' | 'openai-badger';
+                    const provider = e.target.value as 'openai' | 'openai-badger' | 'zhipu';
                     setAIConfig(prev => ({ 
                       ...prev, 
                       provider,
                       // 切换供应商时自动设置对应的默认模型
-                      model: provider === 'openai-badger' ? 'gpt-4o-mini' : 'gpt-4o'
+                      model: provider === 'openai-badger' ? 'gpt-4o-mini' : 
+                             provider === 'zhipu' ? 'glm-4.5-flash' : 'gpt-4o'
                     }));
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="openai">OpenAI</option>
                   <option value="openai-badger">OpenAI-badger</option>
+                  <option value="zhipu">智谱AI (GLM)</option>
                 </select>
               </div>
               
@@ -1722,6 +1724,14 @@ export default function TweetProcessingPage() {
                       <option value="gpt-4o">GPT-4o</option>
                       <option value="gpt-4">GPT-4</option>
                       <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    </>
+                  ) : aiConfig.provider === 'zhipu' ? (
+                    <>
+                      <option value="glm-4.5-flash">GLM-4.5-Flash</option>
+                      <option value="glm-4.5">GLM-4.5</option>
+                      <option value="glm-4.5-air">GLM-4.5-Air</option>
+                      <option value="glm-4.5-x">GLM-4.5-X</option>
+                      <option value="glm-4.5-airx">GLM-4.5-Airx</option>
                     </>
                   ) : (
                     <>

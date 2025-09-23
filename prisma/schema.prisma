@@ -125,6 +125,14 @@ model Tweet {
   aiProcessStatus   String?   // AI处理状态: pending, processing, completed, failed
   aiRetryCount      Int      @default(0) // AI处理重试次数
   
+  // 翻译相关字段
+  translatedContent     String?   // 翻译后的中文内容
+  originalLanguage      String?   // 原始语言代码（如: en, ja, ko等）
+  isTranslated          Boolean   @default(false) // 是否已翻译
+  translationProvider   String?   // 翻译供应商: openai, zhipu, openai-badger
+  translationModel      String?   // 翻译使用的模型
+  translatedAt          DateTime? // 翻译时间
+  
   // 逻辑删除相关字段
   isDeleted  Boolean   @default(false) // 是否已被逻辑删除
   deletedAt  DateTime? // 删除时间

@@ -421,6 +421,13 @@ export class StorageService {
             taskId: true,
             createdAt: true,
             updatedAt: true,
+            // 翻译相关字段
+            translatedContent: true,
+            originalLanguage: true,
+            isTranslated: true,
+            translationProvider: true,
+            translationModel: true,
+            translatedAt: true,
           },
         }),
         db.tweet.count({ where }),

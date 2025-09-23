@@ -395,7 +395,7 @@ export const tweetProcessingRouter = createTRPCRouter({
       systemPrompt: z.string().optional(),
       aiConfig: z.object({
         apiKey: z.string().min(1),
-        provider: z.enum(['openai', 'openai-badger']).default('openai'),
+        provider: z.enum(['openai', 'openai-badger', 'zhipu']).default('openai'),
         model: z.string().default('gpt-4o'),
         baseURL: z.string().optional(),
       }),

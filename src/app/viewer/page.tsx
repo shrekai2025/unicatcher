@@ -22,6 +22,17 @@ interface MediaCard {
   isReply: boolean;
   contentTypes?: string[];  // 解析后的内容类型数组
   keywords?: string[];      // 解析后的主题标签数组(来源于topicTags字段)
+  // 翻译相关字段
+  isTranslated?: boolean;
+  translatedContent?: string | null;
+  originalLanguage?: string | null;
+}
+
+interface AIConfig {
+  apiKey: string;
+  provider: 'openai' | 'openai-badger' | 'zhipu';
+  model: string;
+  baseURL?: string;
 }
 
 interface VideoData {
@@ -45,6 +56,28 @@ export default function ViewerPage() {
   // 浮动播放器状态
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
   const [currentVideo, setCurrentVideo] = useState<VideoData | null>(null);
+
+  // AI翻译配置状态
+  const [showAIConfigModal, setShowAIConfigModal] = useState(false);
+  const [aiConfig, setAIConfig] = useState<AIConfig>(() => {
+    // 从localStorage读取翻译AI配置
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('unicatcher-translation-ai-config');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.warn('翻译AI配置解析失败:', e);
+        }
+      }
+    }
+    return {
+      apiKey: '',
+      provider: 'openai' as const,
+      model: 'gpt-4o',
+    };
+  });
+  const [translationError, setTranslationError] = useState<string>('');
 
   // 数据库中的listId记录
   const [dbListIds, setDbListIds] = useState<{id: string, listId: string, name: string}[]>([]);
@@ -201,6 +234,19 @@ export default function ViewerPage() {
     },
   });
 
+  // 翻译API调用
+  const translateTweet = api.tweets.translateTweet.useMutation({
+    onSuccess: (result: any) => {
+      console.log('翻译成功:', result);
+      setTranslationError('');
+      refetch(); // 刷新列表以显示翻译结果
+    },
+    onError: (error: any) => {
+      console.error('翻译失败:', error);
+      setTranslationError(error.message || '翻译失败');
+    },
+  });
+
   const handleSearch = () => {
     setCurrentPage(1);
     // 清空数据库选择，使用手动输入的listId
@@ -244,6 +290,29 @@ export default function ViewerPage() {
       id: tweetId, 
       deletedBy: session.username 
     });
+  };
+
+  // 处理翻译按钮点击
+  const handleTranslate = async (tweetId: string) => {
+    if (!aiConfig.apiKey) {
+      setShowAIConfigModal(true);
+      return;
+    }
+
+    setTranslationError('');
+    await translateTweet.mutateAsync({
+      tweetId,
+      aiConfig,
+    });
+  };
+
+  // 保存AI配置到localStorage
+  const saveAIConfig = (config: AIConfig) => {
+    setAIConfig(config);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('unicatcher-translation-ai-config', JSON.stringify(config));
+    }
+    setShowAIConfigModal(false);
   };
 
   const openTweet = (tweetUrl: string) => {
@@ -354,6 +423,19 @@ export default function ViewerPage() {
             </div>
           )}
 
+          {/* 翻译按钮 */}
+          <button
+            onClick={() => handleTranslate(card.tweetId)}
+            className={`absolute top-2 right-20 text-white text-xs px-2 py-1 rounded transition-colors ${
+              card.isTranslated 
+                ? 'bg-green-500 hover:bg-green-600' 
+                : 'bg-blue-500 hover:bg-blue-600'
+            }`}
+            disabled={translateTweet.isPending}
+          >
+            {translateTweet.isPending ? '⏳' : card.isTranslated ? '✅ 已译' : '🌐 翻译'}
+          </button>
+
           {/* 删除按钮 */}
           <button
             onClick={() => handleDelete(card.tweetId)}
@@ -389,7 +471,12 @@ export default function ViewerPage() {
 
         {/* 推文内容 */}
         <div className="p-3">
-          <p className="text-sm text-gray-800 line-clamp-6">{card.tweetContent}</p>
+          <p className="text-sm text-gray-800 line-clamp-6">
+            {card.translatedContent || card.tweetContent}
+          </p>
+          {translationError && (
+            <p className="text-red-500 text-xs mt-1">{translationError}</p>
+          )}
         </div>
       </div>
     );
@@ -397,7 +484,8 @@ export default function ViewerPage() {
 
   // 紧凑列表组件
   const CompactCardComponent = ({ card }: { card: MediaCard }) => {
-    const cleanContent = card.tweetContent.replace(/\s+/g, ' ').trim();
+    const displayContent = card.translatedContent || card.tweetContent;
+    const cleanContent = displayContent.replace(/\s+/g, ' ').trim();
     
     // 获取标签数据（现在已经是解析后的数组了）
     const contentTypes = card.contentTypes || [];
@@ -410,6 +498,21 @@ export default function ViewerPage() {
             <span className="text-gray-800 flex-1 pr-2">
               {cleanContent} @{card.userUsername}
             </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTranslate(card.tweetId);
+              }}
+              className={`transition-colors p-1 flex-shrink-0 ${
+                card.isTranslated 
+                  ? 'text-green-500 hover:text-green-600' 
+                  : 'text-blue-500 hover:text-blue-600'
+              }`}
+              disabled={translateTweet.isPending}
+              title={card.isTranslated ? '重新翻译' : '翻译推文'}
+            >
+              {translateTweet.isPending ? '⏳' : card.isTranslated ? '✅' : '🌐'}
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -463,7 +566,8 @@ export default function ViewerPage() {
 
   // 紧凑图组件
   const CompactImageCardComponent = ({ card }: { card: MediaCard }) => {
-    const cleanContent = card.tweetContent.replace(/\s+/g, ' ').trim();
+    const displayContent = card.translatedContent || card.tweetContent;
+    const cleanContent = displayContent.replace(/\s+/g, ' ').trim();
     
     // 获取标签数据
     const contentTypes = card.contentTypes || [];
@@ -528,6 +632,21 @@ export default function ViewerPage() {
                 <span className="text-gray-800 flex-1 pr-2">
                   {cleanContent} @{card.userUsername}
                 </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTranslate(card.tweetId);
+                  }}
+                  className={`transition-colors p-1 flex-shrink-0 ${
+                    card.isTranslated 
+                      ? 'text-green-500 hover:text-green-600' 
+                      : 'text-blue-500 hover:text-blue-600'
+                  }`}
+                  disabled={translateTweet.isPending}
+                  title={card.isTranslated ? '重新翻译' : '翻译推文'}
+                >
+                  {translateTweet.isPending ? '⏳' : card.isTranslated ? '✅' : '🌐'}
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -675,12 +794,21 @@ export default function ViewerPage() {
                   </span>
                 )}
               </label>
-              <button
-                onClick={() => setShowAddListIdForm(!showAddListIdForm)}
-                className="text-sm px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-              >
-                {showAddListIdForm ? '取消' : '添加'}
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setShowAIConfigModal(true)}
+                  className="text-sm px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
+                  title="翻译AI配置"
+                >
+                  🤖 AI配置
+                </button>
+                <button
+                  onClick={() => setShowAddListIdForm(!showAddListIdForm)}
+                  className="text-sm px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                >
+                  {showAddListIdForm ? '取消' : '添加'}
+                </button>
+              </div>
             </div>
 
             {showAddListIdForm && (
@@ -876,6 +1004,119 @@ export default function ViewerPage() {
           videoData={currentVideo}
           onClose={closePlayer}
         />
+
+        {/* AI翻译配置弹窗 */}
+        {showAIConfigModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold mb-4">翻译AI配置</h3>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const config = {
+                  apiKey: formData.get('apiKey') as string,
+                  provider: formData.get('provider') as 'openai' | 'openai-badger' | 'zhipu',
+                  model: formData.get('model') as string,
+                  baseURL: formData.get('baseURL') as string || undefined,
+                };
+                saveAIConfig(config);
+              }}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      API密钥
+                    </label>
+                    <input
+                      type="password"
+                      name="apiKey"
+                      defaultValue={aiConfig.apiKey}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="输入您的API密钥"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      AI供应商
+                    </label>
+                    <select
+                      name="provider"
+                      defaultValue={aiConfig.provider}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => {
+                        const provider = e.target.value as 'openai' | 'openai-badger' | 'zhipu';
+                        const modelSelect = e.target.form?.querySelector('select[name="model"]') as HTMLSelectElement;
+                        if (modelSelect) {
+                          if (provider === 'openai-badger') {
+                            modelSelect.value = 'gpt-4o-mini';
+                          } else if (provider === 'zhipu') {
+                            modelSelect.value = 'glm-4.5-flash';
+                          } else {
+                            modelSelect.value = 'gpt-4o';
+                          }
+                        }
+                      }}
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="openai-badger">OpenAI-Badger</option>
+                      <option value="zhipu">智谱AI (GLM)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      模型
+                    </label>
+                    <select
+                      name="model"
+                      defaultValue={aiConfig.model}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="gpt-4o">GPT-4o</option>
+                      <option value="gpt-4">GPT-4</option>
+                      <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                      <option value="gpt-4o-mini">GPT-4o Mini</option>
+                      <option value="glm-4.5-flash">GLM-4.5-Flash</option>
+                      <option value="glm-4.5">GLM-4.5</option>
+                      <option value="glm-4.5-air">GLM-4.5-Air</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      基础URL (可选)
+                    </label>
+                    <input
+                      type="url"
+                      name="baseURL"
+                      defaultValue={aiConfig.baseURL || ''}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="自定义API端点URL"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowAIConfigModal(false)}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors"
+                  >
+                    保存配置
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -710,15 +710,15 @@ const apiEndpoints: ApiEndpoint[] = [
         name: 'aiConfig.provider',
         type: 'string',
         required: false,
-        description: 'AI提供商，默认openai',
-        options: ['openai', 'openai-badger'],
+        description: 'AI提供商，支持OpenAI、OpenAI-Badger、智谱AI，默认openai',
+        options: ['openai', 'openai-badger', 'zhipu'],
         example: 'openai'
       },
       {
         name: 'aiConfig.model',
         type: 'string',
         required: false,
-        description: 'AI模型名称，默认gpt-4o',
+        description: 'AI模型名称，支持gpt-4o、glm-4.5-flash等，默认gpt-4o',
         example: 'gpt-4o'
       },
       {
@@ -842,7 +842,8 @@ const apiEndpoints: ApiEndpoint[] = [
         ]
       }
     ],
-    example: `curl -X POST http://43.153.84.145:3067/api/external/ai-batch/start \\
+    example: `# OpenAI 示例
+curl -X POST http://43.153.84.145:3067/api/external/ai-batch/start \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: unicatcher-api-key-demo" \\
   -d '{
@@ -858,6 +859,21 @@ const apiEndpoints: ApiEndpoint[] = [
       "provider": "openai",
       "model": "gpt-4o",
       "baseURL": "https://api.openai.com/v1"
+    }
+  }'
+
+# 智谱AI 示例
+curl -X POST http://43.153.84.145:3067/api/external/ai-batch/start \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: unicatcher-api-key-demo" \\
+  -d '{
+    "listIds": ["1948042550071496895"],
+    "batchSize": 10,
+    "batchProcessingMode": "optimized",
+    "aiConfig": {
+      "apiKey": "your-zhipu-api-key.xxxxxx",
+      "provider": "zhipu",
+      "model": "glm-4.5-flash"
     }
   }'`
   },
@@ -1071,15 +1087,15 @@ const apiEndpoints: ApiEndpoint[] = [
         name: 'aiConfig.provider',
         type: 'string',
         required: false,
-        description: 'AI提供商，默认openai',
-        options: ['openai', 'openai-badger'],
+        description: 'AI提供商，支持OpenAI、OpenAI-Badger、智谱AI，默认openai',
+        options: ['openai', 'openai-badger', 'zhipu'],
         example: 'openai'
       },
       {
         name: 'aiConfig.model',
         type: 'string',
         required: false,
-        description: 'AI模型名称，默认gpt-4o',
+        description: 'AI模型名称，支持gpt-4o、glm-4.5-flash等，默认gpt-4o',
         example: 'gpt-4o'
       },
       {
@@ -1189,21 +1205,34 @@ const apiEndpoints: ApiEndpoint[] = [
         ]
       }
     ],
-    example: `curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
+    example: `# 继续OpenAI处理
+curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: unicatcher-api-key-demo" \\
   -d '{
     "previousBatchId": "batch_1703123456789_abc123",
     "listIds": ["1948042550071496895"],
-    "usernames": ["elonmusk"],
-    "publishedAfter": "2024-01-01T00:00:00Z",
-    "isExtracted": "all",
     "batchSize": 20,
     "batchProcessingMode": "optimized",
     "aiConfig": {
       "apiKey": "sk-your-openai-api-key",
       "provider": "openai",
       "model": "gpt-4o"
+    }
+  }'
+
+# 继续智谱AI处理
+curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: unicatcher-api-key-demo" \\
+  -d '{
+    "previousBatchId": "batch_1703123456789_abc123",
+    "listIds": ["1948042550071496895"],
+    "batchSize": 10,
+    "aiConfig": {
+      "apiKey": "your-zhipu-api-key.xxxxxx",
+      "provider": "zhipu",
+      "model": "glm-4.5-flash"
     }
   }'`
   },
@@ -1762,8 +1791,8 @@ export default function ApiDocsClientPage() {
       endpoints: apiEndpoints.filter(ep => ep.path.includes('/data'))
     },
     'ai-batch': {
-      title: 'AI批处理 (新增)',
-      description: 'AI自动分析推文内容，单批次处理模式',
+      title: 'AI批处理',
+      description: 'AI自动分析推文内容，支持OpenAI、OpenAI-Badger、智谱AI供应商，单批次处理模式',
       endpoints: apiEndpoints.filter(ep => ep.path.includes('/ai-batch'))
     }
   };

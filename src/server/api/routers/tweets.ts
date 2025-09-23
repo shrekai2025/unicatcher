@@ -6,6 +6,8 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { StorageService } from "~/server/core/data/storage";
+import { AIServiceFactory } from "~/server/core/ai/ai-factory";
+import { db } from "~/server/db";
 
 const storageService = new StorageService();
 
@@ -488,6 +490,10 @@ export const tweetsRouter = createTRPCRouter({
                       return [];
                     }
                   })(),
+                  // 翻译相关字段
+                  isTranslated: tweet.isTranslated || false,
+                  translatedContent: tweet.translatedContent,
+                  originalLanguage: tweet.originalLanguage,
                 });
               });
             }
@@ -510,6 +516,10 @@ export const tweetsRouter = createTRPCRouter({
                 isReply: tweet.isReply || false,
                 contentTypes: tweet.contentTypes ? JSON.parse(tweet.contentTypes) : [],
                 keywords: tweet.topicTags ? JSON.parse(tweet.topicTags) : [],
+                // 翻译相关字段
+                isTranslated: tweet.isTranslated || false,
+                translatedContent: tweet.translatedContent,
+                originalLanguage: tweet.originalLanguage,
               });
             }
 
@@ -530,6 +540,10 @@ export const tweetsRouter = createTRPCRouter({
                 isReply: tweet.isReply || false,
                 contentTypes: tweet.contentTypes ? JSON.parse(tweet.contentTypes) : [],
                 keywords: tweet.topicTags ? JSON.parse(tweet.topicTags) : [],
+                // 翻译相关字段
+                isTranslated: tweet.isTranslated || false,
+                translatedContent: tweet.translatedContent,
+                originalLanguage: tweet.originalLanguage,
               });
             }
           });
@@ -554,6 +568,95 @@ export const tweetsRouter = createTRPCRouter({
       }
     }),
 
+  /**
+   * 翻译单条推文
+   */
+  translateTweet: protectedProcedure
+    .input(
+      z.object({
+        tweetId: z.string().min(1, "推文ID不能为空"),
+        aiConfig: z.object({
+          apiKey: z.string().min(1),
+          provider: z.enum(['openai', 'openai-badger', 'zhipu']).default('openai'),
+          model: z.string().default('gpt-4o'),
+          baseURL: z.string().optional(),
+        }),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { tweetId, aiConfig } = input;
+
+      try {
+        // 获取推文数据
+        const tweet = await db.tweet.findUnique({
+          where: { id: tweetId },
+          select: {
+            id: true,
+            content: true,
+            isTranslated: true,
+            translatedContent: true,
+            originalLanguage: true,
+          }
+        });
+
+        if (!tweet) {
+          throw new Error('推文不存在');
+        }
+
+        console.log(`[推文翻译] 开始翻译推文: ${tweetId}`);
+
+        // 创建AI服务实例
+        const aiService = AIServiceFactory.createService(aiConfig);
+
+        // 调用翻译服务
+        const translationResult = await aiService.translateTweet(tweet.content);
+
+        console.log(`[推文翻译] 翻译结果:`, translationResult);
+
+        // 更新数据库
+        const updatedTweet = await db.tweet.update({
+          where: { id: tweetId },
+          data: {
+            translatedContent: translationResult.translatedContent,
+            originalLanguage: translationResult.originalLanguage,
+            isTranslated: translationResult.isTranslated,
+            translationProvider: aiConfig.provider,
+            translationModel: aiConfig.model,
+            translatedAt: new Date(),
+          },
+          select: {
+            id: true,
+            content: true,
+            translatedContent: true,
+            originalLanguage: true,
+            isTranslated: true,
+            translationProvider: true,
+            translationModel: true,
+            translatedAt: true,
+          }
+        });
+
+        console.log(`[推文翻译] 翻译完成并已保存: ${tweetId}`);
+
+        return {
+          success: true,
+          data: {
+            tweetId: updatedTweet.id,
+            originalContent: tweet.content,
+            translatedContent: updatedTweet.translatedContent,
+            originalLanguage: updatedTweet.originalLanguage,
+            isTranslated: updatedTweet.isTranslated,
+            provider: updatedTweet.translationProvider,
+            model: updatedTweet.translationModel,
+            translatedAt: updatedTweet.translatedAt,
+          }
+        };
+
+      } catch (error) {
+        console.error(`[推文翻译] 翻译失败 - ${tweetId}:`, error);
+        throw new Error(`翻译失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      }
+    }),
 });
 
 // 辅助函数：获取热门用户
