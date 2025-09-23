@@ -100,7 +100,7 @@ export async function GET(
       progress: {
         total: status.progress.total,
         processed: status.progress.processed,
-        succeeded: status.progress.succeeded,
+        succeeded: status.progress.processed - status.progress.failed,
         failed: status.progress.failed,
         percentage: progressPercentage,
       },

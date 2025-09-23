@@ -1237,6 +1237,706 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
   }'`
   },
 
+  // 推文处理器接口
+  {
+    id: 'tweet-update',
+    method: 'POST',
+    path: '/api/tweet-processor/update',
+    title: '更新推文数据',
+    description: '🔄 异步更新单个推文的社交数据（评论数、转发数、点赞数、浏览量），支持防重复检查',
+    params: [
+      {
+        name: 'tweetId',
+        type: 'string',
+        required: true,
+        description: '推文ID，必须为纯数字字符串',
+        example: '1969561815333159348'
+      },
+      {
+        name: 'force',
+        type: 'boolean',
+        required: false,
+        description: '是否强制更新（忽略10分钟防重复限制），默认false',
+        example: false
+      }
+    ],
+    responses: [
+      {
+        status: 202,
+        description: '更新任务已提交（异步处理）',
+        example: {
+          success: true,
+          message: "推文更新任务已提交",
+          data: {
+            taskId: "cmfw4cfn300003233jpx4ee3c",
+            tweetId: "1969561815333159348",
+            force: false,
+            submittedAt: "2025-09-23T05:32:41.393Z"
+          }
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: true
+          },
+          {
+            name: 'message',
+            type: 'string',
+            description: '操作结果消息',
+            example: '推文更新任务已提交'
+          },
+          {
+            name: 'data.taskId',
+            type: 'string',
+            description: '任务唯一标识符，用于查询任务状态',
+            example: 'cmfw4cfn300003233jpx4ee3c'
+          },
+          {
+            name: 'data.tweetId',
+            type: 'string',
+            description: '目标推文ID',
+            example: '1969561815333159348'
+          },
+          {
+            name: 'data.force',
+            type: 'boolean',
+            description: '是否为强制更新',
+            example: false
+          },
+          {
+            name: 'data.submittedAt',
+            type: 'string',
+            description: '任务提交时间（ISO 8601格式）',
+            example: '2025-09-23T05:32:41.393Z'
+          }
+        ]
+      },
+      {
+        status: 404,
+        description: '推文不存在于数据库',
+        example: {
+          error: "推文 1234567890 不存在于数据库中",
+          code: "TWEET_NOT_IN_DATABASE"
+        },
+        fields: [
+          {
+            name: 'error',
+            type: 'string',
+            description: '错误信息',
+            example: '推文 1234567890 不存在于数据库中'
+          },
+          {
+            name: 'code',
+            type: 'string',
+            description: '错误代码',
+            example: 'TWEET_NOT_IN_DATABASE'
+          }
+        ]
+      },
+      {
+        status: 409,
+        description: '任务冲突或频率限制',
+        example: {
+          error: "推文 1234567890 的更新任务正在运行中",
+          code: "TASK_ALREADY_RUNNING"
+        },
+        fields: [
+          {
+            name: 'error',
+            type: 'string',
+            description: '错误信息',
+            example: '推文 1234567890 的更新任务正在运行中'
+          },
+          {
+            name: 'code',
+            type: 'string',
+            description: '错误代码：TASK_ALREADY_RUNNING, RECENTLY_UPDATED',
+            example: 'TASK_ALREADY_RUNNING'
+          }
+        ]
+      },
+      {
+        status: 429,
+        description: '并发限制或频率限制',
+        example: {
+          error: "并发任务数已达上限: 10",
+          code: "MAX_CONCURRENT_REACHED"
+        },
+        fields: [
+          {
+            name: 'error',
+            type: 'string',
+            description: '错误信息',
+            example: '并发任务数已达上限: 10'
+          },
+          {
+            name: 'code',
+            type: 'string',
+            description: '错误代码',
+            example: 'MAX_CONCURRENT_REACHED'
+          }
+        ]
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/tweet-processor/update \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-2024" \\
+  -d '{"tweetId": "1969561815333159348", "force": false}'`
+  },
+
+  {
+    id: 'tweet-status',
+    method: 'GET',
+    path: '/api/tweet-processor/status/[taskId]',
+    title: '查询任务状态',
+    description: '🔍 查询推文处理任务的执行状态和结果',
+    pathParams: [
+      {
+        name: 'taskId',
+        type: 'string',
+        required: true,
+        description: '任务唯一标识符，由更新接口返回',
+        example: 'cmfw4cfn300003233jpx4ee3c'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '查询成功',
+        example: {
+          success: true,
+          message: "任务状态查询成功",
+          data: {
+            taskId: "cmfw4cfn300003233jpx4ee3c",
+            tweetId: "1969561815333159348",
+            taskType: "update_data",
+            status: "completed",
+            startedAt: "2025-09-23T05:32:41.393Z",
+            completedAt: "2025-09-23T05:32:50.394Z",
+            result: {
+              success: true,
+              message: "推文社交数据已更新",
+              data: {
+                tweetId: "1969561815333159348",
+                oldData: {
+                  replyCount: 5,
+                  retweetCount: 1,
+                  likeCount: 13,
+                  viewCount: 681
+                },
+                newData: {
+                  replyCount: 15,
+                  retweetCount: 6,
+                  likeCount: 114,
+                  viewCount: 742
+                },
+                hasChanges: true,
+                lastUpdatedAt: "2025.09.23 13:32:50"
+              }
+            }
+          },
+          timestamp: "2025-09-23T05:32:55.922Z"
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: true
+          },
+          {
+            name: 'data.taskId',
+            type: 'string',
+            description: '任务ID',
+            example: 'cmfw4cfn300003233jpx4ee3c'
+          },
+          {
+            name: 'data.tweetId',
+            type: 'string',
+            description: '推文ID',
+            example: '1969561815333159348'
+          },
+          {
+            name: 'data.taskType',
+            type: 'string',
+            description: '任务类型：update_data, crawl_comments, generate_comments',
+            example: 'update_data'
+          },
+          {
+            name: 'data.status',
+            type: 'string',
+            description: '任务状态：queued, running, completed, failed',
+            example: 'completed'
+          },
+          {
+            name: 'data.result.data.oldData',
+            type: 'object',
+            description: '更新前的社交数据',
+            example: { replyCount: 5, retweetCount: 1, likeCount: 13, viewCount: 681 }
+          },
+          {
+            name: 'data.result.data.newData',
+            type: 'object',
+            description: '更新后的社交数据',
+            example: { replyCount: 15, retweetCount: 6, likeCount: 114, viewCount: 742 }
+          },
+          {
+            name: 'data.result.data.hasChanges',
+            type: 'boolean',
+            description: '数据是否发生变化',
+            example: true
+          },
+          {
+            name: 'data.result.data.lastUpdatedAt',
+            type: 'string',
+            description: '最后更新时间（中文格式）',
+            example: '2025.09.23 13:32:50'
+          }
+        ]
+      },
+      {
+        status: 404,
+        description: '任务不存在',
+        example: {
+          error: "任务 invalid-task-id 不存在",
+          code: "INVALID_REQUEST"
+        },
+        fields: [
+          {
+            name: 'error',
+            type: 'string',
+            description: '错误信息',
+            example: '任务 invalid-task-id 不存在'
+          },
+          {
+            name: 'code',
+            type: 'string',
+            description: '错误代码',
+            example: 'INVALID_REQUEST'
+          }
+        ]
+      }
+    ],
+    example: `curl -H "x-api-key: unicatcher-api-key-2024" \\
+     http://localhost:3067/api/tweet-processor/status/cmfw4cfn300003233jpx4ee3c`
+  },
+
+  {
+    id: 'tweet-cancel',
+    method: 'DELETE',
+    path: '/api/tweet-processor/status/[taskId]',
+    title: '取消任务',
+    description: '❌ 取消正在执行的推文处理任务',
+    pathParams: [
+      {
+        name: 'taskId',
+        type: 'string',
+        required: true,
+        description: '任务唯一标识符',
+        example: 'cmfw4cfn300003233jpx4ee3c'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '取消成功',
+        example: {
+          success: true,
+          message: "任务已取消",
+          data: {
+            taskId: "cmfw4cfn300003233jpx4ee3c",
+            cancelledAt: "2025-09-23T05:35:00.000Z"
+          }
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: true
+          },
+          {
+            name: 'message',
+            type: 'string',
+            description: '操作结果消息',
+            example: '任务已取消'
+          },
+          {
+            name: 'data.taskId',
+            type: 'string',
+            description: '被取消的任务ID',
+            example: 'cmfw4cfn300003233jpx4ee3c'
+          },
+          {
+            name: 'data.cancelledAt',
+            type: 'string',
+            description: '取消时间（ISO 8601格式）',
+            example: '2025-09-23T05:35:00.000Z'
+          }
+        ]
+      }
+    ],
+    example: `curl -X DELETE \\
+  -H "x-api-key: unicatcher-api-key-2024" \\
+  http://localhost:3067/api/tweet-processor/status/cmfw4cfn300003233jpx4ee3c`
+  },
+
+  // 推文评论处理接口
+  {
+    id: 'comment-crawl',
+    method: 'POST',
+    path: '/api/tweet-processor/crawl-comments',
+    title: '爬取推文评论',
+    description: '🔍 异步爬取指定推文的评论数据，支持全量爬取和增量爬取',
+    params: [
+      {
+        name: 'tweetId',
+        type: 'string',
+        required: true,
+        description: '推文ID',
+        example: '1969561815333159348'
+      },
+      {
+        name: 'incremental',
+        type: 'boolean',
+        required: false,
+        description: '是否增量爬取（默认false，全量爬取）',
+        example: false
+      },
+      {
+        name: 'maxScrolls',
+        type: 'number',
+        required: false,
+        description: '最大滚动次数，用于加载更多评论（1-10，默认3）',
+        example: 3
+      }
+    ],
+    responses: [
+      {
+        status: 202,
+        description: '任务提交成功',
+        example: {
+          success: true,
+          message: '评论爬取任务已提交',
+          data: {
+            taskId: 'cm4v7x8y9000008l4abc12345',
+            tweetId: '1969561815333159348',
+            incremental: false,
+            maxScrolls: 20,
+            status: 'queued',
+            submittedAt: '2024-01-01T10:00:00Z'
+          }
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: true
+          },
+          {
+            name: 'message',
+            type: 'string',
+            description: '操作结果信息',
+            example: '评论爬取任务已提交'
+          },
+          {
+            name: 'data.taskId',
+            type: 'string',
+            description: '任务ID，用于查询任务状态',
+            example: 'cm4v7x8y9000008l4abc12345'
+          },
+          {
+            name: 'data.status',
+            type: 'string',
+            description: '任务状态',
+            example: 'queued'
+          },
+          {
+            name: 'data.submittedAt',
+            type: 'string',
+            description: '任务提交时间（ISO 8601格式）',
+            example: '2024-01-01T10:00:00Z'
+          }
+        ]
+      },
+      {
+        status: 409,
+        description: '任务已在运行中',
+        example: {
+          error: '推文 1969561815333159348 的评论爬取任务正在运行中',
+          code: 'TASK_ALREADY_RUNNING'
+        },
+        fields: [
+          {
+            name: 'error',
+            type: 'string',
+            description: '错误信息',
+            example: '推文 1969561815333159348 的评论爬取任务正在运行中'
+          },
+          {
+            name: 'code',
+            type: 'string',
+            description: '错误代码',
+            example: 'TASK_ALREADY_RUNNING'
+          }
+        ]
+      },
+      {
+        status: 429,
+        description: '并发任务数达到上限',
+        example: {
+          error: '并发任务数已达上限: 10',
+          code: 'MAX_CONCURRENT_REACHED'
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/tweet-processor/crawl-comments \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-2024" \\
+  -d '{"tweetId": "1969561815333159348", "incremental": false, "maxScrolls": 20}'`
+  },
+
+  {
+    id: 'comment-view',
+    method: 'GET',
+    path: '/api/tweet-processor/comments/[tweetId]',
+    title: '获取推文评论',
+    description: '📄 获取指定推文的评论数据和统计信息',
+    pathParams: [
+      {
+        name: 'tweetId',
+        type: 'string',
+        required: true,
+        description: '推文ID',
+        example: '1969561815333159348'
+      }
+    ],
+    queryParams: [
+      {
+        name: 'limit',
+        type: 'number',
+        required: false,
+        description: '返回评论数量限制（默认50）',
+        example: 50
+      },
+      {
+        name: 'includeReplies',
+        type: 'boolean',
+        required: false,
+        description: '是否包含回复评论（默认true）',
+        example: true
+      },
+      {
+        name: 'includeStats',
+        type: 'boolean',
+        required: false,
+        description: '是否包含统计信息和爬取历史（默认true）',
+        example: true
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '获取成功',
+        example: {
+          success: true,
+          message: '评论数据获取成功',
+          data: {
+            tweetId: '1969561815333159348',
+            comments: [
+              {
+                commentId: '1969562000000000000',
+                content: 'Great post! Thanks for sharing.',
+                authorUsername: 'user123',
+                authorNickname: 'John Doe',
+                authorProfileImage: 'https://pbs.twimg.com/profile_images/...',
+                replyCount: 2,
+                likeCount: 15,
+                publishedAt: 1703123456789,
+                scrapedAt: 1703123500000,
+                isReply: false,
+                parentCommentId: null
+              }
+            ],
+            pagination: {
+              total: 125,
+              returned: 50,
+              hasMore: true
+            },
+            stats: {
+              totalComments: 125,
+              replyComments: 43,
+              directComments: 82,
+              latestCommentAt: '2024-01-01T10:30:00Z'
+            },
+            crawlHistory: [
+              {
+                sessionId: 'cm4v7x8y9000008l4def67890',
+                status: 'completed',
+                totalComments: 125,
+                newComments: 15,
+                isIncremental: true,
+                startedAt: '2024-01-01T10:25:00Z',
+                completedAt: '2024-01-01T10:27:00Z'
+              }
+            ]
+          },
+          timestamp: '2024-01-01T10:30:00Z'
+        }
+      },
+      {
+        status: 404,
+        description: '推文不存在',
+        example: {
+          error: 'Tweet not found in database'
+        }
+      }
+    ],
+    example: `curl -H "x-api-key: unicatcher-api-key-2024" \\
+     "http://localhost:3067/api/tweet-processor/comments/1969561815333159348?limit=20&includeStats=true"`
+  },
+
+  {
+    id: 'comment-clear',
+    method: 'DELETE',
+    path: '/api/tweet-processor/clear-comments/[tweetId]',
+    title: '清除推文评论',
+    description: '🗑️ 删除指定推文的所有评论数据',
+    pathParams: [
+      {
+        name: 'tweetId',
+        type: 'string',
+        required: true,
+        description: '推文ID',
+        example: '1969561815333159348'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '清除成功',
+        example: {
+          success: true,
+          message: '评论清理完成',
+          data: {
+            tweetId: '1969561815333159348',
+            deletedComments: 125,
+            beforeStats: {
+              totalComments: 125,
+              replyComments: 43,
+              latestCommentAt: '2024-01-01T10:25:00Z'
+            },
+            clearedAt: '2024-01-01T10:30:00Z'
+          }
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: true
+          },
+          {
+            name: 'data.deletedComments',
+            type: 'number',
+            description: '删除的评论数量',
+            example: 125
+          },
+          {
+            name: 'data.beforeStats',
+            type: 'object',
+            description: '清除前的统计信息',
+            example: {}
+          }
+        ]
+      },
+      {
+        status: 404,
+        description: '推文不存在',
+        example: {
+          error: 'Tweet not found in database'
+        }
+      }
+    ],
+    example: `curl -X DELETE -H "x-api-key: unicatcher-api-key-2024" \\
+     http://localhost:3067/api/tweet-processor/clear-comments/1969561815333159348`
+  },
+
+  {
+    id: 'tweet-processor-health',
+    method: 'GET',
+    path: '/api/tweet-processor/update',
+    title: '推文处理器状态',
+    description: '💚 获取推文处理器的健康状态和运行信息',
+    responses: [
+      {
+        status: 200,
+        description: '健康检查成功',
+        example: {
+          success: true,
+          service: "tweet-processor-update",
+          status: "healthy",
+          data: {
+            runningTasks: 2,
+            maxConcurrentTasks: 10,
+            runningTaskDetails: [
+              {
+                taskId: "task123",
+                tweetId: "1234567890",
+                taskType: "update_data",
+                runningTime: 5000
+              }
+            ],
+            timestamp: "2025-09-23T05:30:12.200Z"
+          }
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '服务是否正常',
+            example: true
+          },
+          {
+            name: 'service',
+            type: 'string',
+            description: '服务名称',
+            example: 'tweet-processor-update'
+          },
+          {
+            name: 'status',
+            type: 'string',
+            description: '健康状态',
+            example: 'healthy'
+          },
+          {
+            name: 'data.runningTasks',
+            type: 'number',
+            description: '当前运行的任务数',
+            example: 2
+          },
+          {
+            name: 'data.maxConcurrentTasks',
+            type: 'number',
+            description: '最大并发任务数',
+            example: 10
+          },
+          {
+            name: 'data.runningTaskDetails',
+            type: 'array',
+            description: '正在运行的任务详情',
+            example: [{ taskId: "task123", tweetId: "1234567890" }]
+          }
+        ]
+      }
+    ],
+    example: `curl -H "x-api-key: unicatcher-api-key-2024" \\
+     http://localhost:3067/api/tweet-processor/update`
+  },
+
   // AI批处理清除接口
   {
     id: 'ai-batch-clear-post',
@@ -1789,6 +2489,11 @@ export default function ApiDocsClientPage() {
       title: '数据管理',
       description: '获取和提取推文数据',
       endpoints: apiEndpoints.filter(ep => ep.path.includes('/data'))
+    },
+    'tweet-processor': {
+      title: '推文处理器',
+      description: '单推文数据更新、评论获取、AI评论生成，支持异步处理和并发控制',
+      endpoints: apiEndpoints.filter(ep => ep.path.includes('/tweet-processor'))
     },
     'ai-batch': {
       title: 'AI批处理',

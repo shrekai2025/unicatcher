@@ -482,6 +482,55 @@ export class OpenAIService extends BaseAIService {
     }
   }
 
+  /**
+   * 通用文本生成方法
+   */
+  async generateText(prompt: string): Promise<string> {
+    try {
+      console.log(`[OpenAI文本生成] 开始生成，模型: ${this.model}`);
+
+      const requestBody = {
+        model: this.model,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+      };
+
+      const response = await fetch(`${this.baseURL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`OpenAI API 错误: ${response.status} ${error}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+
+      if (!content) {
+        throw new Error('OpenAI返回空内容');
+      }
+
+      console.log(`[OpenAI文本生成] 生成完成，内容长度: ${content.length}`);
+      return content;
+
+    } catch (error) {
+      console.error('[OpenAI文本生成] 生成失败:', error);
+      throw new Error(`OpenAI文本生成失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }

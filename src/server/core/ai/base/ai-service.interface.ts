@@ -62,4 +62,10 @@ export abstract class BaseAIService {
     content: string,
     targetLanguage?: string // 默认 'zh-CN'
   ): Promise<TranslationResult>;
+
+  /**
+   * 通用文本生成方法
+   * 用于评论生成等场景
+   */
+  abstract generateText(prompt: string): Promise<string>;
 }

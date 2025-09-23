@@ -285,9 +285,9 @@ export class AIProcessManager {
           progress: {
             total: 0,
             processed: 0,
-            succeeded: 0,
+            successful: 0,
             failed: 0,
-            valueless: 0,
+            startTime: Date.now(),
             currentBatch: 0,
             totalBatches: 0,
           },
@@ -309,9 +309,9 @@ export class AIProcessManager {
       progress: {
         total: record.totalTweets,
         processed: record.processedTweets,
-        succeeded: record.processedTweets - record.failedTweets,
+        successful: record.processedTweets - record.failedTweets,
         failed: record.failedTweets,
-        valueless: 0, // 这个字段暂时没有存储，可以后续添加
+        startTime: record.startedAt?.getTime() || Date.now(),
         currentBatch: Math.ceil(record.processedTweets / 10), // 假设每批10条
         totalBatches: Math.ceil(record.totalTweets / 10),
       },

@@ -159,6 +159,94 @@ model Tweet {
   @@index([isDeleted, listId, publishedAt])
 }
 
+// 推文处理任务表 - 记录单推文处理任务的状态
+model TweetProcessTask {
+  id            String    @id @default(cuid())
+  tweetId       String    // 目标推文ID
+  taskType      String    // 任务类型: update_data, crawl_comments, generate_comments
+  status        String    // 任务状态: queued, running, completed, failed
+  result        String?   // 任务结果（JSON格式）
+  errorMessage  String?   // 错误信息
+  startedAt     DateTime? // 开始时间
+  completedAt   DateTime? // 完成时间
+  lastUpdatedAt DateTime? // 数据最后更新时间（用于10分钟检查）
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tweetId, taskType])
+  @@index([status])
+  @@index([lastUpdatedAt])
+  @@index([createdAt])
+}
+
+// 推文评论表 - 存储推文的评论数据
+model TweetComment {
+  id                String    @id @default(cuid())
+  tweetId           String    // 推文ID
+  commentId         String    @unique // 评论ID
+  content           String    // 评论内容
+  authorUsername    String    // 评论作者用户名
+  authorNickname    String    // 评论作者昵称
+  authorProfileImage String?  // 评论作者头像
+  replyCount        Int       @default(0) // 回复数
+  likeCount         Int       @default(0) // 点赞数
+  publishedAt       BigInt    // 发布时间戳
+  scrapedAt         BigInt    // 爬取时间戳
+  isReply           Boolean   @default(false) // 是否为回复
+  parentCommentId   String?   // 父评论ID
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([tweetId, publishedAt])
+  @@index([commentId])
+  @@index([tweetId])
+  @@index([parentCommentId])
+}
+
+// 评论爬取会话记录表 - 记录评论爬取任务的状态
+model CommentCrawlSession {
+  id              String    @id @default(cuid())
+  tweetId         String    // 推文ID
+  status          String    // 状态: running, completed, failed
+  totalComments   Int       @default(0) // 总评论数
+  newComments     Int       @default(0) // 新增评论数
+  lastCommentId   String?   // 最后处理的评论ID
+  isIncremental   Boolean   @default(false) // 是否为增量更新
+
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tweetId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+// AI生成评论记录表 - 记录AI评论生成的历史
+model AIGeneratedComment {
+  id                      String    @id @default(cuid())
+  tweetId                 String    // 推文ID
+  userInfo                String?   // 用户提供的额外信息
+  systemPrompt            String?   // 自定义系统提示词
+  commentLength           String    // 评论长度: short, medium, long
+  commentCount            Int       // 生成评论数量
+  generatedComments       String    // 生成的评论（JSON数组格式）
+  basedOnExisting         Boolean   @default(false) // 是否基于现有评论
+  existingCommentsSnapshot String?  // 现有评论快照（JSON格式）
+  aiProvider              String    // AI供应商
+  aiModel                 String    // AI模型
+
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([tweetId])
+  @@index([createdAt])
+}
+
 // 数据同步记录表 - 记录外部系统的数据获取历史
 model DataSyncRecord {
   id            String    @id @default(cuid())
