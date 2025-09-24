@@ -3137,35 +3137,18 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
     description: '批量添加手采推文文本数据到指定分类中',
     params: [
       {
-        name: 'categoryId',
-        type: 'string',
-        required: true,
-        description: '分类ID',
-        example: 'cat_123456'
-      },
-      {
-        name: 'texts',
+        name: 'data',
         type: 'array',
         required: true,
         description: '文本数据数组',
         example: [
           {
-            content: 'AI正在改变我们的工作方式，这是一个令人兴奋的时代。',
-            source: 'manual',
-            metadata: {
-              author: '科技博主',
-              platform: 'Twitter',
-              date: '2025-01-15'
-            }
+            categoryId: 'cat_123456',
+            content: 'AI正在改变我们的工作方式，这是一个令人兴奋的时代。'
           },
           {
-            content: '机器学习算法的突破让AI应用变得更加实用和高效。',
-            source: 'manual',
-            metadata: {
-              author: 'AI研究员',
-              platform: 'Twitter',
-              date: '2025-01-15'
-            }
+            categoryId: 'cat_123456',
+            content: '机器学习算法的突破让AI应用变得更加实用和高效。'
           }
         ]
       }
@@ -3247,25 +3230,14 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: unicatcher-api-key-demo" \\
   -d '{
-    "categoryId": "cat_123456",
-    "texts": [
+    "data": [
       {
-        "content": "AI正在改变我们的工作方式，这是一个令人兴奋的时代。",
-        "source": "manual",
-        "metadata": {
-          "author": "科技博主",
-          "platform": "Twitter",
-          "date": "2025-01-15"
-        }
+        "categoryId": "cat_123456",
+        "content": "AI正在改变我们的工作方式，这是一个令人兴奋的时代。"
       },
       {
-        "content": "机器学习算法的突破让AI应用变得更加实用和高效。",
-        "source": "manual",
-        "metadata": {
-          "author": "AI研究员",
-          "platform": "Twitter",
-          "date": "2025-01-15"
-        }
+        "categoryId": "cat_123456",
+        "content": "机器学习算法的突破让AI应用变得更加实用和高效。"
       }
     ]
   }'`
