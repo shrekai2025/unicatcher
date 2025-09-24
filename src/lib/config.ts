@@ -206,6 +206,41 @@ export const config = {
       // Retweet识别选择器
       retweetSelector: 'svg[viewBox="0 0 24 24"] path[d*="M4.75 3.79l4.603 4.3"]', // 转发图标特征
       retweetTextSelector: '[data-testid="socialContext"]', // 包含"reposted"文本的元素
+      // 性能优化选项
+      disableImages: false, // 是否禁用图片加载以提高性能
+    },
+
+    // YouTube Channel 爬取专用配置
+    youtubeChannel: {
+      waitTime: 4000, // 页面加载和滚动等待时间（4秒，比Twitter稍长）
+      scrollTrigger: 100, // 滚动到距离底部100px时触发加载
+      maxVideosPerChannel: 20, // 每个频道最大爬取视频数量
+      duplicateStopCount: 3, // 连续遇到重复视频时停止爬取
+      // 用户代理配置（YouTube专用）
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      // YouTube 页面选择器
+      selectors: {
+        // 容器选择器
+        videosContainer: '#contents ytd-rich-grid-renderer #contents',
+        videoContainer: 'ytd-rich-item-renderer, ytd-video-renderer',
+
+        // 基础信息选择器
+        videoTitle: '#video-title, h3 a#video-title',
+        videoUrl: '#video-title, h3 a#video-title',
+        thumbnail: 'img#img',
+        duration: 'span.ytd-thumbnail-overlay-time-status-renderer',
+        viewCount: 'span.inline-metadata-item:first-child',
+        publishedAt: 'span.inline-metadata-item:last-child',
+
+        // 频道信息选择器
+        channelName: '#channel-name #text, .ytd-channel-name #text',
+        channelHandle: '#channel-name .ytd-channel-name, #channel-handle',
+        channelUrl: '#channel-name a, .ytd-channel-name a',
+
+        // 加载更多选择器
+        loadMoreButton: 'button[aria-label*="Show more"]',
+        scrollContainer: 'html',
+      },
     },
   },
 

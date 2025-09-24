@@ -12,6 +12,7 @@ export class BrowserManager {
   private context: BrowserContext | null = null;
   private page: Page | null = null;
   private isHealthy = true;
+  private cleanupPromise?: Promise<void>; // 新增：防止重复关闭
 
   constructor(private readonly browserConfig: BrowserConfig) {}
 
@@ -325,31 +326,78 @@ export class BrowserManager {
   }
 
   /**
-   * 关闭浏览器
+   * 关闭浏览器 - 改进版：防止重复关闭，并行清理
    */
   async close(): Promise<void> {
+    // 防止重复关闭
+    if (this.cleanupPromise) {
+      return this.cleanupPromise;
+    }
+
+    this.cleanupPromise = this.performCleanup();
+    return this.cleanupPromise;
+  }
+
+  /**
+   * 执行清理操作 - 新增：并行清理和超时机制
+   */
+  private async performCleanup(): Promise<void> {
     try {
-      // 保存登录状态
-      await this.saveStorageState();
-      
-      if (this.page) {
-        await this.page.close();
-        this.page = null;
+      // 设置关闭超时
+      const cleanupTasks: Promise<void>[] = [];
+
+      // 先保存登录状态
+      try {
+        await this.saveStorageState();
+      } catch (error) {
+        console.warn('保存登录状态失败:', error);
+      }
+
+      if (this.page && !this.page.isClosed()) {
+        cleanupTasks.push(
+          Promise.race([
+            this.page.close(),
+            new Promise<void>((_, reject) =>
+              setTimeout(() => reject(new Error('页面关闭超时')), 5000)
+            )
+          ])
+        );
       }
 
       if (this.context) {
-        await this.context.close();
-        this.context = null;
+        cleanupTasks.push(
+          Promise.race([
+            this.context.close(),
+            new Promise<void>((_, reject) =>
+              setTimeout(() => reject(new Error('上下文关闭超时')), 5000)
+            )
+          ])
+        );
       }
 
       if (this.browser) {
-        await this.browser.close();
-        this.browser = null;
+        cleanupTasks.push(
+          Promise.race([
+            this.browser.close(),
+            new Promise<void>((_, reject) =>
+              setTimeout(() => reject(new Error('浏览器关闭超时')), 10000)
+            )
+          ])
+        );
       }
 
-      console.log('浏览器已关闭');
+      // 并行关闭所有资源
+      await Promise.allSettled(cleanupTasks);
+
+      console.log('浏览器资源清理完成');
     } catch (error) {
-      console.error('关闭浏览器失败:', error);
+      console.error('浏览器清理失败:', error);
+    } finally {
+      // 强制清除所有引用
+      this.page = null;
+      this.context = null;
+      this.browser = null;
+      this.isHealthy = false;
     }
   }
 
