@@ -163,13 +163,23 @@ model Tweet {
 model TweetProcessTask {
   id            String    @id @default(cuid())
   tweetId       String    // 目标推文ID
-  taskType      String    // 任务类型: update_data, crawl_comments, generate_comments
+  taskType      String    // 任务类型: update_data, crawl_comments, generate_comments, x_helper_process
   status        String    // 任务状态: queued, running, completed, failed
   result        String?   // 任务结果（JSON格式）
   errorMessage  String?   // 错误信息
   startedAt     DateTime? // 开始时间
   completedAt   DateTime? // 完成时间
   lastUpdatedAt DateTime? // 数据最后更新时间（用于10分钟检查）
+
+  // X Helper 专用字段
+  tweetUrl          String?   // 推文链接
+  tweetContent      String?   // 推文正文
+  authorUsername    String?   // 发推者用户名
+  authorNickname    String?   // 发推者昵称
+  authorProfileImage String?  // 发推者头像
+  translatedContent String?   // 翻译结果
+  aiComments        String?   // AI生成的评论(JSON格式)
+  userExtraInfo     String?   // 用户额外信息
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -178,6 +188,7 @@ model TweetProcessTask {
   @@index([status])
   @@index([lastUpdatedAt])
   @@index([createdAt])
+  @@index([taskType])
 }
 
 // 推文评论表 - 存储推文的评论数据

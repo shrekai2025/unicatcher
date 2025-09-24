@@ -2607,6 +2607,312 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
       }
     ],
     example: `curl -X GET http://localhost:3067/api/external/tweet-info/1234567890123456789`
+  },
+
+  // 独立外部接口 (无需数据库存储)
+  {
+    id: 'translate-standalone',
+    method: 'POST',
+    path: '/api/external/translate-standalone',
+    title: '独立翻译接口',
+    description: '独立的推文翻译接口，无需将数据存储到unicatcher数据库中。外部项目可以传入推文信息进行翻译并自行管理数据。',
+    params: [
+      {
+        name: 'content',
+        type: 'string',
+        required: true,
+        description: '要翻译的推文内容',
+        example: 'Hello world! This is a test tweet.'
+      },
+      {
+        name: 'aiConfig',
+        type: 'object',
+        required: true,
+        description: 'AI配置对象',
+        example: {
+          provider: 'openai',
+          model: 'gpt-4o',
+          apiKey: 'your-openai-api-key',
+          baseURL: 'https://api.openai.com/v1'
+        }
+      },
+      {
+        name: 'targetLanguage',
+        type: 'string',
+        required: false,
+        description: '目标语言',
+        options: ['zh-CN', 'en-US'],
+        example: 'zh-CN'
+      },
+      {
+        name: 'tweetId',
+        type: 'string',
+        required: false,
+        description: '推文ID（仅用于记录）',
+        example: '1234567890'
+      },
+      {
+        name: 'tweetUrl',
+        type: 'string',
+        required: false,
+        description: '推文链接（仅用于记录）',
+        example: 'https://x.com/user/status/1234567890'
+      },
+      {
+        name: 'authorUsername',
+        type: 'string',
+        required: false,
+        description: '作者用户名（仅用于记录）',
+        example: 'example_user'
+      },
+      {
+        name: 'authorNickname',
+        type: 'string',
+        required: false,
+        description: '作者昵称（仅用于记录）',
+        example: '示例用户'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '翻译成功',
+        example: {
+          success: true,
+          message: '翻译成功',
+          data: {
+            tweetId: '1234567890',
+            tweetUrl: 'https://x.com/user/status/1234567890',
+            authorUsername: 'example_user',
+            authorNickname: '示例用户',
+            originalContent: 'Hello world! This is a test tweet.',
+            translatedContent: '你好世界！这是一条测试推文。',
+            originalLanguage: 'en',
+            targetLanguage: 'zh-CN',
+            translationProvider: 'openai',
+            translationModel: 'gpt-4o',
+            translatedAt: '2025-01-15T10:30:45.123Z'
+          }
+        }
+      },
+      {
+        status: 401,
+        description: 'API密钥无效',
+        example: {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or missing API key'
+          }
+        }
+      },
+      {
+        status: 400,
+        description: '参数错误',
+        example: {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Missing or invalid content'
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/external/translate-standalone \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "content": "Hello world! This is a test tweet about AI.",
+    "targetLanguage": "zh-CN",
+    "aiConfig": {
+      "provider": "openai",
+      "model": "gpt-4o",
+      "apiKey": "your-openai-api-key"
+    },
+    "tweetId": "1234567890",
+    "tweetUrl": "https://x.com/user/status/1234567890",
+    "authorUsername": "example_user",
+    "authorNickname": "示例用户"
+  }'`
+  },
+
+  {
+    id: 'generate-comments-standalone',
+    method: 'POST',
+    path: '/api/external/generate-comments-standalone',
+    title: '独立评论生成接口',
+    description: '独立的推文评论生成接口，无需将数据存储到unicatcher数据库中。为传入的推文内容生成AI评论，外部项目可以自行管理数据。',
+    params: [
+      {
+        name: 'content',
+        type: 'string',
+        required: true,
+        description: '推文内容',
+        example: '分享一个关于AI发展的有趣观点：AI不会替代人类，而是让人类变得更强大。'
+      },
+      {
+        name: 'aiConfig',
+        type: 'object',
+        required: true,
+        description: 'AI配置对象',
+        example: {
+          provider: 'zhipu',
+          model: 'glm-4.5-flash',
+          apiKey: 'your-zhipu-api-key'
+        }
+      },
+      {
+        name: 'tweetId',
+        type: 'string',
+        required: false,
+        description: '推文ID（仅用于记录）',
+        example: '1234567890'
+      },
+      {
+        name: 'tweetUrl',
+        type: 'string',
+        required: false,
+        description: '推文链接（仅用于记录）',
+        example: 'https://x.com/user/status/1234567890'
+      },
+      {
+        name: 'authorUsername',
+        type: 'string',
+        required: false,
+        description: '作者用户名（仅用于记录）',
+        example: 'ai_enthusiast'
+      },
+      {
+        name: 'authorNickname',
+        type: 'string',
+        required: false,
+        description: '作者昵称（仅用于记录）',
+        example: 'AI爱好者'
+      },
+      {
+        name: 'commentCount',
+        type: 'number',
+        required: false,
+        description: '生成评论数量，1-10，默认3',
+        example: 3
+      },
+      {
+        name: 'commentLength',
+        type: 'string',
+        required: false,
+        description: '评论长度，默认medium',
+        options: ['short', 'medium', 'long'],
+        example: 'medium'
+      },
+      {
+        name: 'language',
+        type: 'string',
+        required: false,
+        description: '评论语言，默认zh-CN',
+        options: ['zh-CN', 'en-US'],
+        example: 'zh-CN'
+      },
+      {
+        name: 'userInfo',
+        type: 'string',
+        required: false,
+        description: '用户信息，用于个性化评论',
+        example: '我是一名软件工程师，对AI技术很感兴趣'
+      },
+      {
+        name: 'systemPrompt',
+        type: 'string',
+        required: false,
+        description: '自定义系统提示词',
+        example: '请生成专业且友好的评论回复'
+      },
+      {
+        name: 'existingComments',
+        type: 'array',
+        required: false,
+        description: '现有评论列表（一般不使用）',
+        example: []
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '评论生成成功',
+        example: {
+          success: true,
+          message: '成功生成 3 条评论',
+          data: {
+            tweetId: '1234567890',
+            tweetUrl: 'https://x.com/user/status/1234567890',
+            authorUsername: 'ai_enthusiast',
+            authorNickname: 'AI爱好者',
+            tweetContent: '分享一个关于AI发展的有趣观点...',
+            comments: [
+              {
+                content: '这个观点很有启发性！AI确实在改变我们的工作方式。',
+                reasoning: '基于推文内容，表达赞同并延伸讨论'
+              },
+              {
+                content: '感谢分享，这让我对AI的未来更加乐观了。',
+                reasoning: '表达感谢并分享个人感受'
+              },
+              {
+                content: '非常同意！期待看到更多这样的深度分析。',
+                reasoning: '表达赞同并鼓励更多分享'
+              }
+            ],
+            commentCount: 3,
+            commentLength: 'medium',
+            language: 'zh-CN',
+            basedOnExistingComments: false,
+            existingCommentsCount: 0,
+            aiProvider: 'zhipu',
+            aiModel: 'glm-4.5-flash',
+            generatedAt: '2025-01-15T10:35:22.456Z'
+          }
+        }
+      },
+      {
+        status: 401,
+        description: 'API密钥无效',
+        example: {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or missing API key'
+          }
+        }
+      },
+      {
+        status: 400,
+        description: '参数错误',
+        example: {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Missing or invalid content'
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/external/generate-comments-standalone \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "content": "分享一个关于AI发展的有趣观点：AI不会替代人类，而是让人类变得更强大。技术的进步应该服务于人类的创造力和想象力。",
+    "aiConfig": {
+      "provider": "zhipu",
+      "model": "glm-4.5-flash",
+      "apiKey": "your-zhipu-api-key"
+    },
+    "commentCount": 5,
+    "commentLength": "medium",
+    "language": "zh-CN",
+    "userInfo": "我是一名软件工程师，对AI技术很感兴趣",
+    "tweetId": "1234567890",
+    "authorUsername": "ai_enthusiast",
+    "authorNickname": "AI爱好者"
+  }'`
   }
 ];
 

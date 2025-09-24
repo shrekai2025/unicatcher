@@ -569,11 +569,57 @@ export class TweetProcessorManager {
       console.log(`[AI评论生成] 开始处理请求: ${request.tweetId}`);
 
       // 检查推文是否存在
-      const tweet = await db.tweet.findUnique({
+      let tweet = await db.tweet.findUnique({
         where: { id: request.tweetId },
       });
 
-      if (!tweet) {
+      // 如果推文不存在但请求中包含内容数据（X Helper场景），创建临时推文对象
+      if (!tweet && request.content) {
+        console.log(`[AI评论生成] 推文不在数据库中，使用请求中的内容数据创建临时推文对象`);
+        tweet = {
+          id: request.tweetId,
+          content: request.content,
+          userNickname: request.authorNickname || '未知用户',
+          userUsername: request.authorUsername || 'unknown',
+          tweetUrl: request.tweetUrl || '',
+          // 其他必需字段使用默认值
+          replyCount: 0,
+          retweetCount: 0,
+          likeCount: 0,
+          viewCount: 0,
+          isRT: false,
+          isReply: false,
+          imageUrls: null,
+          profileImageUrl: null,
+          videoUrls: null,
+          publishedAt: BigInt(Date.now()),
+          listId: '',
+          scrapedAt: BigInt(Date.now()),
+          analysisStatus: null,
+          syncedAt: null,
+          analyzedAt: null,
+          analysisBatchId: null,
+          keywords: null,
+          topicTags: null,
+          contentTypes: null,
+          isValueless: null,
+          aiProcessedAt: null,
+          aiProcessStatus: null,
+          aiRetryCount: 0,
+          translatedContent: null,
+          originalLanguage: null,
+          isTranslated: false,
+          translationProvider: null,
+          translationModel: null,
+          translatedAt: null,
+          isDeleted: false,
+          deletedAt: null,
+          deletedBy: null,
+          taskId: '',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      } else if (!tweet) {
         return {
           success: false,
           message: '推文不存在',

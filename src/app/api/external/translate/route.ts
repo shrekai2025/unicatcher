@@ -8,6 +8,18 @@ export async function POST(request: NextRequest) {
   try {
     console.log('[外部翻译API] 收到请求');
 
+    // 验证API密钥
+    const apiKey = request.headers.get('x-api-key') || request.headers.get('authorization')?.replace('Bearer ', '');
+    if (!apiKey || apiKey !== 'unicatcher-api-key-demo') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'UNAUTHORIZED', message: 'Invalid or missing API key' }
+        },
+        { status: 401 }
+      );
+    }
+
     // 解析请求体
     const body = await request.json();
     const { content, aiConfig } = body;

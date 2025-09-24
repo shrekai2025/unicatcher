@@ -9,6 +9,18 @@ export async function GET(
   { params }: { params: Promise<{ tweetId: string }> }
 ) {
   try {
+    // 验证API密钥
+    const apiKey = request.headers.get('x-api-key') || request.headers.get('authorization')?.replace('Bearer ', '');
+    if (!apiKey || apiKey !== 'unicatcher-api-key-demo') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'UNAUTHORIZED', message: 'Invalid or missing API key' }
+        },
+        { status: 401 }
+      );
+    }
+
     const { tweetId } = await params;
     console.log(`[外部推文信息API] 查询推文信息: ${tweetId}`);
 

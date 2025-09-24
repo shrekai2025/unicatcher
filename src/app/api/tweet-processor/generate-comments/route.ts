@@ -16,6 +16,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       tweetId,
+      content,
+      authorUsername,
+      authorNickname,
+      tweetUrl,
       userInfo,
       systemPrompt,
       includeExistingComments = false,
@@ -135,6 +139,10 @@ export async function POST(request: NextRequest) {
     // 构建请求对象
     const generateRequest: CommentGenerateRequest = {
       tweetId,
+      content,
+      authorUsername,
+      authorNickname,
+      tweetUrl,
       userInfo,
       systemPrompt,
       includeExistingComments,

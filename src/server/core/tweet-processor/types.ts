@@ -114,6 +114,11 @@ export interface CommentGenerateRequest {
     model: string;
     baseURL?: string;
   }; // AI服务配置
+  // X Helper 专用字段：当推文不在数据库中时提供基础数据
+  content?: string; // 推文内容
+  authorUsername?: string; // 作者用户名
+  authorNickname?: string; // 作者昵称
+  tweetUrl?: string; // 推文链接
 }
 
 // 生成的评论

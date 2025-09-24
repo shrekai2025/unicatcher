@@ -3,772 +3,444 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '~/components/dashboard-layout';
 
-interface TweetInfo {
-  id: string;
-  content: string;
-  userNickname: string;
-  userUsername: string;
-  profileImageUrl: string | null;
-  tweetUrl: string;
-  publishedAtFormatted: string;
-
-  // 翻译相关
-  translatedContent: string | null;
-  isTranslated: boolean;
-  originalLanguage: string | null;
-
-  // 统计数据
-  replyCount: number;
-  retweetCount: number;
-  likeCount: number;
-  viewCount: number;
-
-  // 评论相关
-  commentCount: number;
-  recentComments: any[];
-}
-
 interface AIConfig {
-  apiKey: string;
   provider: 'openai' | 'openai-badger' | 'zhipu';
   model: string;
+  apiKey: string;
   baseURL?: string;
 }
 
-interface ProcessTask {
+interface Task {
   id: string;
-  tweetUrl: string;
   tweetId: string;
-  status: 'processing' | 'completed' | 'failed';
-  startTime: string;
+  tweetUrl: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
 
-  // 翻译状态
-  translationStatus: 'pending' | 'processing' | 'completed' | 'failed';
-  translationResult?: any;
+  // 推文信息
+  tweetContent?: string;
+  authorUsername?: string;
+  authorNickname?: string;
+  authorProfileImage?: string;
 
-  // 推特评论爬取状态（第一阶段）
-  crawlCommentsStatus: 'pending' | 'processing' | 'completed' | 'failed';
-  crawlCommentsResult?: any;
+  // 处理结果
+  translatedContent?: string;
+  aiComments?: (string | { content: string; reasoning?: string })[];
+  userExtraInfo?: string;
 
-  // AI生成评论状态（第二阶段）
-  generateCommentsStatus: 'pending' | 'processing' | 'completed' | 'failed';
-  generateCommentsResult?: any;
+  // 时间信息
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
 
-  tweetInfo?: TweetInfo;
-  error?: string;
+  // 错误信息
+  errorMessage?: string;
 }
 
 export default function XHelperPage() {
-  // 客户端挂载状态
   const [mounted, setMounted] = useState(false);
-
-  // 基本状态
   const [tweetUrl, setTweetUrl] = useState('');
+  const [userExtraInfo, setUserExtraInfo] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('');
+  const [currentTask, setCurrentTask] = useState<Task | null>(null);
+  const [taskHistory, setTaskHistory] = useState<Task[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentTask, setCurrentTask] = useState<ProcessTask | null>(null);
+  const [isReTranslating, setIsReTranslating] = useState(false);
+  const [isReGeneratingComments, setIsReGeneratingComments] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // AI配置状态
-  const [showAIConfig, setShowAIConfig] = useState(false);
   const [translationAIConfig, setTranslationAIConfig] = useState<AIConfig>({
-    apiKey: '',
-    provider: 'zhipu',
-    model: 'glm-4.5-flash'
+    provider: 'openai',
+    model: 'gpt-4o',
+    apiKey: ''
   });
 
   const [commentAIConfig, setCommentAIConfig] = useState<AIConfig>({
-    apiKey: '',
-    provider: 'zhipu',
-    model: 'glm-4.5-flash'
+    provider: 'openai',
+    model: 'gpt-4o',
+    apiKey: ''
   });
 
-  // 任务历史
-  const [taskHistory, setTaskHistory] = useState<ProcessTask[]>([]);
+  const [showAIConfig, setShowAIConfig] = useState(false);
 
-  // 恢复状态提示
-  const [recoveryStatus, setRecoveryStatus] = useState<string | null>(null);
-
-  // 客户端挂载后加载localStorage数据
   useEffect(() => {
     setMounted(true);
-
-    // 加载翻译AI配置
-    const savedTranslationConfig = localStorage.getItem('x-helper-translation-ai-config');
-    if (savedTranslationConfig) {
-      try {
-        setTranslationAIConfig(JSON.parse(savedTranslationConfig));
-      } catch (e) {
-        console.warn('翻译AI配置解析失败:', e);
-      }
-    }
-
-    // 加载评论AI配置
-    const savedCommentConfig = localStorage.getItem('x-helper-comment-ai-config');
-    if (savedCommentConfig) {
-      try {
-        setCommentAIConfig(JSON.parse(savedCommentConfig));
-      } catch (e) {
-        console.warn('评论AI配置解析失败:', e);
-      }
-    }
-
-    // 加载任务历史
-    const savedTaskHistory = localStorage.getItem('x-helper-task-history');
-    if (savedTaskHistory) {
-      try {
-        const tasks = JSON.parse(savedTaskHistory);
-        // 检查是否有未完成的任务需要恢复
-        checkAndRecoverUnfinishedTasks(tasks);
-        setTaskHistory(tasks);
-      } catch (e) {
-        console.warn('任务历史解析失败:', e);
-      }
-    }
+    loadAIConfigs();
+    loadTaskHistory();
   }, []);
 
-  // 保存配置到localStorage
+  // 从localStorage加载AI配置
+  const loadAIConfigs = () => {
+    try {
+      const savedTranslationConfig = localStorage.getItem('x-helper-translation-ai-config');
+      const savedCommentConfig = localStorage.getItem('x-helper-comment-ai-config');
+      const savedUserExtraInfo = localStorage.getItem('x-helper-user-extra-info');
+      const savedSystemPrompt = localStorage.getItem('x-helper-system-prompt');
+
+      if (savedTranslationConfig) {
+        setTranslationAIConfig(JSON.parse(savedTranslationConfig));
+      }
+      if (savedCommentConfig) {
+        setCommentAIConfig(JSON.parse(savedCommentConfig));
+      }
+      if (savedUserExtraInfo) {
+        setUserExtraInfo(savedUserExtraInfo);
+      }
+      if (savedSystemPrompt) {
+        setSystemPrompt(savedSystemPrompt);
+      }
+    } catch (error) {
+      console.error('加载AI配置失败:', error);
+    }
+  };
+
+  // 保存AI配置到localStorage
   const saveAIConfigs = () => {
-    if (mounted) {
+    try {
       localStorage.setItem('x-helper-translation-ai-config', JSON.stringify(translationAIConfig));
       localStorage.setItem('x-helper-comment-ai-config', JSON.stringify(commentAIConfig));
+      localStorage.setItem('x-helper-user-extra-info', userExtraInfo);
+      localStorage.setItem('x-helper-system-prompt', systemPrompt);
+      setShowAIConfig(false);
+      console.log('AI配置已保存');
+    } catch (error) {
+      console.error('保存AI配置失败:', error);
     }
-    setShowAIConfig(false);
+  };
+
+  // Debug：显示当前历史记录信息
+  const debugHistoryInfo = () => {
+    console.log('[Debug] 当前历史记录状态:', {
+      taskHistoryLength: taskHistory.length,
+      taskHistoryPreview: taskHistory.slice(0, 3).map(task => ({
+        id: task.id,
+        tweetUrl: task.tweetUrl,
+        userExtraInfo: !!task.userExtraInfo,
+        status: task.status
+      })),
+      currentTaskId: currentTask?.id
+    });
+  };
+
+  // 从localStorage加载任务历史
+  const loadTaskHistory = () => {
+    try {
+      const saved = localStorage.getItem('x-helper-task-history');
+      if (saved) {
+        const history = JSON.parse(saved);
+        setTaskHistory(history);
+        if (history.length > 0 && !currentTask) {
+          setCurrentTask(history[0]);
+        }
+      }
+    } catch (error) {
+      console.error('加载任务历史失败:', error);
+    }
   };
 
   // 保存任务历史到localStorage
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem('x-helper-task-history', JSON.stringify(taskHistory));
+  const saveTaskHistory = (history: Task[]) => {
+    try {
+      localStorage.setItem('x-helper-task-history', JSON.stringify(history));
+      setTaskHistory(history);
+    } catch (error) {
+      console.error('保存任务历史失败:', error);
     }
-  }, [taskHistory, mounted]);
+  };
+
+  // 验证推文URL
+  const validateTweetUrl = (url: string): boolean => {
+    const tweetUrlPattern = /^https?:\/\/(twitter\.com|x\.com)\/\w+\/status\/\d+/;
+    return tweetUrlPattern.test(url);
+  };
 
   // 处理推文
-  const handleProcessTweet = async () => {
-    console.log('[X Helper] 开始处理推文:', tweetUrl);
-
+  const processTweet = async () => {
     if (!tweetUrl.trim()) {
-      alert('请输入推文URL');
+      alert('请输入推文链接');
+      return;
+    }
+
+    if (!validateTweetUrl(tweetUrl)) {
+      alert('推文链接格式不正确，请输入有效的Twitter/X链接');
       return;
     }
 
     if (!translationAIConfig.apiKey || !commentAIConfig.apiKey) {
-      console.log('[X Helper] AI配置检查失败 - 翻译配置:', !!translationAIConfig.apiKey, '评论配置:', !!commentAIConfig.apiKey);
-      alert('请先配置AI服务');
+      alert('请先配置AI密钥');
       setShowAIConfig(true);
       return;
     }
 
-    console.log('[X Helper] AI配置检查通过，开始处理');
+    console.log('[X Helper] 开始处理推文:', tweetUrl);
     setIsProcessing(true);
 
     try {
-      // 第1步：解析URL
-      console.log('[X Helper] 步骤1: 解析URL -', tweetUrl);
-      const parseResponse = await fetch('/api/tweet-processor/parse-url', {
+      // 调用推文处理接口
+      const response = await fetch('/api/external/x-helper/process-tweet', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: tweetUrl })
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'unicatcher-api-key-demo'
+        },
+        body: JSON.stringify({
+          tweetUrl,
+          translationAIConfig,
+          commentAIConfig,
+          userExtraInfo,
+          systemPrompt
+        })
       });
 
-      console.log('[X Helper] URL解析响应状态:', parseResponse.status);
-      const parseResult = await parseResponse.json();
-      console.log('[X Helper] URL解析结果:', parseResult);
-
-      if (!parseResult.success) {
-        throw new Error(parseResult.error?.message || 'URL解析失败');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || `HTTP ${response.status}`);
       }
 
-      const tweetId = parseResult.data.tweetId;
-      console.log('[X Helper] 提取的推文ID:', tweetId);
+      const result = await response.json();
+      console.log('[X Helper] 任务创建成功:', result);
 
-      // 创建任务记录
-      const newTask: ProcessTask = {
-        id: Date.now().toString(),
-        tweetUrl: tweetUrl,
-        tweetId: tweetId,
-        status: 'processing',
-        startTime: new Date().toLocaleString('zh-CN'),
-        translationStatus: 'pending',
-        crawlCommentsStatus: 'pending',
-        generateCommentsStatus: 'pending'
+      // 创建任务对象
+      const newTask: Task = {
+        id: result.data.taskId,
+        tweetId: result.data.tweetId,
+        tweetUrl: tweetUrl, // 使用用户输入的推文链接
+        status: 'queued',
+        createdAt: new Date().toISOString(),
+        userExtraInfo
       };
 
+      // 更新状态
       setCurrentTask(newTask);
-      setTaskHistory(prev => [newTask, ...prev.slice(0, 9)]); // 保留最近10条
+      const newHistory = [newTask, ...taskHistory];
+      saveTaskHistory(newHistory);
 
-      // 第2步：获取或爬取推文信息
-      console.log('[X Helper] 步骤2: 获取推文信息 -', tweetId);
-      let tweetInfoResult = await fetchTweetInfo(tweetId);
+      // 开始轮询任务状态
+      pollTaskStatus(result.data.taskId);
 
-      // 如果推文不在数据库中，尝试爬取
-      if (!tweetInfoResult.success && tweetInfoResult.error?.code === 'NOT_FOUND') {
-        console.log('[X Helper] 推文不在数据库中，尝试爬取推文数据');
+      // 清空输入框
+      setTweetUrl('');
 
-        // 尝试爬取推文数据
-        const updateResult = await crawlTweetData(tweetId);
-        if (updateResult.success) {
-          // 等待爬取完成后再次获取
-          const pollResult = await pollTaskStatus(updateResult.data.taskId);
-          if (pollResult.success) {
-            console.log('[X Helper] 推文爬取成功，再次获取推文信息');
-            tweetInfoResult = await fetchTweetInfo(tweetId);
-          }
-        }
-      }
-
-      if (tweetInfoResult.success) {
-        console.log('[X Helper] 推文信息获取成功');
-        newTask.tweetInfo = tweetInfoResult.data;
-        setCurrentTask({ ...newTask });
-      } else {
-        console.log('[X Helper] 推文信息获取失败，但继续执行');
-        // 如果依然没有推文内容，我们将无法进行翻译，但仍然可以尝试评论爬取
-      }
-
-      // 第3步：并行执行翻译和获取评论
-      console.log('[X Helper] 步骤3: 开始并行处理翻译和评论获取');
-      const promises: Promise<any>[] = [];
-
-      // 翻译任务
-      console.log('[X Helper] 步骤3a: 开始翻译处理');
-      console.log('[X Helper] 翻译内容:', newTask.tweetInfo?.content || '');
-      console.log('[X Helper] 翻译AI配置:', { provider: translationAIConfig.provider, model: translationAIConfig.model, hasApiKey: !!translationAIConfig.apiKey });
-      newTask.translationStatus = 'processing';
-      setCurrentTask({ ...newTask });
-
-      promises.push(
-        fetch('/api/tweet-processor/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: newTask.tweetInfo?.content || '',
-            aiConfig: translationAIConfig
-          })
-        }).then(res => {
-          console.log('[X Helper] 翻译API响应状态:', res.status);
-          return res.json();
-        }).then(result => {
-          console.log('[X Helper] 翻译API结果:', result);
-          if (result.success) {
-            console.log('[X Helper] 翻译成功:', result.data?.translatedContent?.substring(0, 100) + '...');
-            newTask.translationStatus = 'completed';
-            newTask.translationResult = result.data;
-          } else {
-            console.log('[X Helper] 翻译失败:', result.error?.message);
-            newTask.translationStatus = 'failed';
-            newTask.error = result.error?.message;
-          }
-          return { type: 'translation', result };
-        }).catch(error => {
-          console.error('[X Helper] 翻译请求异常:', error);
-          newTask.translationStatus = 'failed';
-          newTask.error = error.message;
-          return { type: 'translation', error: error.message };
-        })
-      );
-
-      // 评论获取任务
-      console.log('[X Helper] 步骤3b: 开始评论爬取处理');
-      console.log('[X Helper] 爬取推文ID:', tweetId);
-      newTask.crawlCommentsStatus = 'processing';
-      setCurrentTask({ ...newTask });
-
-      promises.push(
-        fetch('/api/tweet-processor/crawl-comments', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-'x-api-key': 'unicatcher-api-key-2024'
-          },
-          body: JSON.stringify({
-            tweetId: tweetId,
-            incremental: false,
-            maxScrolls: 10
-          })
-        }).then(res => {
-          console.log('[X Helper] 评论爬取API响应状态:', res.status);
-          return res.json();
-        }).then(result => {
-          console.log('[X Helper] 评论爬取API结果:', result);
-          if (result.success) {
-            console.log('[X Helper] 评论爬取任务创建成功，任务ID:', result.data.taskId);
-            // 轮询任务状态
-            return pollTaskStatus(result.data.taskId).then(taskResult => {
-              console.log('[X Helper] 评论爬取任务完成，结果:', taskResult);
-              if (taskResult.success) {
-                console.log('[X Helper] 评论爬取成功，获取到评论数:', taskResult.data?.totalComments || 0);
-                newTask.crawlCommentsStatus = 'completed';
-                newTask.crawlCommentsResult = taskResult.data;
-
-                // 评论爬取完成，设置状态但不生成AI评论
-                console.log('[X Helper] 评论爬取完成，等待AI生成评论阶段');
-                return { type: 'comments', result: taskResult };
-              } else {
-                console.log('[X Helper] 评论爬取任务失败:', taskResult.error?.message);
-                newTask.crawlCommentsStatus = 'failed';
-                newTask.error = taskResult.error?.message;
-                return { type: 'comments', result: taskResult };
-              }
-            });
-          } else {
-            console.log('[X Helper] 评论爬取API调用失败:', result.error?.message);
-            newTask.crawlCommentsStatus = 'failed';
-            newTask.error = result.error?.message;
-            return { type: 'comments', result };
-          }
-        }).catch(error => {
-          console.error('[X Helper] 评论爬取请求异常:', error);
-          newTask.crawlCommentsStatus = 'failed';
-          newTask.error = error.message;
-          return { type: 'comments', error: error.message };
-        })
-      );
-
-      // 等待翻译完成
-      console.log('[X Helper] 步骤4: 等待翻译完成');
-      const translationResults = await Promise.allSettled([promises[0]]);
-      console.log('[X Helper] 翻译完成，结果:', translationResults);
-
-      // 然后执行评论爬取
-      console.log('[X Helper] 步骤5: 开始评论爬取');
-      const commentResults = await Promise.allSettled([promises[1]]);
-      console.log('[X Helper] 评论爬取完成，结果:', commentResults);
-
-      // 第6步：执行AI生成评论
-      console.log('[X Helper] 步骤6: 开始AI生成评论');
-      newTask.generateCommentsStatus = 'processing';
-      setCurrentTask({ ...newTask });
-
-      try {
-        const generateResult = await generateComments(tweetId, newTask.tweetInfo?.content || '');
-        console.log('[X Helper] AI评论生成结果:', generateResult);
-
-        if (generateResult.success) {
-          newTask.generateCommentsStatus = 'completed';
-          // 为了保持前端一致性，将comments重命名为generatedComments
-          newTask.generateCommentsResult = {
-            ...generateResult.data,
-            generatedComments: generateResult.data?.comments || []
-          };
-          console.log('[X Helper] AI评论生成完成，生成', generateResult.data?.comments?.length || 0, '条评论');
-        } else {
-          newTask.generateCommentsStatus = 'failed';
-          newTask.error = generateResult.error?.message || 'AI评论生成失败';
-          console.log('[X Helper] AI评论生成失败:', generateResult.error?.message);
-        }
-      } catch (error) {
-        console.error('[X Helper] AI评论生成异常:', error);
-        newTask.generateCommentsStatus = 'failed';
-        newTask.error = error instanceof Error ? error.message : 'AI评论生成异常';
-      }
-
-      // 立即更新状态显示AI评论生成结果
-      setCurrentTask({ ...newTask });
-
-      // 更新最终状态
-      newTask.status = 'completed';
-      console.log('[X Helper] 任务最终状态:', {
-        id: newTask.id,
-        tweetId: newTask.tweetId,
-        translationStatus: newTask.translationStatus,
-        crawlCommentsStatus: newTask.crawlCommentsStatus,
-        generateCommentsStatus: newTask.generateCommentsStatus,
-        hasGenerateCommentsResult: !!newTask.generateCommentsResult,
-        generateCommentsCount: newTask.generateCommentsResult?.generatedComments?.length || 0,
-        error: newTask.error
-      });
-
-      // 最终更新状态和历史
-      setCurrentTask({ ...newTask });
-      setTaskHistory(prev => [newTask, ...prev.slice(1)]);
-
-      // 保存到localStorage
-      if (mounted) {
-        const updatedHistory = [newTask, ...taskHistory.slice(1)];
-        localStorage.setItem('x-helper-task-history', JSON.stringify(updatedHistory));
-        console.log('[X Helper] 任务已保存到localStorage，包含AI评论结果:', !!newTask.generateCommentsResult);
-      }
-
-    } catch (error: any) {
-      console.error('[X Helper] 整体处理失败:', error);
-      const failedTask: ProcessTask = {
-        id: Date.now().toString(),
-        tweetUrl: tweetUrl,
-        tweetId: '',
-        status: 'failed',
-        startTime: new Date().toLocaleString('zh-CN'),
-        translationStatus: 'failed',
-        crawlCommentsStatus: 'failed',
-        generateCommentsStatus: 'failed',
-        error: error.message
-      };
-
-      console.log('[X Helper] 创建失败任务记录:', failedTask);
-      setCurrentTask(failedTask);
-      setTaskHistory(prev => [failedTask, ...prev.slice(0, 9)]);
+    } catch (error) {
+      console.error('[X Helper] 处理失败:', error);
+      alert(`处理失败: ${error instanceof Error ? error.message : '未知错误'}`);
     } finally {
-      console.log('[X Helper] 处理结束，设置isProcessing为false');
       setIsProcessing(false);
     }
   };
 
   // 轮询任务状态
-  const pollTaskStatus = async (taskId: string): Promise<any> => {
-    console.log('[X Helper] 开始轮询任务状态，任务ID:', taskId);
+  const pollTaskStatus = async (taskId: string) => {
+    const maxAttempts = 60; // 最多轮询60次（5分钟）
     let attempts = 0;
-    const maxAttempts = 30; // 最多30次，总共约1分钟
 
-    while (attempts < maxAttempts) {
+    const poll = async () => {
       try {
-        console.log(`[X Helper] 轮询尝试 ${attempts + 1}/${maxAttempts}`);
-        const response = await fetch(`/api/tweet-processor/status/${taskId}`, {
-          headers: { 'x-api-key': process.env.NEXT_PUBLIC_API_KEY || 'unicatcher-api-key-demo' }
+        attempts++;
+
+        const response = await fetch(`/api/external/x-helper/task/${taskId}`, {
+          headers: {
+            'x-api-key': 'unicatcher-api-key-demo'
+          }
         });
 
-        console.log('[X Helper] 任务状态查询响应状态:', response.status);
+        if (!response.ok) {
+          if (attempts >= maxAttempts) {
+            throw new Error('任务状态查询超时');
+          }
+          setTimeout(poll, 5000);
+          return;
+        }
+
         const result = await response.json();
-        console.log('[X Helper] 任务状态查询结果:', result);
+        const taskData = result.data;
 
-        if (result.success && result.data.status === 'completed') {
-          console.log('[X Helper] 任务状态轮询完成，任务成功');
-          return { success: true, data: result.data.result };
-        } else if (result.data.status === 'failed') {
-          console.log('[X Helper] 任务状态轮询完成，任务失败:', result.data.errorMessage);
-          return { success: false, error: { message: result.data.errorMessage } };
+        console.log(`[X Helper] 任务状态更新: ${taskData.status}`);
+
+        // 更新任务数据
+        const updatedTask: Task = {
+          id: taskData.taskId,
+          tweetId: taskData.tweetId,
+          tweetUrl: taskData.tweetUrl,
+          status: taskData.status,
+          tweetContent: taskData.tweetContent,
+          authorUsername: taskData.authorUsername,
+          authorNickname: taskData.authorNickname,
+          authorProfileImage: taskData.authorProfileImage,
+          translatedContent: taskData.translatedContent,
+          aiComments: taskData.aiComments || [],
+          userExtraInfo: taskData.userExtraInfo,
+          startedAt: taskData.startedAt,
+          completedAt: taskData.completedAt,
+          createdAt: taskData.createdAt,
+          errorMessage: taskData.errorMessage
+        };
+
+        // 更新当前任务和历史记录
+        setCurrentTask(updatedTask);
+        setTaskHistory(prevHistory => {
+          const newHistory = prevHistory.map(t => t.id === taskId ? updatedTask : t);
+          saveTaskHistory(newHistory);
+          return newHistory;
+        });
+
+        // 如果任务完成或失败，停止轮询
+        if (taskData.status === 'completed' || taskData.status === 'failed') {
+          console.log(`[X Helper] 任务结束: ${taskData.status}`);
+          return;
         }
 
-        console.log(`[X Helper] 任务状态: ${result.data.status}，继续轮询`);
         // 继续轮询
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 5000);
+        } else {
+          throw new Error('任务处理超时');
+        }
+
       } catch (error) {
-        console.error('[X Helper] 轮询任务状态异常:', error);
-        attempts++;
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
+        console.error('[X Helper] 轮询任务状态失败:', error);
 
-    console.log('[X Helper] 任务状态轮询超时');
-    return { success: false, error: { message: '任务超时' } };
+        // 更新任务为失败状态
+        const failedTask: Task = {
+          id: taskId,
+          tweetId: currentTask?.tweetId || '',
+          tweetUrl: currentTask?.tweetUrl || '',
+          status: 'failed',
+          createdAt: currentTask?.createdAt || new Date().toISOString(),
+          errorMessage: error instanceof Error ? error.message : '未知错误'
+        };
+
+        setCurrentTask(failedTask);
+        setTaskHistory(prevHistory => {
+          const newHistory = prevHistory.map(t => t.id === taskId ? failedTask : t);
+          saveTaskHistory(newHistory);
+          return newHistory;
+        });
+      }
+    };
+
+    // 开始轮询
+    setTimeout(poll, 2000);
   };
 
-  // 获取推文信息
-  const fetchTweetInfo = async (tweetId: string) => {
-    try {
-      const response = await fetch(`/api/tweet-processor/tweet-info/${tweetId}`);
-      console.log('[X Helper] 推文信息响应状态:', response.status);
-      const result = await response.json();
-      console.log('[X Helper] 推文信息结果:', result);
-      return result;
-    } catch (error) {
-      console.error('[X Helper] 获取推文信息异常:', error);
-      return { success: false, error: { message: '网络错误' } };
-    }
+  // 选择历史任务
+  const selectTask = (task: Task) => {
+    setCurrentTask(task);
   };
 
-  // 爬取推文数据
-  const crawlTweetData = async (tweetId: string) => {
-    try {
-      console.log('[X Helper] 开始爬取推文数据:', tweetId);
-      const response = await fetch('/api/tweet-processor/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.NEXT_PUBLIC_API_KEY || 'unicatcher-api-key-demo'
-        },
-        body: JSON.stringify({
-          tweetId: tweetId,
-          force: false
-        })
-      });
-
-      console.log('[X Helper] 推文爬取API响应状态:', response.status);
-      const result = await response.json();
-      console.log('[X Helper] 推文爬取API结果:', result);
-      return result;
-    } catch (error) {
-      console.error('[X Helper] 爬取推文数据异常:', error);
-      return { success: false, error: { message: '网络错误' } };
-    }
+  // 检查是否有任务正在运行
+  const hasRunningTask = () => {
+    return currentTask && (currentTask.status === 'queued' || currentTask.status === 'running');
   };
 
-  // 生成评论
-  const generateComments = async (tweetId: string, content: string) => {
-    console.log('[X Helper] 开始生成评论');
-    console.log('[X Helper] 生成评论参数:', { tweetId, content: content.substring(0, 100) + '...', aiConfig: { provider: commentAIConfig.provider, model: commentAIConfig.model, hasApiKey: !!commentAIConfig.apiKey } });
-
-    try {
-      const response = await fetch('/api/tweet-processor/generate-comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tweetId,
-          systemPrompt: '',
-          includeExistingComments: true,
-          commentCount: 3,
-          commentLength: 'medium',
-          language: 'zh-CN',
-          aiConfig: commentAIConfig
-        })
-      });
-
-      console.log('[X Helper] 生成评论API响应状态:', response.status);
-      const result = await response.json();
-      console.log('[X Helper] 生成评论API结果:', result);
-
-      if (result.success) {
-        console.log('[X Helper] 评论生成成功，生成数量:', result.data?.comments?.length || 0);
-        console.log('[X Helper] 评论生成详细数据:', result.data);
-        console.log('[X Helper] 评论数组:', result.data?.comments);
-      } else {
-        console.log('[X Helper] 评论生成失败:', result.error?.message);
-        console.log('[X Helper] 完整错误信息:', result);
-      }
-
-      return result;
-    } catch (error) {
-      console.error('[X Helper] 生成评论异常:', error);
-      return { success: false, error: { message: '生成评论失败' } };
-    }
-  };
-
-  // 检查并恢复未完成的任务
-  const checkAndRecoverUnfinishedTasks = async (tasks: ProcessTask[]) => {
-    console.log('[X Helper] 检查未完成的任务');
-
-    const unfinishedTasks = tasks.filter(task =>
-      task.status === 'processing' &&
-      (task.translationStatus === 'processing' || task.crawlCommentsStatus === 'processing' || task.generateCommentsStatus === 'processing')
-    );
-
-    if (unfinishedTasks.length > 0) {
-      console.log(`[X Helper] 发现 ${unfinishedTasks.length} 个未完成的任务，开始恢复状态`);
-
-      for (const task of unfinishedTasks) {
-        // 检查任务开始时间，如果超过10分钟则标记为失败
-        const taskStartTime = new Date(task.startTime).getTime();
-        const now = Date.now();
-        const timeDiff = now - taskStartTime;
-        const timeoutThreshold = 10 * 60 * 1000; // 10分钟
-
-        if (timeDiff > timeoutThreshold) {
-          console.log(`[X Helper] 任务 ${task.id} 超时，标记为失败`);
-          task.status = 'failed';
-          task.error = '任务超时（页面关闭导致）';
-          if (task.translationStatus === 'processing') {
-            task.translationStatus = 'failed';
-          }
-          if (task.crawlCommentsStatus === 'processing') {
-            task.crawlCommentsStatus = 'failed';
-          }
-          if (task.generateCommentsStatus === 'processing') {
-            task.generateCommentsStatus = 'failed';
-          }
-        } else {
-          // 尝试恢复任务状态
-          console.log(`[X Helper] 尝试恢复任务 ${task.id} 的状态`);
-          await recoverTaskStatus(task);
-        }
-      }
-
-      // 更新任务历史
-      localStorage.setItem('x-helper-task-history', JSON.stringify(tasks));
-    }
-  };
-
-  // 恢复单个任务的状态
-  const recoverTaskStatus = async (task: ProcessTask) => {
-    try {
-      // 重新获取推文信息看是否已经更新
-      if (task.tweetId) {
-        const tweetInfoResult = await fetchTweetInfo(task.tweetId);
-        if (tweetInfoResult.success && !task.tweetInfo) {
-          task.tweetInfo = tweetInfoResult.data;
-        }
-      }
-
-      // 检查翻译状态
-      if (task.translationStatus === 'processing') {
-        if (task.tweetInfo?.translatedContent) {
-          console.log(`[X Helper] 任务 ${task.id} 的翻译已完成`);
-          task.translationStatus = 'completed';
-          task.translationResult = {
-            translatedContent: task.tweetInfo.translatedContent,
-            originalLanguage: task.tweetInfo.originalLanguage
-          };
-        } else {
-          console.log(`[X Helper] 任务 ${task.id} 的翻译未完成，标记为失败`);
-          task.translationStatus = 'failed';
-        }
-      }
-
-      // 检查评论状态 - 这里比较复杂，暂时标记为需要手动重试
-      if (task.crawlCommentsStatus === 'processing') {
-        console.log(`[X Helper] 任务 ${task.id} 的推特评论爬取未完成，标记为失败`);
-        task.crawlCommentsStatus = 'failed';
-      }
-
-      if (task.generateCommentsStatus === 'processing') {
-        console.log(`[X Helper] 任务 ${task.id} 的AI评论生成未完成，标记为失败`);
-        task.generateCommentsStatus = 'failed';
-      }
-
-      // 更新整体任务状态：如果所有子任务都不在处理中，则标记为完成
-      const allSubTasksCompleted =
-        (task.translationStatus === 'completed' || task.translationStatus === 'failed') &&
-        (task.crawlCommentsStatus === 'completed' || task.crawlCommentsStatus === 'failed') &&
-        (task.generateCommentsStatus === 'completed' || task.generateCommentsStatus === 'failed');
-
-      if (allSubTasksCompleted) {
-        task.status = 'completed';
-      }
-
-    } catch (error) {
-      console.error(`[X Helper] 恢复任务 ${task.id} 状态失败:`, error);
-      task.status = 'failed';
-      task.error = '状态恢复失败';
-    }
-  };
-
-  // 重试任务
-  const retryTask = (task: ProcessTask) => {
-    console.log('[X Helper] 重试任务:', task.id);
-    setTweetUrl(task.tweetUrl);
-    handleProcessTweet();
-  };
-
-  // 单独重试翻译
-  const retryTranslation = async (task: ProcessTask) => {
-    if (!task.tweetInfo?.content) {
-      alert('缺少推文内容，无法进行翻译');
+  // 从历史回填数据
+  const backfillFromHistory = (task: Task) => {
+    if (hasRunningTask()) {
+      alert('有任务正在运行中，无法进行回填');
       return;
     }
 
-    console.log('[X Helper] 单独重试翻译:', task.id);
+    // 回填基本信息
+    if (task.tweetUrl) {
+      setTweetUrl(task.tweetUrl);
+    }
 
-    // 更新状态
-    task.translationStatus = 'processing';
-    setCurrentTask({ ...task });
-    setTaskHistory(prev => prev.map(t => t.id === task.id ? task : t));
+    // 回填用户额外信息
+    if (task.userExtraInfo) {
+      setUserExtraInfo(task.userExtraInfo);
+    }
+
+    // 关闭弹窗
+    setShowHistoryModal(false);
+
+    console.log('[X Helper] 已从历史回填数据:', {
+      tweetUrl: task.tweetUrl,
+      userExtraInfo: task.userExtraInfo
+    });
+  };
+
+  // 重新翻译
+  const handleReTranslate = async () => {
+    if (!currentTask || !currentTask.tweetContent) {
+      console.error('[X Helper] 无法重新翻译：缺少任务或推文内容');
+      return;
+    }
+
+    setIsReTranslating(true);
 
     try {
-      const response = await fetch('/api/tweet-processor/translate', {
+      console.log('[X Helper] 开始重新翻译');
+
+      const response = await fetch('/api/external/translate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'unicatcher-api-key-demo'
+        },
         body: JSON.stringify({
-          content: task.tweetInfo.content,
+          content: currentTask.tweetContent,
+          targetLanguage: 'zh-CN',
           aiConfig: translationAIConfig
         })
       });
 
       const result = await response.json();
-      console.log('[X Helper] 翻译重试结果:', result);
 
       if (result.success) {
-        task.translationStatus = 'completed';
-        task.translationResult = result.data;
+        // 更新当前任务的翻译内容
+        const updatedTask = {
+          ...currentTask,
+          translatedContent: result.data.translatedContent
+        };
+        setCurrentTask(updatedTask);
+
+        // 更新任务历史
+        setTaskHistory(prevHistory => {
+          const newHistory = prevHistory.map(t =>
+            t.id === currentTask.id ? updatedTask : t
+          );
+          saveTaskHistory(newHistory);
+          return newHistory;
+        });
+
+        console.log('[X Helper] 重新翻译成功');
       } else {
-        task.translationStatus = 'failed';
-        task.error = result.error?.message || '翻译失败';
+        console.error('[X Helper] 重新翻译失败:', result.error);
       }
-
-      setCurrentTask({ ...task });
-      setTaskHistory(prev => prev.map(t => t.id === task.id ? task : t));
-
-      // 更新localStorage
-      if (mounted) {
-        const updatedHistory = taskHistory.map(t => t.id === task.id ? task : t);
-        localStorage.setItem('x-helper-task-history', JSON.stringify(updatedHistory));
-      }
-
     } catch (error) {
-      console.error('[X Helper] 翻译重试异常:', error);
-      task.translationStatus = 'failed';
-      task.error = '网络错误';
-      setCurrentTask({ ...task });
-      setTaskHistory(prev => prev.map(t => t.id === task.id ? task : t));
+      console.error('[X Helper] 重新翻译异常:', error);
+    } finally {
+      setIsReTranslating(false);
     }
   };
 
-  // 单独重试评论爬取
-  const retryComments = async (task: ProcessTask) => {
-    if (!task.tweetInfo?.id) {
-      alert('缺少推文ID，无法进行评论爬取');
+  // 重新生成评论
+  const handleReGenerateComments = async () => {
+    if (!currentTask || !currentTask.tweetContent) {
+      console.error('[X Helper] 无法重新生成评论：缺少任务或推文内容');
       return;
     }
 
-    console.log('[X Helper] 单独重试评论爬取:', task.id);
-
-    // 更新状态
-    task.crawlCommentsStatus = 'processing';
-    task.crawlCommentsResult = undefined;
-    setCurrentTask({ ...task });
-    setTaskHistory(prev => prev.map(t => t.id === task.id ? task : t));
+    setIsReGeneratingComments(true);
 
     try {
-      const response = await fetch('/api/tweet-processor/comments', {
+      console.log('[X Helper] 开始重新生成评论');
+
+      const response = await fetch('/api/external/generate-comments', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'unicatcher-api-key-demo'
+        },
         body: JSON.stringify({
-          tweetId: task.tweetInfo.id,
-          incremental: false
-        })
-      });
-
-      const result = await response.json();
-      console.log('[X Helper] 评论爬取重试结果:', result);
-
-      if (result.success) {
-        task.crawlCommentsStatus = 'completed';
-        task.crawlCommentsResult = result.data;
-      } else {
-        task.crawlCommentsStatus = 'failed';
-        task.error = result.error?.message || '评论爬取失败';
-      }
-
-      setCurrentTask({ ...task });
-      setTaskHistory(prev => prev.map(t => t.id === task.id ? task : t));
-
-      // 更新localStorage
-      if (mounted) {
-        const updatedHistory = taskHistory.map(t => t.id === task.id ? task : t);
-        localStorage.setItem('x-helper-task-history', JSON.stringify(updatedHistory));
-      }
-
-    } catch (error) {
-      console.error('[X Helper] 评论爬取重试异常:', error);
-      task.crawlCommentsStatus = 'failed';
-      task.error = '网络错误';
-      setCurrentTask({ ...task });
-      setTaskHistory(prev => prev.map(t => t.id === task.id ? task : t));
-    }
-  };
-
-  // 单独重试AI评论生成
-  const retryGenerateComments = async (task: ProcessTask) => {
-    if (!task.tweetInfo?.content) {
-      alert('缺少推文内容，无法生成AI评论');
-      return;
-    }
-
-    console.log('[X Helper] 单独重试AI评论生成:', task.id);
-
-    // 更新状态
-    task.generateCommentsStatus = 'processing';
-    task.generateCommentsResult = undefined;
-    setCurrentTask({ ...task });
-    setTaskHistory(prev => prev.map(t => t.id === task.id ? task : t));
-
-    try {
-      const response = await fetch('/api/tweet-processor/generate-comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tweetId: task.tweetInfo.id,
-          content: task.tweetInfo.content,
+          tweetId: currentTask.tweetId,
+          content: currentTask.tweetContent,
+          authorUsername: currentTask.authorUsername,
+          authorNickname: currentTask.authorNickname,
           aiConfig: commentAIConfig,
-          includeExistingComments: true,
-          userInfo: '',
-          systemPrompt: '',
+          includeExistingComments: false,
+          userInfo: userExtraInfo,
+          systemPrompt: systemPrompt,
           commentLength: 'medium',
           commentCount: 3,
           language: 'zh-CN'
@@ -776,467 +448,335 @@ export default function XHelperPage() {
       });
 
       const result = await response.json();
-      console.log('[X Helper] AI评论生成重试结果:', result);
 
-      if (result.success && result.data?.comments) {
-        task.generateCommentsStatus = 'completed';
-        // 确保格式一致
-        task.generateCommentsResult = {
-          generatedComments: result.data.comments,
-          ...result.data
+      if (result.success && result.data.comments) {
+        // 更新当前任务的AI评论
+        const updatedTask = {
+          ...currentTask,
+          aiComments: result.data.comments
         };
+        setCurrentTask(updatedTask);
+
+        // 更新任务历史
+        setTaskHistory(prevHistory => {
+          const newHistory = prevHistory.map(t =>
+            t.id === currentTask.id ? updatedTask : t
+          );
+          saveTaskHistory(newHistory);
+          return newHistory;
+        });
+
+        console.log('[X Helper] 重新生成评论成功');
       } else {
-        task.generateCommentsStatus = 'failed';
-        task.error = result.error?.message || 'AI评论生成失败';
+        console.error('[X Helper] 重新生成评论失败:', result.error);
       }
-
-      setCurrentTask({ ...task });
-      setTaskHistory(prev => prev.map(t => t.id === task.id ? task : t));
-
-      // 更新localStorage
-      if (mounted) {
-        const updatedHistory = taskHistory.map(t => t.id === task.id ? task : t);
-        localStorage.setItem('x-helper-task-history', JSON.stringify(updatedHistory));
-      }
-
     } catch (error) {
-      console.error('[X Helper] AI评论生成重试异常:', error);
-      task.generateCommentsStatus = 'failed';
-      task.error = '网络错误';
-      setCurrentTask({ ...task });
-      setTaskHistory(prev => prev.map(t => t.id === task.id ? task : t));
+      console.error('[X Helper] 重新生成评论异常:', error);
+    } finally {
+      setIsReGeneratingComments(false);
     }
   };
 
-  // 清理任务（从历史中移除）
+  // 清理任务
   const clearTask = (taskId: string) => {
-    console.log('[X Helper] 清理任务:', taskId);
-    const updatedHistory = taskHistory.filter(task => task.id !== taskId);
-    setTaskHistory(updatedHistory);
+    const newHistory = taskHistory.filter(t => t.id !== taskId);
+    saveTaskHistory(newHistory);
+
     if (currentTask?.id === taskId) {
-      setCurrentTask(null);
+      setCurrentTask(newHistory.length > 0 ? newHistory[0] || null : null);
     }
   };
 
-  // 选择任务
-  const selectTask = (task: ProcessTask) => {
-    setCurrentTask(task);
+  // 重试任务
+  const retryTask = (task: Task) => {
     setTweetUrl(task.tweetUrl);
+    setUserExtraInfo(task.userExtraInfo || '');
+    processTweet();
   };
 
-  const headerActions = (
-    <button
-      onClick={() => setShowAIConfig(true)}
-      className="inline-flex items-center px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-    >
-      <span className="mr-2">⚙️</span>
-      AI配置
-    </button>
-  );
+  if (!mounted) {
+    return <DashboardLayout><div>Loading...</div></DashboardLayout>;
+  }
 
   return (
-    <DashboardLayout actions={headerActions}>
-      {/* 恢复状态提示 */}
-      {recoveryStatus && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <div className="flex items-center">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
-            <p className="text-blue-800">{recoveryStatus}</p>
-          </div>
+    <DashboardLayout>
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-900">X 辅助器</h1>
+          <button
+            onClick={() => setShowAIConfig(true)}
+            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors"
+          >
+            AI配置
+          </button>
+
+          {/* Debug按钮 */}
+          <button
+            onClick={debugHistoryInfo}
+            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors text-sm"
+            title="调试历史记录信息"
+          >
+            Debug
+          </button>
         </div>
-      )}
 
-      {/* 主处理区域 */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <div className="space-y-4">
-          {/* URL输入 */}
-          <div>
-            <input
-              type="text"
-              value={tweetUrl}
-              onChange={(e) => setTweetUrl(e.target.value)}
-              placeholder="输入推文URL (如: https://x.com/username/status/1234567890)"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              disabled={isProcessing}
-            />
-          </div>
-
-          {/* 处理按钮 */}
-          <div>
-            <button
-              onClick={handleProcessTweet}
-              disabled={isProcessing || !tweetUrl.trim()}
-              className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-            >
-              {isProcessing ? '处理中...' : '处理'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 当前任务展示区域 */}
-      {currentTask && (
+        {/* 推文处理表单 */}
         <div className="bg-white shadow rounded-lg p-6">
-          <div className="space-y-6">
-            {/* 推文信息 */}
-            {currentTask.tweetInfo && (
-              <div className="border-b pb-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">推文信息</h3>
-                <div className="flex items-start space-x-4">
-                  {currentTask.tweetInfo.profileImageUrl && (
-                    <img
-                      src={currentTask.tweetInfo.profileImageUrl}
-                      alt={currentTask.tweetInfo.userNickname}
-                      className="w-12 h-12 rounded-full"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <span className="font-medium">{currentTask.tweetInfo.userNickname}</span>
-                      <span className="text-gray-500">@{currentTask.tweetInfo.userUsername}</span>
-                      <span className="text-gray-500">·</span>
-                      <span className="text-gray-500">{currentTask.tweetInfo.publishedAtFormatted}</span>
-                    </div>
-                    <p className="text-gray-900 mb-3">{currentTask.tweetInfo.content}</p>
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <span>💬 {currentTask.tweetInfo.commentCount}</span>
-                      <span>🔄 {currentTask.tweetInfo.retweetCount}</span>
-                      <span>❤️ {currentTask.tweetInfo.likeCount}</span>
-                      <span>👁️ {currentTask.tweetInfo.viewCount}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">处理推文</h2>
 
-            {/* 处理状态 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* 翻译状态 */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">翻译状态:</span>
-                    <StatusBadge status={currentTask.translationStatus} />
-                  </div>
-                  {currentTask.translationStatus === 'failed' && (
-                    <button
-                      onClick={() => retryTranslation(currentTask)}
-                      className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-md hover:bg-blue-200 transition-colors flex items-center space-x-1"
-                      title="重试翻译"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      <span>重试</span>
-                    </button>
-                  )}
-                </div>
-                {currentTask.translationResult && (
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600 mb-2">译文:</p>
-                    <p className="text-gray-900">{currentTask.translationResult.translatedContent}</p>
-                    {currentTask.translationResult.originalLanguage && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        检测语言: {currentTask.translationResult.originalLanguage}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                推文链接
+              </label>
+              <input
+                type="url"
+                value={tweetUrl}
+                onChange={(e) => setTweetUrl(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="https://twitter.com/username/status/123456789"
+                disabled={isProcessing}
+              />
+            </div>
 
-              {/* 评论状态 */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">评论状态:</span>
-                    <StatusBadge status={currentTask.crawlCommentsStatus} />
-                  </div>
-                  {currentTask.crawlCommentsStatus === 'failed' && (
-                    <button
-                      onClick={() => retryComments(currentTask)}
-                      className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-md hover:bg-green-200 transition-colors flex items-center space-x-1"
-                      title="重试评论处理"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      <span>重试</span>
-                    </button>
-                  )}
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                用户额外信息 (可选)
+              </label>
+              <textarea
+                value={userExtraInfo}
+                onChange={(e) => setUserExtraInfo(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="输入你的身份信息、观点偏好等，AI会基于这些信息生成更符合你风格的评论"
+                rows={3}
+                disabled={isProcessing}
+              />
+            </div>
 
-                {/* AI评论生成状态区域 */}
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">AI评论生成:</span>
-                    <StatusBadge status={currentTask.generateCommentsStatus} />
-                  </div>
-                  {currentTask.generateCommentsStatus === 'failed' && (
-                    <button
-                      onClick={() => retryGenerateComments(currentTask)}
-                      className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-md hover:bg-blue-200 transition-colors flex items-center space-x-1"
-                      title="重试AI评论生成"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      <span>重试</span>
-                    </button>
-                  )}
-                </div>
+            <div className="flex gap-3">
+              <button
+                onClick={processTweet}
+                disabled={isProcessing || !tweetUrl.trim()}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md transition-colors"
+              >
+                {isProcessing ? '处理中...' : '开始处理'}
+              </button>
 
-                {/* AI生成评论独立展示区域 */}
-                {currentTask.generateCommentsResult && currentTask.generateCommentsResult.generatedComments && currentTask.generateCommentsResult.generatedComments.length > 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-4">
-                    <h3 className="text-lg font-medium text-blue-900 mb-4 flex items-center">
-                      <span className="mr-2">🤖</span>
-                      AI生成的参考评论 ({currentTask.generateCommentsResult.generatedComments.length}条)
-                    </h3>
-                    <div className="space-y-4">
-                      {currentTask.generateCommentsResult.generatedComments.map((comment: any, index: number) => {
-                        const commentText = typeof comment === 'string' ? comment : comment.content || comment.text || JSON.stringify(comment);
-                        return (
-                          <div key={index} className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center mb-2">
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                    评论 {index + 1}
-                                  </span>
-                                </div>
-                                <p className="text-gray-900 whitespace-pre-wrap leading-relaxed">
-                                  {commentText}
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => navigator.clipboard.writeText(commentText)}
-                                className="ml-4 flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
-                                title="复制评论"
-                              >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-4 p-3 bg-blue-100 rounded-lg">
-                      <p className="text-sm text-blue-700">
-                        💡 提示：这些是AI根据推文内容生成的参考评论，您可以直接使用或作为灵感进行修改。点击右上角的复制按钮可以快速复制评论内容。
-                      </p>
-                    </div>
-                  </div>
-                )}
+              {taskHistory.length > 0 && (
+                <button
+                  onClick={() => setShowHistoryModal(true)}
+                  disabled={hasRunningTask() || isProcessing}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white rounded-md transition-colors whitespace-nowrap"
+                  title={hasRunningTask() ? '有任务正在运行，无法回填' : '从历史任务中回填数据'}
+                >
+                  从历史回填
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
 
-                {currentTask.crawlCommentsResult && (
-                  <div className="bg-green-50 p-4 rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-gray-600">
-                        获取评论: {currentTask.crawlCommentsResult.totalComments || 0} 条
-                      </p>
-                      {currentTask.crawlCommentsResult.comments && currentTask.crawlCommentsResult.comments.length > 0 && (
-                        <span className="text-xs text-green-600">
-                          ↓ 查看详细评论
-                        </span>
+        {/* 当前任务状态 */}
+        {currentTask && (
+          <div className="bg-white shadow rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">当前任务</h2>
+              <StatusBadge status={currentTask.status} />
+            </div>
+
+            <div className="space-y-4">
+              {/* 推文信息 */}
+              {currentTask.tweetContent && (
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-2">推文内容</h3>
+                  <div className="bg-gray-50 p-3 rounded-md">
+                    <div className="flex items-center space-x-3 mb-2">
+                      {currentTask.authorProfileImage && (
+                        <img
+                          src={currentTask.authorProfileImage}
+                          alt="头像"
+                          className="w-8 h-8 rounded-full"
+                        />
                       )}
-                    </div>
-
-                    {/* 展示AI生成的评论 */}
-                    {currentTask.generateCommentsResult && currentTask.generateCommentsResult.generatedComments && currentTask.generateCommentsResult.generatedComments.length > 0 && (
-                      <div className="space-y-2 mb-4">
-                        <p className="text-xs text-gray-500 font-medium">AI生成的参考评论：</p>
-                        {currentTask.generateCommentsResult.generatedComments.map((comment: any, index: number) => {
-                          const commentText = typeof comment === 'string' ? comment : comment.content || comment.text || JSON.stringify(comment);
-                          return (
-                            <div key={index} className="bg-blue-50 p-3 rounded border border-blue-200 text-sm">
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center mb-1">
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                      AI评论 {index + 1}
-                                    </span>
-                                  </div>
-                                  <p className="text-gray-900 whitespace-pre-wrap leading-relaxed">
-                                    {commentText}
-                                  </p>
-                                </div>
-                                <button
-                                  onClick={() => navigator.clipboard.writeText(commentText)}
-                                  className="ml-2 flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
-                                  title="复制评论"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
+                      <div>
+                        <p className="font-medium">{currentTask.authorNickname}</p>
+                        <p className="text-sm text-gray-500">@{currentTask.authorUsername}</p>
                       </div>
-                    )}
+                    </div>
+                    <p className="text-gray-800">{currentTask.tweetContent}</p>
+                  </div>
+                </div>
+              )}
 
-                    {/* 展示爬取的评论列表 */}
-                    {currentTask.crawlCommentsResult.comments && currentTask.crawlCommentsResult.comments.length > 0 && (
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
-                        <p className="text-xs text-gray-500 font-medium">爬取的评论内容：</p>
-                        {currentTask.crawlCommentsResult.comments.slice(0, 5).map((comment: any, index: number) => (
-                          <div key={index} className="bg-white p-3 rounded border border-green-200 text-sm">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center space-x-2">
-                                {comment.authorProfileImage && (
-                                  <img
-                                    src={comment.authorProfileImage}
-                                    alt={comment.authorNickname}
-                                    className="w-6 h-6 rounded-full"
-                                  />
-                                )}
-                                <div>
-                                  <span className="font-medium text-gray-900">
-                                    {comment.authorNickname || comment.authorUsername || '匿名用户'}
-                                  </span>
-                                  {comment.authorUsername && (
-                                    <span className="text-gray-500 text-xs ml-1">
-                                      @{comment.authorUsername}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => navigator.clipboard.writeText(comment.content || '')}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
-                                title="复制评论"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                              </button>
-                            </div>
-                            <p className="text-gray-800 leading-relaxed">
-                              {comment.content || '无内容'}
-                            </p>
-                            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                              {comment.likeCount !== undefined && (
-                                <span>❤️ {comment.likeCount}</span>
-                              )}
-                              {comment.replyCount !== undefined && (
-                                <span>💬 {comment.replyCount}</span>
-                              )}
-                              {comment.publishedAt && (
-                                <span>{new Date(Number(comment.publishedAt)).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                        {currentTask.crawlCommentsResult.comments.length > 5 && (
-                          <div className="text-center py-2">
-                            <span className="text-xs text-gray-500">
-                              …还有 {currentTask.crawlCommentsResult.comments.length - 5} 条评论未显示
-                            </span>
-                          </div>
+              {/* 翻译结果 */}
+              {currentTask.translatedContent && (
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-medium text-gray-900">翻译结果</h3>
+                    <button
+                      onClick={handleReTranslate}
+                      disabled={isReTranslating}
+                      className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isReTranslating ? '重新翻译中...' : '重新翻译'}
+                    </button>
+                  </div>
+                  <div className="bg-blue-50 p-3 rounded-md">
+                    <p className="text-blue-900">{currentTask.translatedContent}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* AI评论 */}
+              {currentTask.aiComments && currentTask.aiComments.length > 0 && (
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-medium text-gray-900">AI生成评论</h3>
+                    <button
+                      onClick={handleReGenerateComments}
+                      disabled={isReGeneratingComments}
+                      className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isReGeneratingComments ? '重新生成中...' : '重新生成评论'}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {currentTask.aiComments.map((comment, index) => (
+                      <div key={index} className="bg-green-50 p-3 rounded-md">
+                        <p className="text-green-900">
+                          {typeof comment === 'string' ? comment : comment.content}
+                        </p>
+                        {typeof comment === 'object' && comment.reasoning && (
+                          <p className="text-green-700 text-sm mt-1 italic">
+                            理由: {comment.reasoning}
+                          </p>
                         )}
                       </div>
-                    )}
+                    ))}
                   </div>
+                </div>
+              )}
+
+              {/* 用户额外信息 */}
+              {currentTask.userExtraInfo && (
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-2">用户信息</h3>
+                  <div className="bg-yellow-50 p-3 rounded-md">
+                    <p className="text-yellow-900">{currentTask.userExtraInfo}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* 错误信息 */}
+              {currentTask.status === 'failed' && currentTask.errorMessage && (
+                <div>
+                  <h3 className="font-medium text-red-900 mb-2">错误信息</h3>
+                  <div className="bg-red-50 p-3 rounded-md">
+                    <p className="text-red-900">{currentTask.errorMessage}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* 时间信息 */}
+              <div className="text-sm text-gray-500">
+                <p>创建时间: {new Date(currentTask.createdAt).toLocaleString()}</p>
+                {currentTask.startedAt && (
+                  <p>开始时间: {new Date(currentTask.startedAt).toLocaleString()}</p>
                 )}
-                {currentTask.generateCommentsResult && (
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600">
-                      AI生成评论: {currentTask.generateCommentsResult.generatedComments?.length || 0} 条
-                    </p>
-                    <p className="text-xs text-orange-600 mt-1">
-                      ↓ 详细内容请查看下方的“AI生成的参考评论”区域
-                    </p>
-                  </div>
+                {currentTask.completedAt && (
+                  <p>完成时间: {new Date(currentTask.completedAt).toLocaleString()}</p>
                 )}
               </div>
             </div>
-
-
-            {/* 错误信息 */}
-            {currentTask.error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-red-800">{currentTask.error}</p>
-              </div>
-            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 任务历史 */}
-      {mounted && taskHistory.length > 0 && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">处理历史</h3>
-          <div className="space-y-3">
-            {taskHistory.map((task) => (
-              <div
-                key={task.id}
-                onClick={() => selectTask(task)}
-                className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
-                  currentTask?.id === task.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 truncate">
-                      {task.tweetInfo?.userNickname || task.tweetUrl}
-                    </p>
-                    <p className="text-sm text-gray-500">{task.startTime}</p>
-                    {task.error && (
-                      <p className="text-xs text-red-600 mt-1">错误: {task.error}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <StatusBadge status={task.translationStatus} size="sm" />
-                    <StatusBadge status={task.crawlCommentsStatus} size="sm" />
-                    <StatusBadge status={task.generateCommentsStatus} size="sm" />
+        {/* 任务历史 */}
+        {mounted && taskHistory.length > 0 && (
+          <div className="bg-white shadow rounded-lg p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">处理历史</h3>
+            <div className="space-y-3">
+              {taskHistory.map((task) => (
+                <div
+                  key={task.id}
+                  onClick={() => selectTask(task)}
+                  className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                    currentTask?.id === task.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 truncate">
+                        {task.authorNickname || task.tweetUrl}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {new Date(task.createdAt).toLocaleString()}
+                      </p>
+                      {task.errorMessage && (
+                        <p className="text-xs text-red-600 mt-1">错误: {task.errorMessage}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <StatusBadge status={task.status} size="sm" />
 
-                    {/* 操作按钮 */}
-                    <div className="flex items-center space-x-1 ml-2">
-                      {task.status === 'failed' && (
+                      {/* 操作按钮 */}
+                      <div className="flex items-center space-x-1 ml-2">
+                        {task.status === 'failed' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              retryTask(task);
+                            }}
+                            className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+                            title="重试任务"
+                          >
+                            重试
+                          </button>
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            retryTask(task);
+                            clearTask(task.id);
                           }}
-                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
-                          title="重试任务"
+                          className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded hover:bg-gray-200"
+                          title="从历史中移除"
                         >
-                          重试
+                          清理
                         </button>
-                      )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          clearTask(task.id);
-                        }}
-                        className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded hover:bg-gray-200"
-                        title="从历史中移除"
-                      >
-                        清理
-                      </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* AI配置弹窗 */}
-      {showAIConfig && (
-        <AIConfigModal
-          translationConfig={translationAIConfig}
-          commentConfig={commentAIConfig}
-          onTranslationConfigChange={setTranslationAIConfig}
-          onCommentConfigChange={setCommentAIConfig}
-          onSave={saveAIConfigs}
-          onCancel={() => setShowAIConfig(false)}
-        />
-      )}
+        {/* AI配置弹窗 */}
+        {showAIConfig && (
+          <AIConfigModal
+            translationConfig={translationAIConfig}
+            commentConfig={commentAIConfig}
+            userExtraInfo={userExtraInfo}
+            systemPrompt={systemPrompt}
+            onTranslationConfigChange={setTranslationAIConfig}
+            onCommentConfigChange={setCommentAIConfig}
+            onUserExtraInfoChange={setUserExtraInfo}
+            onSystemPromptChange={setSystemPrompt}
+            onSave={saveAIConfigs}
+            onCancel={() => setShowAIConfig(false)}
+          />
+        )}
+
+        {/* 历史回填弹窗 */}
+        {showHistoryModal && (
+          <HistoryModal
+            tasks={taskHistory}
+            onSelect={backfillFromHistory}
+            onCancel={() => setShowHistoryModal(false)}
+          />
+        )}
+      </div>
     </DashboardLayout>
   );
 }
@@ -1245,9 +785,9 @@ function StatusBadge({ status, size = 'md' }: { status: string; size?: 'sm' | 'm
   const sizeClasses = size === 'sm' ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm';
 
   switch (status) {
-    case 'pending':
-      return <span className={`${sizeClasses} bg-gray-100 text-gray-700 rounded-full`}>待处理</span>;
-    case 'processing':
+    case 'queued':
+      return <span className={`${sizeClasses} bg-gray-100 text-gray-700 rounded-full`}>队列中</span>;
+    case 'running':
       return <span className={`${sizeClasses} bg-blue-100 text-blue-700 rounded-full`}>处理中</span>;
     case 'completed':
       return <span className={`${sizeClasses} bg-green-100 text-green-700 rounded-full`}>完成</span>;
@@ -1261,15 +801,23 @@ function StatusBadge({ status, size = 'md' }: { status: string; size?: 'sm' | 'm
 function AIConfigModal({
   translationConfig,
   commentConfig,
+  userExtraInfo,
+  systemPrompt,
   onTranslationConfigChange,
   onCommentConfigChange,
+  onUserExtraInfoChange,
+  onSystemPromptChange,
   onSave,
   onCancel
 }: {
   translationConfig: AIConfig;
   commentConfig: AIConfig;
+  userExtraInfo: string;
+  systemPrompt: string;
   onTranslationConfigChange: (config: AIConfig) => void;
   onCommentConfigChange: (config: AIConfig) => void;
+  onUserExtraInfoChange: (info: string) => void;
+  onSystemPromptChange: (prompt: string) => void;
   onSave: () => void;
   onCancel: () => void;
 }) {
@@ -1340,6 +888,46 @@ function AIConfigModal({
         <h3 className="text-lg font-semibold mb-6">AI配置</h3>
 
         <div className="space-y-8">
+          {/* 用户额外信息 */}
+          <div>
+            <h4 className="text-md font-medium mb-4">用户额外信息</h4>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                个人信息和偏好 (用于AI评论生成)
+              </label>
+              <textarea
+                value={userExtraInfo}
+                onChange={(e) => onUserExtraInfoChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="例如：我是一个软件工程师，关注技术创新，倾向于理性分析..."
+                rows={4}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                这些信息将帮助AI生成更符合你风格的评论
+              </p>
+            </div>
+          </div>
+
+          {/* 系统提示词配置 */}
+          <div>
+            <h4 className="text-md font-medium mb-4">AI提示词配置</h4>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                系统提示词 (自定义AI评论生成指令)
+              </label>
+              <textarea
+                value={systemPrompt}
+                onChange={(e) => onSystemPromptChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                placeholder="你是一个专业的社交媒体评论助手，请根据推文内容和用户信息生成恰当的评论回复..."
+                rows={6}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                留空将使用默认评论生成提示词。你可以自定义AI生成评论的风格和要求。
+              </p>
+            </div>
+          </div>
+
           {/* 翻译AI配置 */}
           <div>
             <h4 className="text-md font-medium mb-4">翻译AI</h4>
@@ -1449,10 +1037,11 @@ function AIConfigModal({
           </div>
         </div>
 
+        {/* 按钮区域 */}
         <div className="flex justify-end space-x-3 mt-8">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+            className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-md transition-colors"
           >
             取消
           </button>
@@ -1461,6 +1050,96 @@ function AIConfigModal({
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
           >
             保存配置
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistoryModal({
+  tasks,
+  onSelect,
+  onCancel
+}: {
+  tasks: Task[];
+  onSelect: (task: Task) => void;
+  onCancel: () => void;
+}) {
+  // 过滤出有效的历史任务（有推文链接或用户额外信息的任务）
+  const validTasks = tasks.filter(task =>
+    task.tweetUrl || task.userExtraInfo
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <h3 className="text-lg font-semibold mb-6">选择历史任务进行回填</h3>
+
+        {validTasks.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <p>暂无可回填的历史任务</p>
+            <p className="text-sm mt-2">历史任务需要包含推文链接或用户额外信息才能进行回填</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {validTasks.map((task) => (
+              <div
+                key={task.id}
+                onClick={() => onSelect(task)}
+                className="p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-blue-300 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <h4 className="font-medium text-gray-900 truncate">
+                        {task.authorNickname ? `@${task.authorNickname}` : '推文处理任务'}
+                      </h4>
+                      <StatusBadge status={task.status} size="sm" />
+                    </div>
+
+                    {task.tweetUrl && (
+                      <p className="text-sm text-gray-600 truncate mb-1">
+                        <span className="text-gray-500">链接:</span> {task.tweetUrl}
+                      </p>
+                    )}
+
+                    {task.userExtraInfo && (
+                      <p className="text-sm text-gray-600 mb-1">
+                        <span className="text-gray-500">用户信息:</span>
+                        <span className="ml-1">{task.userExtraInfo.substring(0, 50)}{task.userExtraInfo.length > 50 ? '...' : ''}</span>
+                      </p>
+                    )}
+
+                    <p className="text-xs text-gray-400">
+                      {new Date(task.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div className="ml-4">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect(task);
+                      }}
+                      className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition-colors"
+                    >
+                      回填
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 按钮区域 */}
+        <div className="flex justify-end space-x-3 mt-6">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-md transition-colors"
+          >
+            取消
           </button>
         </div>
       </div>
