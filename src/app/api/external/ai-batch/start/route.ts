@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       // AI配置
       aiConfig: z.object({
         apiKey: z.string().min(1),
-        provider: z.enum(['openai', 'openai-badger', 'zhipu']).default('openai'),
+        provider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic']).default('openai'),
         model: z.string().default('gpt-4o'),
         baseURL: z.string().optional(),
       }),

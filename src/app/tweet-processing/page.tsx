@@ -8,14 +8,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '~/trpc/react';
 import { DashboardLayout } from '~/components/dashboard-layout';
-
-// AI 配置接口
-interface AIConfig {
-  apiKey: string;
-  provider: 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
-  model: string;
-  baseURL?: string;
-}
+import type { AIConfig } from '~/server/core/ai/base/ai-types';
 
 // 筛选配置接口
 interface FilterConfig {

@@ -13,6 +13,7 @@ import { GenerateCommentDialog } from '~/components/ui/generate-comment-dialog';
 import { FloatingCommentPanel } from '~/components/ui/floating-comment-panel';
 import { api } from '~/trpc/react';
 import { formatCount } from '~/lib/format';
+import type { AIConfig } from '~/server/core/ai/base/ai-types';
 import { getSession } from '~/lib/simple-auth';
 
 interface MediaCard {
@@ -37,12 +38,6 @@ interface MediaCard {
   originalLanguage?: string | null;
 }
 
-interface AIConfig {
-  apiKey: string;
-  provider: 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
-  model: string;
-  baseURL?: string;
-}
 
 interface VideoData {
   id: string;

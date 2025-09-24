@@ -111,7 +111,7 @@ export class AnthropicService extends BaseAIService {
 
       // 解析响应
       const textContent = response.content[0];
-      if (textContent.type !== 'text') {
+      if (!textContent || textContent.type !== 'text') {
         throw new Error('意外的响应格式');
       }
 
@@ -153,6 +153,8 @@ export class AnthropicService extends BaseAIService {
     for (let i = 0; i < tweets.length; i += batchSize) {
       const batch = tweets.slice(i, i + batchSize);
 
+      if (batch.length === 0) continue;
+
       try {
         // 构建批量分析的消息
         const batchContent = batch.map((tweet, index) =>
@@ -166,7 +168,7 @@ ${batchContent}
 请返回以下格式的JSON数组：
 [
   {
-    "tweetId": "${batch[0].id}",
+    "tweetId": "${batch[0]?.id || 'EXAMPLE_ID'}",
     "isValueless": false,
     "keywords": ["关键词1", "关键词2"],
     "topicTags": ["匹配的标签"],
@@ -189,7 +191,7 @@ ${batchContent}
         });
 
         const textContent = response.content[0];
-        if (textContent.type !== 'text') {
+        if (!textContent || textContent.type !== 'text') {
           throw new Error('意外的响应格式');
         }
 
@@ -248,6 +250,8 @@ ${batchContent}
 
     for (let i = 0; i < tweets.length; i++) {
       const tweet = tweets[i];
+
+      if (!tweet) continue;
 
       try {
         const result = await this.analyzeTweet(tweet.content, topicTags, contentTypes, systemPrompt);
@@ -319,7 +323,7 @@ ${content}`;
       });
 
       const textContent = response.content[0];
-      if (textContent.type !== 'text') {
+      if (!textContent || textContent.type !== 'text') {
         throw new Error('意外的响应格式');
       }
 
@@ -347,7 +351,7 @@ ${content}`;
       });
 
       const textContent = response.content[0];
-      if (textContent.type !== 'text') {
+      if (!textContent || textContent.type !== 'text') {
         throw new Error('意外的响应格式');
       }
 

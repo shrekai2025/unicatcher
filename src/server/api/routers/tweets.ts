@@ -577,7 +577,7 @@ export const tweetsRouter = createTRPCRouter({
         tweetId: z.string().min(1, "推文ID不能为空"),
         aiConfig: z.object({
           apiKey: z.string().min(1),
-          provider: z.enum(['openai', 'openai-badger', 'zhipu']).default('openai'),
+          provider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic']).default('openai'),
           model: z.string().default('gpt-4o'),
           baseURL: z.string().optional(),
         }),
