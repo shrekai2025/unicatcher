@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '~/components/dashboard-layout';
 
 interface AIConfig {
-  provider: 'openai' | 'openai-badger' | 'zhipu';
+  provider: 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
   model: string;
   apiKey: string;
   baseURL?: string;
@@ -843,6 +843,12 @@ function AIConfigModal({
           { value: 'glm-4.5', label: 'GLM-4.5' },
           { value: 'glm-4.5-air', label: 'GLM-4.5-Air' }
         ];
+      case 'anthropic':
+        return [
+          { value: 'claude-3-5-sonnet-20241022', label: 'Claude-3.5-Sonnet' },
+          { value: 'claude-3-opus-20240229', label: 'Claude-3-Opus' },
+          { value: 'claude-3-sonnet-20240229', label: 'Claude-3-Sonnet' }
+        ];
       default:
         return [];
     }
@@ -857,6 +863,8 @@ function AIConfigModal({
         return 'gpt-4o-mini';
       case 'zhipu':
         return 'glm-4.5-flash';
+      case 'anthropic':
+        return 'claude-3-5-sonnet-20241022';
       default:
         return '';
     }
@@ -953,6 +961,7 @@ function AIConfigModal({
                   <option value="openai">OpenAI</option>
                   <option value="openai-badger">OpenAI-Badger</option>
                   <option value="zhipu">智谱AI (GLM)</option>
+                  <option value="anthropic">Anthropic Claude</option>
                 </select>
               </div>
 
@@ -1007,6 +1016,7 @@ function AIConfigModal({
                   <option value="openai">OpenAI</option>
                   <option value="openai-badger">OpenAI-Badger</option>
                   <option value="zhipu">智谱AI (GLM)</option>
+                  <option value="anthropic">Anthropic Claude</option>
                 </select>
               </div>
 

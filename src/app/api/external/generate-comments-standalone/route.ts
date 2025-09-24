@@ -43,7 +43,11 @@ export async function POST(request: NextRequest) {
       systemPrompt = '',
 
       // 现有评论相关（可选，一般不会使用因为是外部传入）
-      existingComments = []
+      existingComments = [],
+
+      // 参考数据参数（可选）
+      referenceTweetCategoryId,
+      referenceCount = 5
     } = body;
 
     // 验证必需参数 - 内容
@@ -129,7 +133,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[独立评论生成API] 为推文生成 ${commentCount} 条${commentLength}评论, 语言: ${language}, AI供应商: ${aiConfig.provider}, 推文ID: ${tweetId || 'N/A'}`);
+    // 验证参考数据参数（可选）
+    if (referenceTweetCategoryId && typeof referenceTweetCategoryId !== 'string') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'INVALID_REQUEST', message: 'Invalid referenceTweetCategoryId: must be string' }
+        },
+        { status: 400 }
+      );
+    }
+
+    if (typeof referenceCount !== 'number' || referenceCount < 0 || referenceCount > 20) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'INVALID_REQUEST', message: 'Invalid referenceCount: must be number between 0-20' }
+        },
+        { status: 400 }
+      );
+    }
+
+    console.log(`[独立评论生成API] 为推文生成 ${commentCount} 条${commentLength}评论, 语言: ${language}, AI供应商: ${aiConfig.provider}, 推文ID: ${tweetId || 'N/A'}, 参考分类: ${referenceTweetCategoryId || '无'}, 参考数量: ${referenceCount}`);
 
     // 为了调用内部API，我们需要提供一个临时tweetId（不会存储到数据库）
     const tempTweetId = tweetId || `temp-${Date.now()}`;
@@ -150,7 +175,9 @@ export async function POST(request: NextRequest) {
         commentCount: commentCount,
         commentLength: commentLength,
         language: language,
-        aiConfig: aiConfig
+        aiConfig: aiConfig,
+        referenceTweetCategoryId: referenceTweetCategoryId,
+        referenceCount: referenceCount
       })
     });
 

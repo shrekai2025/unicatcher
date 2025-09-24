@@ -32,18 +32,25 @@ export class CommentGenerator {
         console.log(`[评论生成器] 获取到 ${existingCommentsCount} 条现有评论`);
       }
 
-      // 2. 获取AI配置
+      // 2. 准备参考推文数据
+      let referenceData: Array<{content: string}> = [];
+      if (request.referenceTweetCategoryId && request.referenceCount && request.referenceCount > 0) {
+        referenceData = await this.prepareReferenceData(request.referenceTweetCategoryId, request.referenceCount);
+        console.log(`[评论生成器] 获取到 ${referenceData.length} 条参考推文数据`);
+      }
+
+      // 3. 获取AI配置
       const aiConfig = request.aiConfig || await this.getAIConfig();
       console.log(`[评论生成器] 使用AI供应商: ${aiConfig.provider}`);
 
-      // 3. 构建AI提示词
-      const prompt = this.buildPrompt(request, tweet, existingComments);
+      // 4. 构建AI提示词
+      const prompt = this.buildPrompt(request, tweet, existingComments, referenceData);
 
-      // 4. 调用AI服务生成评论
+      // 5. 调用AI服务生成评论
       const aiService = AIServiceFactory.createService(aiConfig);
       const aiResponse = await aiService.generateText(prompt);
 
-      // 5. 解析AI响应
+      // 6. 解析AI响应
       const parsedComments = this.parseAIResponse(aiResponse, request.commentCount);
 
       const result: CommentGenerateResult = {
@@ -61,7 +68,7 @@ export class CommentGenerator {
         }
       };
 
-      // 6. 保存AI生成评论到数据库
+      // 7. 保存AI生成评论到数据库
       try {
         await db.aIGeneratedComment.create({
           data: {
@@ -148,6 +155,35 @@ export class CommentGenerator {
   }
 
   /**
+   * 准备参考推文数据
+   */
+  private async prepareReferenceData(categoryId: string, count: number): Promise<Array<{content: string}>> {
+    try {
+      console.log(`[评论生成器] 获取参考数据: 分类=${categoryId}, 数量=${count}`);
+
+      // 从手采推文数据库中获取指定分类的推文数据
+      const referenceTexts = await db.manualTweetText.findMany({
+        where: { categoryId },
+        select: { content: true },
+        take: count,
+        orderBy: { createdAt: 'desc' } // 按创建时间倒序，获取最新的数据
+      });
+
+      if (referenceTexts.length > 0) {
+        console.log(`[评论生成器] 成功获取到 ${referenceTexts.length} 条参考推文`);
+        return referenceTexts.map(text => ({ content: text.content }));
+      }
+
+      console.log(`[评论生成器] 未找到指定分类的参考数据: ${categoryId}`);
+      return [];
+
+    } catch (error) {
+      console.error('[评论生成器] 获取参考数据失败:', error);
+      return [];
+    }
+  }
+
+  /**
    * 获取AI配置
    * 从AI批处理模块获取配置
    */
@@ -199,7 +235,8 @@ export class CommentGenerator {
   private buildPrompt(
     request: CommentGenerateRequest,
     tweet: Tweet,
-    existingComments: CommentData[]
+    existingComments: CommentData[],
+    referenceData: Array<{content: string}> = []
   ): string {
     const { language, commentLength, commentCount, userInfo, systemPrompt } = request;
 
@@ -249,6 +286,15 @@ export class CommentGenerator {
       existingComments.slice(0, 10).forEach((comment, index) => {
         prompt += `${index + 1}. ${comment.content}\n`;
       });
+    }
+
+    // 添加参考推文数据
+    if (referenceData.length > 0) {
+      prompt += `\n\n参考推文数据：\n以下是同类型推文的表达方式参考，请学习它们的语言风格和表达方式，但不要吸收与当前推文无关的具体信息：\n`;
+      referenceData.forEach((ref, index) => {
+        prompt += `${index + 1}. ${ref.content}\n`;
+      });
+      prompt += `\n请参考以上推文的表达风格和语言习惯来生成评论，但确保评论内容与当前推文内容相关。`;
     }
 
     // 输出格式要求

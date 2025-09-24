@@ -39,7 +39,7 @@ interface MediaCard {
 
 interface AIConfig {
   apiKey: string;
-  provider: 'openai' | 'openai-badger' | 'zhipu';
+  provider: 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
   model: string;
   baseURL?: string;
 }
@@ -1276,7 +1276,7 @@ export default function ViewerPage() {
                 const formData = new FormData(e.currentTarget);
                 const config = {
                   apiKey: formData.get('apiKey') as string,
-                  provider: formData.get('provider') as 'openai' | 'openai-badger' | 'zhipu',
+                  provider: formData.get('provider') as 'openai' | 'openai-badger' | 'zhipu' | 'anthropic',
                   model: formData.get('model') as string,
                   baseURL: formData.get('baseURL') as string || undefined,
                 };
@@ -1306,13 +1306,15 @@ export default function ViewerPage() {
                       defaultValue={aiConfig.provider}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       onChange={(e) => {
-                        const provider = e.target.value as 'openai' | 'openai-badger' | 'zhipu';
+                        const provider = e.target.value as 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
                         const modelSelect = e.target.form?.querySelector('select[name="model"]') as HTMLSelectElement;
                         if (modelSelect) {
                           if (provider === 'openai-badger') {
                             modelSelect.value = 'gpt-4o-mini';
                           } else if (provider === 'zhipu') {
                             modelSelect.value = 'glm-4.5-flash';
+                          } else if (provider === 'anthropic') {
+                            modelSelect.value = 'claude-3-5-sonnet-20241022';
                           } else {
                             modelSelect.value = 'gpt-4o';
                           }
@@ -1322,6 +1324,7 @@ export default function ViewerPage() {
                       <option value="openai">OpenAI</option>
                       <option value="openai-badger">OpenAI-Badger</option>
                       <option value="zhipu">智谱AI (GLM)</option>
+                      <option value="anthropic">Anthropic Claude</option>
                     </select>
                   </div>
 
@@ -1341,6 +1344,9 @@ export default function ViewerPage() {
                       <option value="glm-4.5-flash">GLM-4.5-Flash</option>
                       <option value="glm-4.5">GLM-4.5</option>
                       <option value="glm-4.5-air">GLM-4.5-Air</option>
+                      <option value="claude-3-5-sonnet-20241022">Claude-3.5-Sonnet</option>
+                      <option value="claude-3-opus-20240229">Claude-3-Opus</option>
+                      <option value="claude-3-sonnet-20240229">Claude-3-Sonnet</option>
                     </select>
                   </div>
 
@@ -1403,7 +1409,7 @@ export default function ViewerPage() {
                 const formData = new FormData(e.currentTarget);
                 const config = {
                   apiKey: formData.get('apiKey') as string,
-                  provider: formData.get('provider') as 'openai' | 'openai-badger' | 'zhipu',
+                  provider: formData.get('provider') as 'openai' | 'openai-badger' | 'zhipu' | 'anthropic',
                   model: formData.get('model') as string,
                   baseURL: formData.get('baseURL') as string || undefined,
                 };
@@ -1438,6 +1444,7 @@ export default function ViewerPage() {
                       <option value="openai">OpenAI</option>
                       <option value="openai-badger">OpenAI-Badger</option>
                       <option value="zhipu">智谱AI</option>
+                      <option value="anthropic">Anthropic Claude</option>
                     </select>
                   </div>
 
@@ -1459,6 +1466,9 @@ export default function ViewerPage() {
                       <option value="glm-4.5-flash">GLM-4.5-Flash</option>
                       <option value="glm-4.5">GLM-4.5</option>
                       <option value="glm-4.5-air">GLM-4.5-Air</option>
+                      <option value="claude-3-5-sonnet-20241022">Claude-3.5-Sonnet</option>
+                      <option value="claude-3-opus-20240229">Claude-3-Opus</option>
+                      <option value="claude-3-sonnet-20240229">Claude-3-Sonnet</option>
                     </select>
                   </div>
 

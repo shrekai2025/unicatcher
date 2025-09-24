@@ -12,7 +12,7 @@ import { DashboardLayout } from '~/components/dashboard-layout';
 // AI 配置接口
 interface AIConfig {
   apiKey: string;
-  provider: 'openai' | 'openai-badger' | 'zhipu';
+  provider: 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
   model: string;
   baseURL?: string;
 }
@@ -1694,13 +1694,14 @@ export default function TweetProcessingPage() {
                 <select
                   value={aiConfig.provider}
                   onChange={(e) => {
-                    const provider = e.target.value as 'openai' | 'openai-badger' | 'zhipu';
+                    const provider = e.target.value as 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
                     setAIConfig(prev => ({ 
                       ...prev, 
                       provider,
                       // 切换供应商时自动设置对应的默认模型
-                      model: provider === 'openai-badger' ? 'gpt-4o-mini' : 
-                             provider === 'zhipu' ? 'glm-4.5-flash' : 'gpt-4o'
+                      model: provider === 'openai-badger' ? 'gpt-4o-mini' :
+                             provider === 'zhipu' ? 'glm-4.5-flash' :
+                             provider === 'anthropic' ? 'claude-3-5-sonnet-20241022' : 'gpt-4o'
                     }));
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -1708,6 +1709,7 @@ export default function TweetProcessingPage() {
                   <option value="openai">OpenAI</option>
                   <option value="openai-badger">OpenAI-badger</option>
                   <option value="zhipu">智谱AI (GLM)</option>
+                  <option value="anthropic">Anthropic Claude</option>
                 </select>
               </div>
               
@@ -1732,6 +1734,12 @@ export default function TweetProcessingPage() {
                       <option value="glm-4.5-air">GLM-4.5-Air</option>
                       <option value="glm-4.5-x">GLM-4.5-X</option>
                       <option value="glm-4.5-airx">GLM-4.5-Airx</option>
+                    </>
+                  ) : aiConfig.provider === 'anthropic' ? (
+                    <>
+                      <option value="claude-3-5-sonnet-20241022">Claude-3.5-Sonnet</option>
+                      <option value="claude-3-opus-20240229">Claude-3-Opus</option>
+                      <option value="claude-3-sonnet-20240229">Claude-3-Sonnet</option>
                     </>
                   ) : (
                     <>

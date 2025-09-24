@@ -2,7 +2,7 @@
  * AI服务通用类型定义
  */
 
-export type AIProvider = 'openai' | 'openai-badger' | 'zhipu';
+export type AIProvider = 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
 
 // 向后兼容的类型别名
 export type { AIProvider as AIProviderType };

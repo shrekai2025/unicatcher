@@ -31,7 +31,9 @@ export async function POST(request: NextRequest) {
       systemPrompt = '',
       commentLength = 'medium',
       commentCount = 3,
-      language = 'zh-CN'
+      language = 'zh-CN',
+      referenceTweetCategoryId,
+      referenceCount = 5
     } = body;
 
     // 验证必需参数
@@ -96,7 +98,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[外部评论生成API] 为推文 ${tweetId} 生成 ${commentCount} 条${commentLength}评论, 语言: ${language}`);
+    // 验证参考数据参数
+    if (referenceTweetCategoryId && typeof referenceTweetCategoryId !== 'string') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'INVALID_PARAMETER', message: 'referenceTweetCategoryId must be string' }
+        },
+        { status: 400 }
+      );
+    }
+
+    if (typeof referenceCount !== 'number' || referenceCount < 0 || referenceCount > 20) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'INVALID_PARAMETER', message: 'referenceCount must be number between 0-20' }
+        },
+        { status: 400 }
+      );
+    }
+
+    console.log(`[外部评论生成API] 为推文 ${tweetId} 生成 ${commentCount} 条${commentLength}评论, 语言: ${language}, 参考分类: ${referenceTweetCategoryId || '无'}, 参考数量: ${referenceCount}`);
 
     // 调用内部评论生成接口
     const internalResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/tweet-processor/generate-comments`, {
@@ -111,7 +134,9 @@ export async function POST(request: NextRequest) {
         systemPrompt,
         commentLength,
         commentCount,
-        language
+        language,
+        referenceTweetCategoryId,
+        referenceCount
       })
     });
 

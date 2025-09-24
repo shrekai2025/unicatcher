@@ -10,7 +10,7 @@ interface GeneratedComment {
 
 interface AIConfig {
   apiKey: string;
-  provider: 'openai' | 'openai-badger' | 'zhipu';
+  provider: 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
   model: string;
   baseURL?: string;
 }

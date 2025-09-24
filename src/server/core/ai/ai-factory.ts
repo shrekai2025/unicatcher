@@ -5,7 +5,7 @@
 
 import { BaseAIService } from './base/ai-service.interface';
 import type { AIConfig } from './base/ai-types';
-import { OpenAIService, ZhipuService } from './providers';
+import { OpenAIService, ZhipuService, AnthropicService } from './providers';
 
 export class AIServiceFactory {
   /**
@@ -16,10 +16,13 @@ export class AIServiceFactory {
       case 'openai':
       case 'openai-badger':
         return new OpenAIService(config);
-      
+
       case 'zhipu':
         return new ZhipuService(config);
-      
+
+      case 'anthropic':
+        return new AnthropicService(config);
+
       default:
         throw new Error(`不支持的AI供应商: ${config.provider}`);
     }
@@ -29,7 +32,7 @@ export class AIServiceFactory {
    * 获取所有支持的供应商
    */
   static getSupportedProviders(): string[] {
-    return ['openai', 'openai-badger', 'zhipu'];
+    return ['openai', 'openai-badger', 'zhipu', 'anthropic'];
   }
 
   /**
@@ -43,6 +46,8 @@ export class AIServiceFactory {
         return 'gpt-4o-mini';
       case 'zhipu':
         return 'glm-4.5-flash';
+      case 'anthropic':
+        return 'claude-3-5-sonnet-20241022';
       default:
         throw new Error(`不支持的AI供应商: ${provider}`);
     }
@@ -59,6 +64,8 @@ export class AIServiceFactory {
         return ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
       case 'zhipu':
         return ['glm-4.5-flash', 'glm-4.5', 'glm-4.5-air', 'glm-4.5-x', 'glm-4.5-airx'];
+      case 'anthropic':
+        return ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'];
       default:
         return [];
     }

@@ -26,7 +26,9 @@ export async function POST(request: NextRequest) {
       commentCount = 2,
       commentLength = 'medium',
       language = 'zh-CN',
-      aiConfig
+      aiConfig,
+      referenceTweetCategoryId,
+      referenceCount = 5
     } = body;
 
     // 验证必需参数
@@ -101,6 +103,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 验证参考数据参数
+    if (referenceTweetCategoryId && typeof referenceTweetCategoryId !== 'string') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'INVALID_REQUEST', message: 'Invalid referenceTweetCategoryId parameter, must be string' }
+        },
+        { status: 400 }
+      );
+    }
+
+    if (typeof referenceCount !== 'number' || referenceCount < 0 || referenceCount > 20) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'INVALID_REQUEST', message: 'Invalid referenceCount parameter, must be number between 0-20' }
+        },
+        { status: 400 }
+      );
+    }
+
     // 验证AI配置
     if (aiConfig) {
       if (!aiConfig.apiKey || typeof aiConfig.apiKey !== 'string') {
@@ -113,11 +136,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (!aiConfig.provider || !['openai', 'openai-badger', 'zhipu'].includes(aiConfig.provider)) {
+      if (!aiConfig.provider || !['openai', 'openai-badger', 'zhipu', 'anthropic'].includes(aiConfig.provider)) {
         return NextResponse.json(
           {
             success: false,
-            error: { code: 'INVALID_REQUEST', message: 'Invalid aiConfig: provider must be openai|openai-badger|zhipu' }
+            error: { code: 'INVALID_REQUEST', message: 'Invalid aiConfig: provider must be openai|openai-badger|zhipu|anthropic' }
           },
           { status: 400 }
         );
@@ -134,7 +157,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`[AI评论生成API] 处理请求: ${tweetId} (用户信息: ${userInfo ? '有' : '无'}, 基于现有评论: ${includeExistingComments}, 数量: ${commentCount}, 长度: ${commentLength}, 语言: ${language})`);
+    console.log(`[AI评论生成API] 处理请求: ${tweetId} (用户信息: ${userInfo ? '有' : '无'}, 基于现有评论: ${includeExistingComments}, 数量: ${commentCount}, 长度: ${commentLength}, 语言: ${language}, 参考分类: ${referenceTweetCategoryId || '无'}, 参考数量: ${referenceCount})`);
 
     // 构建请求对象
     const generateRequest: CommentGenerateRequest = {
@@ -149,7 +172,9 @@ export async function POST(request: NextRequest) {
       commentCount: commentCount as 1 | 2 | 3 | 4 | 5 | 6 | 7,
       commentLength: commentLength as 'short' | 'medium' | 'long',
       language: language as 'zh-CN' | 'en-US',
-      aiConfig
+      aiConfig,
+      referenceTweetCategoryId,
+      referenceCount
     };
 
     // 调用管理器处理

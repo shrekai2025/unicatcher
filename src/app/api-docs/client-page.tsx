@@ -710,15 +710,15 @@ const apiEndpoints: ApiEndpoint[] = [
         name: 'aiConfig.provider',
         type: 'string',
         required: false,
-        description: 'AI提供商，支持OpenAI、OpenAI-Badger、智谱AI，默认openai',
-        options: ['openai', 'openai-badger', 'zhipu'],
+        description: 'AI提供商，支持OpenAI、OpenAI-Badger、智谱AI、Anthropic Claude，默认openai',
+        options: ['openai', 'openai-badger', 'zhipu', 'anthropic'],
         example: 'openai'
       },
       {
         name: 'aiConfig.model',
         type: 'string',
         required: false,
-        description: 'AI模型名称，支持gpt-4o、glm-4.5-flash等，默认gpt-4o',
+        description: 'AI模型名称，支持gpt-4o、glm-4.5-flash、claude-3-5-sonnet-20241022等，默认gpt-4o',
         example: 'gpt-4o'
       },
       {
@@ -874,6 +874,21 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/start \\
       "apiKey": "your-zhipu-api-key.xxxxxx",
       "provider": "zhipu",
       "model": "glm-4.5-flash"
+    }
+  }'
+
+# Anthropic Claude 示例
+curl -X POST http://43.153.84.145:3067/api/external/ai-batch/start \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: unicatcher-api-key-demo" \\
+  -d '{
+    "listIds": ["1948042550071496895"],
+    "batchSize": 10,
+    "batchProcessingMode": "optimized",
+    "aiConfig": {
+      "apiKey": "sk-ant-api03-xxxxxx",
+      "provider": "anthropic",
+      "model": "claude-3-5-sonnet-20241022"
     }
   }'`
   },
@@ -1087,15 +1102,15 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/start \\
         name: 'aiConfig.provider',
         type: 'string',
         required: false,
-        description: 'AI提供商，支持OpenAI、OpenAI-Badger、智谱AI，默认openai',
-        options: ['openai', 'openai-badger', 'zhipu'],
+        description: 'AI提供商，支持OpenAI、OpenAI-Badger、智谱AI、Anthropic Claude，默认openai',
+        options: ['openai', 'openai-badger', 'zhipu', 'anthropic'],
         example: 'openai'
       },
       {
         name: 'aiConfig.model',
         type: 'string',
         required: false,
-        description: 'AI模型名称，支持gpt-4o、glm-4.5-flash等，默认gpt-4o',
+        description: 'AI模型名称，支持gpt-4o、glm-4.5-flash、claude-3-5-sonnet-20241022等，默认gpt-4o',
         example: 'gpt-4o'
       },
       {
@@ -1233,6 +1248,21 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
       "apiKey": "your-zhipu-api-key.xxxxxx",
       "provider": "zhipu",
       "model": "glm-4.5-flash"
+    }
+  }'
+
+# 继续Anthropic Claude处理
+curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: unicatcher-api-key-demo" \\
+  -d '{
+    "previousBatchId": "batch_1703123456789_abc123",
+    "listIds": ["1948042550071496895"],
+    "batchSize": 10,
+    "aiConfig": {
+      "apiKey": "sk-ant-api03-xxxxxx",
+      "provider": "anthropic",
+      "model": "claude-3-5-sonnet-20241022"
     }
   }'`
   },
@@ -2378,7 +2408,7 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
     method: 'POST',
     path: '/api/external/translate',
     title: '推文翻译',
-    description: '使用AI服务翻译推文内容，支持多种AI供应商',
+    description: '使用AI服务翻译推文内容，支持OpenAI、OpenAI-Badger、智谱AI、Anthropic Claude等多种AI供应商',
     params: [
       {
         name: 'content',
@@ -2446,7 +2476,7 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
     method: 'POST',
     path: '/api/external/generate-comments',
     title: 'AI评论生成',
-    description: '根据推文内容使用AI生成参考评论',
+    description: '根据推文内容使用AI生成参考评论，支持OpenAI、OpenAI-Badger、智谱AI、Anthropic Claude等AI供应商',
     params: [
       {
         name: 'tweetId',
@@ -2495,6 +2525,20 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
         description: '生成语言',
         options: ['zh-CN', 'en-US'],
         example: 'zh-CN'
+      },
+      {
+        name: 'referenceTweetCategoryId',
+        type: 'string',
+        required: false,
+        description: '参考推文分类ID，用于从手采推文数据库中获取同类型推文作为AI生成时的参考',
+        example: 'clm123456789'
+      },
+      {
+        name: 'referenceCount',
+        type: 'number',
+        required: false,
+        description: '参考推文数量 (0-20)，默认5条',
+        example: 5
       }
     ],
     responses: [
@@ -2532,7 +2576,9 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
     },
     "commentCount": 3,
     "commentLength": "medium",
-    "language": "zh-CN"
+    "language": "zh-CN",
+    "referenceTweetCategoryId": "clm123456789",
+    "referenceCount": 5
   }'`
   },
 
@@ -2741,7 +2787,7 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
     method: 'POST',
     path: '/api/external/generate-comments-standalone',
     title: '独立评论生成接口',
-    description: '独立的推文评论生成接口，无需将数据存储到unicatcher数据库中。为传入的推文内容生成AI评论，外部项目可以自行管理数据。',
+    description: '独立的推文评论生成接口，无需将数据存储到unicatcher数据库中。为传入的推文内容生成AI评论，支持OpenAI、OpenAI-Badger、智谱AI、Anthropic Claude等AI供应商，外部项目可以自行管理数据。',
     params: [
       {
         name: 'content',
@@ -2832,6 +2878,20 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
         required: false,
         description: '现有评论列表（一般不使用）',
         example: []
+      },
+      {
+        name: 'referenceTweetCategoryId',
+        type: 'string',
+        required: false,
+        description: '参考推文分类ID，用于从手采推文数据库中获取同类型推文作为AI生成时的参考',
+        example: 'clm123456789'
+      },
+      {
+        name: 'referenceCount',
+        type: 'number',
+        required: false,
+        description: '参考推文数量 (0-20)，默认5条',
+        example: 5
       }
     ],
     responses: [
@@ -2911,7 +2971,9 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
     "userInfo": "我是一名软件工程师，对AI技术很感兴趣",
     "tweetId": "1234567890",
     "authorUsername": "ai_enthusiast",
-    "authorNickname": "AI爱好者"
+    "authorNickname": "AI爱好者",
+    "referenceTweetCategoryId": "clm123456789",
+    "referenceCount": 5
   }'`
   },
 
@@ -3780,7 +3842,7 @@ export default function ApiDocsClientPage() {
     },
     'ai-batch': {
       title: 'AI批处理',
-      description: 'AI自动分析推文内容，支持OpenAI、OpenAI-Badger、智谱AI供应商，单批次处理模式',
+      description: 'AI自动分析推文内容，支持OpenAI、OpenAI-Badger、智谱AI、Anthropic Claude供应商，单批次处理模式',
       endpoints: apiEndpoints.filter(ep => ep.path.includes('/ai-batch'))
     },
     'tweet-processing': {

@@ -110,7 +110,7 @@ export interface CommentGenerateRequest {
   language: 'zh-CN' | 'en-US'; // 语言：简体中文 | 美国英语
   aiConfig?: {
     apiKey: string;
-    provider: 'openai' | 'openai-badger' | 'zhipu';
+    provider: 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
     model: string;
     baseURL?: string;
   }; // AI服务配置
@@ -119,6 +119,9 @@ export interface CommentGenerateRequest {
   authorUsername?: string; // 作者用户名
   authorNickname?: string; // 作者昵称
   tweetUrl?: string; // 推文链接
+  // 参考数据字段
+  referenceTweetCategoryId?: string; // 参考推文的分类ID
+  referenceCount?: number; // 参考推文数量，默认5条
 }
 
 // 生成的评论
