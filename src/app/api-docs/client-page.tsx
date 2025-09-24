@@ -46,7 +46,7 @@ interface ApiEndpoint {
 }
 
 const apiEndpoints: ApiEndpoint[] = [
-  // 任务管理接口
+  // 推文翻译接口
   {
     id: 'create-task',
     method: 'POST',
@@ -2370,6 +2370,243 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
       "model": "glm-4.5-flash"
     }
   }'`
+  },
+
+  // 推文处理接口
+  {
+    id: 'translate-text',
+    method: 'POST',
+    path: '/api/external/translate',
+    title: '推文翻译',
+    description: '使用AI服务翻译推文内容，支持多种AI供应商',
+    params: [
+      {
+        name: 'content',
+        type: 'string',
+        required: true,
+        description: '待翻译的推文内容',
+        example: 'Hello world, this is a test tweet!'
+      },
+      {
+        name: 'aiConfig',
+        type: 'object',
+        required: true,
+        description: 'AI服务配置',
+        example: {
+          provider: 'zhipu',
+          apiKey: 'your-api-key',
+          model: 'glm-4.5-flash'
+        }
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '翻译成功',
+        example: {
+          success: true,
+          message: '翻译成功',
+          data: {
+            originalContent: 'Hello world, this is a test tweet!',
+            translatedContent: '你好世界，这是一条测试推文！',
+            originalLanguage: 'en',
+            targetLanguage: 'zh-CN',
+            translationProvider: 'zhipu',
+            translationModel: 'glm-4.5-flash',
+            translatedAt: '2024-01-01T12:00:00Z'
+          }
+        }
+      },
+      {
+        status: 400,
+        description: '参数错误',
+        example: {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Missing or invalid content'
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/external/translate \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "content": "Hello world, this is a test tweet!",
+    "aiConfig": {
+      "provider": "zhipu",
+      "apiKey": "your-api-key",
+      "model": "glm-4.5-flash"
+    }
+  }'`
+  },
+
+  {
+    id: 'generate-comments',
+    method: 'POST',
+    path: '/api/external/generate-comments',
+    title: 'AI评论生成',
+    description: '根据推文内容使用AI生成参考评论',
+    params: [
+      {
+        name: 'tweetId',
+        type: 'string',
+        required: true,
+        description: '推文ID',
+        example: '1234567890123456789'
+      },
+      {
+        name: 'content',
+        type: 'string',
+        required: true,
+        description: '推文内容',
+        example: '今天天气很好，适合出门散步。'
+      },
+      {
+        name: 'aiConfig',
+        type: 'object',
+        required: true,
+        description: 'AI服务配置',
+        example: {
+          provider: 'zhipu',
+          apiKey: 'your-api-key',
+          model: 'glm-4.5-flash'
+        }
+      },
+      {
+        name: 'commentCount',
+        type: 'number',
+        required: false,
+        description: '生成评论数量 (1-10)',
+        example: 3
+      },
+      {
+        name: 'commentLength',
+        type: 'string',
+        required: false,
+        description: '评论长度',
+        options: ['short', 'medium', 'long'],
+        example: 'medium'
+      },
+      {
+        name: 'language',
+        type: 'string',
+        required: false,
+        description: '生成语言',
+        options: ['zh-CN', 'en-US'],
+        example: 'zh-CN'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '评论生成成功',
+        example: {
+          success: true,
+          message: '成功生成 3 条评论',
+          data: {
+            tweetId: '1234567890123456789',
+            comments: [
+              { content: '确实是这样，好天气让人心情都变好了！', reasoning: '积极回应天气话题' },
+              { content: '我也想出去走走，有推荐的地方吗？', reasoning: '互动性提问' },
+              { content: '散步对身体真的很有好处。', reasoning: '健康话题延伸' }
+            ],
+            basedOnExistingComments: true,
+            aiProvider: 'zhipu',
+            aiModel: 'glm-4.5-flash',
+            language: 'zh-CN',
+            generatedAt: '2024-01-01T12:00:00Z'
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/external/generate-comments \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "tweetId": "1234567890123456789",
+    "content": "今天天气很好，适合出门散步。",
+    "aiConfig": {
+      "provider": "zhipu",
+      "apiKey": "your-api-key",
+      "model": "glm-4.5-flash"
+    },
+    "commentCount": 3,
+    "commentLength": "medium",
+    "language": "zh-CN"
+  }'`
+  },
+
+  {
+    id: 'tweet-info',
+    method: 'GET',
+    path: '/api/external/tweet-info/[tweetId]',
+    title: '推文信息查询',
+    description: '获取推文的详细信息，包括翻译、AI分析结果等',
+    pathParams: [
+      {
+        name: 'tweetId',
+        type: 'string',
+        required: true,
+        description: '推文ID',
+        example: '1234567890123456789'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '查询成功',
+        example: {
+          success: true,
+          message: '推文信息获取成功',
+          data: {
+            tweetId: '1234567890123456789',
+            content: '今天天气很好，适合出门散步。',
+            author: {
+              username: 'example_user',
+              nickname: '示例用户',
+              profileImage: 'https://example.com/avatar.jpg'
+            },
+            stats: {
+              replyCount: 15,
+              retweetCount: 32,
+              likeCount: 128,
+              viewCount: 1024,
+              commentCount: 8
+            },
+            translation: {
+              isTranslated: true,
+              translatedContent: 'The weather is nice today, perfect for going out for a walk.',
+              originalLanguage: 'zh',
+              translationProvider: 'zhipu',
+              translationModel: 'glm-4.5-flash',
+              translatedAt: '2024-01-01T12:00:00Z'
+            },
+            aiAnalysis: {
+              keywords: ['天气', '散步', '户外活动'],
+              topicTags: ['生活', '健康'],
+              contentTypes: ['日常分享'],
+              isValueless: false,
+              processedAt: '2024-01-01T12:00:00Z'
+            },
+            publishedAt: 1704067200000,
+            publishedAtFormatted: '2024/1/1 12:00:00',
+            tweetUrl: 'https://x.com/example_user/status/1234567890123456789'
+          }
+        }
+      },
+      {
+        status: 404,
+        description: '推文未找到',
+        example: {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Tweet not found'
+          }
+        }
+      }
+    ],
+    example: `curl -X GET http://localhost:3067/api/external/tweet-info/1234567890123456789`
   }
 ];
 
@@ -2630,7 +2867,7 @@ function ApiEndpointCard({ endpoint }: { endpoint: ApiEndpoint }) {
 }
 
 export default function ApiDocsClientPage() {
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>('tweet-processing');
   const [currentTime, setCurrentTime] = useState<string>('');
 
   useEffect(() => {
@@ -2653,15 +2890,15 @@ export default function ApiDocsClientPage() {
       description: '获取和提取推文数据',
       endpoints: apiEndpoints.filter(ep => ep.path.includes('/data'))
     },
-    'tweet-processor': {
-      title: '推文处理器',
-      description: '单推文数据更新、评论获取、AI评论生成，支持异步处理和并发控制',
-      endpoints: apiEndpoints.filter(ep => ep.path.includes('/tweet-processor'))
-    },
     'ai-batch': {
       title: 'AI批处理',
       description: 'AI自动分析推文内容，支持OpenAI、OpenAI-Badger、智谱AI供应商，单批次处理模式',
       endpoints: apiEndpoints.filter(ep => ep.path.includes('/ai-batch'))
+    },
+    'tweet-processing': {
+      title: '推文处理',
+      description: '推文翻译、评论生成、推文信息查询等API接口',
+      endpoints: apiEndpoints.filter(ep => ep.path.includes('/external') && (ep.path.includes('/translate') || ep.path.includes('/generate-comments') || ep.path.includes('/tweet-info')))
     }
   };
 

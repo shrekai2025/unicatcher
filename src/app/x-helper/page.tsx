@@ -352,13 +352,16 @@ export default function XHelperPage() {
           console.log('[X Helper] AI评论生成完成，生成', generateResult.data?.comments?.length || 0, '条评论');
         } else {
           newTask.generateCommentsStatus = 'failed';
+          newTask.error = generateResult.error?.message || 'AI评论生成失败';
           console.log('[X Helper] AI评论生成失败:', generateResult.error?.message);
         }
       } catch (error) {
         console.error('[X Helper] AI评论生成异常:', error);
         newTask.generateCommentsStatus = 'failed';
+        newTask.error = error instanceof Error ? error.message : 'AI评论生成异常';
       }
 
+      // 立即更新状态显示AI评论生成结果
       setCurrentTask({ ...newTask });
 
       // 更新最终状态
@@ -369,10 +372,21 @@ export default function XHelperPage() {
         translationStatus: newTask.translationStatus,
         crawlCommentsStatus: newTask.crawlCommentsStatus,
         generateCommentsStatus: newTask.generateCommentsStatus,
+        hasGenerateCommentsResult: !!newTask.generateCommentsResult,
+        generateCommentsCount: newTask.generateCommentsResult?.generatedComments?.length || 0,
         error: newTask.error
       });
+
+      // 最终更新状态和历史
       setCurrentTask({ ...newTask });
       setTaskHistory(prev => [newTask, ...prev.slice(1)]);
+
+      // 保存到localStorage
+      if (mounted) {
+        const updatedHistory = [newTask, ...taskHistory.slice(1)];
+        localStorage.setItem('x-helper-task-history', JSON.stringify(updatedHistory));
+        console.log('[X Helper] 任务已保存到localStorage，包含AI评论结果:', !!newTask.generateCommentsResult);
+      }
 
     } catch (error: any) {
       console.error('[X Helper] 整体处理失败:', error);
@@ -501,16 +515,10 @@ export default function XHelperPage() {
       const result = await response.json();
       console.log('[X Helper] 生成评论API结果:', result);
 
-      if (result.success && currentTask) {
+      if (result.success) {
         console.log('[X Helper] 评论生成成功，生成数量:', result.data?.comments?.length || 0);
         console.log('[X Helper] 评论生成详细数据:', result.data);
         console.log('[X Helper] 评论数组:', result.data?.comments);
-        // 为了保持前端一致性，将comments重命名为generatedComments
-        currentTask.generateCommentsResult = {
-          ...result.data,
-          generatedComments: result.data?.comments || []
-        };
-        setCurrentTask({ ...currentTask });
       } else {
         console.log('[X Helper] 评论生成失败:', result.error?.message);
         console.log('[X Helper] 完整错误信息:', result);
