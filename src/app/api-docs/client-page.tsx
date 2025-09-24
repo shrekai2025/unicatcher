@@ -2913,17 +2913,606 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
     "authorUsername": "ai_enthusiast",
     "authorNickname": "AI爱好者"
   }'`
+  },
+
+  // 手采推文分类管理接口
+  {
+    id: 'create-manual-tweet-category',
+    method: 'POST',
+    path: '/api/external/manual-tweet-categories',
+    title: '创建手采推文分类',
+    description: '创建新的手采推文分类，用于组织和管理手采推文数据',
+    params: [
+      {
+        name: 'name',
+        type: 'string',
+        required: true,
+        description: '分类名称',
+        example: 'AI技术'
+      },
+      {
+        name: 'description',
+        type: 'string',
+        required: false,
+        description: '分类描述',
+        example: '关于人工智能技术发展的推文内容'
+      },
+      {
+        name: 'color',
+        type: 'string',
+        required: false,
+        description: '分类标签颜色',
+        example: '#3B82F6'
+      }
+    ],
+    responses: [
+      {
+        status: 201,
+        description: '分类创建成功',
+        example: {
+          success: true,
+          message: '分类创建成功',
+          data: {
+            id: 'cat_123456',
+            name: 'AI技术',
+            description: '关于人工智能技术发展的推文内容',
+            color: '#3B82F6',
+            createdAt: '2025-01-15T10:35:22.456Z',
+            updatedAt: '2025-01-15T10:35:22.456Z'
+          }
+        }
+      },
+      {
+        status: 400,
+        description: '参数错误',
+        example: {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Category name is required'
+          }
+        }
+      },
+      {
+        status: 401,
+        description: 'API密钥无效',
+        example: {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or missing API key'
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/external/manual-tweet-categories \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "name": "AI技术",
+    "description": "关于人工智能技术发展的推文内容",
+    "color": "#3B82F6"
+  }'`
+  },
+
+  {
+    id: 'get-manual-tweet-categories',
+    method: 'GET',
+    path: '/api/external/manual-tweet-categories',
+    title: '查询手采推文分类',
+    description: '获取所有手采推文分类列表',
+    queryParams: [
+      {
+        name: 'page',
+        type: 'number',
+        required: false,
+        description: '页码，从1开始',
+        example: 1
+      },
+      {
+        name: 'limit',
+        type: 'number',
+        required: false,
+        description: '每页数量，最大100',
+        example: 20
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '查询成功',
+        example: {
+          success: true,
+          data: {
+            categories: [
+              {
+                id: 'cat_123456',
+                name: 'AI技术',
+                description: '关于人工智能技术发展的推文内容',
+                color: '#3B82F6',
+                textCount: 25,
+                createdAt: '2025-01-15T10:35:22.456Z',
+                updatedAt: '2025-01-15T10:35:22.456Z'
+              },
+              {
+                id: 'cat_789012',
+                name: '区块链',
+                description: '区块链技术和加密货币相关内容',
+                color: '#10B981',
+                textCount: 18,
+                createdAt: '2025-01-15T11:20:15.123Z',
+                updatedAt: '2025-01-15T11:20:15.123Z'
+              }
+            ],
+            pagination: {
+              page: 1,
+              limit: 20,
+              total: 2,
+              totalPages: 1
+            }
+          }
+        }
+      },
+      {
+        status: 401,
+        description: 'API密钥无效',
+        example: {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or missing API key'
+          }
+        }
+      }
+    ],
+    example: `curl -X GET "http://localhost:3067/api/external/manual-tweet-categories?page=1&limit=20" \\
+  -H "x-api-key: unicatcher-api-key-demo"`
+  },
+
+  {
+    id: 'delete-manual-tweet-category',
+    method: 'DELETE',
+    path: '/api/external/manual-tweet-categories/[categoryId]',
+    title: '删除手采推文分类',
+    description: '删除指定的手采推文分类。注意：删除分类会同时删除该分类下的所有文本数据',
+    pathParams: [
+      {
+        name: 'categoryId',
+        type: 'string',
+        required: true,
+        description: '分类ID',
+        example: 'cat_123456'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '删除成功',
+        example: {
+          success: true,
+          message: '分类删除成功',
+          data: {
+            deletedCategory: {
+              id: 'cat_123456',
+              name: 'AI技术',
+              description: '关于人工智能技术发展的推文内容'
+            },
+            deletedTextsCount: 25
+          }
+        }
+      },
+      {
+        status: 404,
+        description: '分类不存在',
+        example: {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Category not found'
+          }
+        }
+      },
+      {
+        status: 401,
+        description: 'API密钥无效',
+        example: {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or missing API key'
+          }
+        }
+      }
+    ],
+    example: `curl -X DELETE http://localhost:3067/api/external/manual-tweet-categories/cat_123456 \\
+  -H "x-api-key: unicatcher-api-key-demo"`
+  },
+
+  // 手采推文文本数据接口
+  {
+    id: 'create-manual-tweet-texts',
+    method: 'POST',
+    path: '/api/external/manual-tweet-texts',
+    title: '批量添加手采推文文本',
+    description: '批量添加手采推文文本数据到指定分类中',
+    params: [
+      {
+        name: 'categoryId',
+        type: 'string',
+        required: true,
+        description: '分类ID',
+        example: 'cat_123456'
+      },
+      {
+        name: 'texts',
+        type: 'array',
+        required: true,
+        description: '文本数据数组',
+        example: [
+          {
+            content: 'AI正在改变我们的工作方式，这是一个令人兴奋的时代。',
+            source: 'manual',
+            metadata: {
+              author: '科技博主',
+              platform: 'Twitter',
+              date: '2025-01-15'
+            }
+          },
+          {
+            content: '机器学习算法的突破让AI应用变得更加实用和高效。',
+            source: 'manual',
+            metadata: {
+              author: 'AI研究员',
+              platform: 'Twitter',
+              date: '2025-01-15'
+            }
+          }
+        ]
+      }
+    ],
+    responses: [
+      {
+        status: 201,
+        description: '文本添加成功',
+        example: {
+          success: true,
+          message: '成功添加 2 条文本数据',
+          data: {
+            categoryId: 'cat_123456',
+            addedTexts: [
+              {
+                id: 'txt_789012',
+                content: 'AI正在改变我们的工作方式，这是一个令人兴奋的时代。',
+                categoryId: 'cat_123456',
+                source: 'manual',
+                metadata: {
+                  author: '科技博主',
+                  platform: 'Twitter',
+                  date: '2025-01-15'
+                },
+                createdAt: '2025-01-15T10:35:22.456Z'
+              },
+              {
+                id: 'txt_345678',
+                content: '机器学习算法的突破让AI应用变得更加实用和高效。',
+                categoryId: 'cat_123456',
+                source: 'manual',
+                metadata: {
+                  author: 'AI研究员',
+                  platform: 'Twitter',
+                  date: '2025-01-15'
+                },
+                createdAt: '2025-01-15T10:35:22.456Z'
+              }
+            ],
+            totalAdded: 2
+          }
+        }
+      },
+      {
+        status: 400,
+        description: '参数错误',
+        example: {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Category ID and texts array are required'
+          }
+        }
+      },
+      {
+        status: 404,
+        description: '分类不存在',
+        example: {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Category not found'
+          }
+        }
+      },
+      {
+        status: 401,
+        description: 'API密钥无效',
+        example: {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or missing API key'
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/external/manual-tweet-texts \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "categoryId": "cat_123456",
+    "texts": [
+      {
+        "content": "AI正在改变我们的工作方式，这是一个令人兴奋的时代。",
+        "source": "manual",
+        "metadata": {
+          "author": "科技博主",
+          "platform": "Twitter",
+          "date": "2025-01-15"
+        }
+      },
+      {
+        "content": "机器学习算法的突破让AI应用变得更加实用和高效。",
+        "source": "manual",
+        "metadata": {
+          "author": "AI研究员",
+          "platform": "Twitter",
+          "date": "2025-01-15"
+        }
+      }
+    ]
+  }'`
+  },
+
+  {
+    id: 'get-manual-tweet-texts',
+    method: 'GET',
+    path: '/api/external/manual-tweet-texts',
+    title: '查询手采推文文本',
+    description: '查询手采推文文本数据，支持按分类筛选和分页',
+    queryParams: [
+      {
+        name: 'categoryId',
+        type: 'string',
+        required: false,
+        description: '分类ID，不传则查询所有分类的文本',
+        example: 'cat_123456'
+      },
+      {
+        name: 'page',
+        type: 'number',
+        required: false,
+        description: '页码，从1开始',
+        example: 1
+      },
+      {
+        name: 'limit',
+        type: 'number',
+        required: false,
+        description: '每页数量，最大100',
+        example: 20
+      },
+      {
+        name: 'search',
+        type: 'string',
+        required: false,
+        description: '搜索关键词，在文本内容中搜索',
+        example: 'AI'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '查询成功',
+        example: {
+          success: true,
+          data: {
+            texts: [
+              {
+                id: 'txt_789012',
+                content: 'AI正在改变我们的工作方式，这是一个令人兴奋的时代。',
+                categoryId: 'cat_123456',
+                categoryName: 'AI技术',
+                source: 'manual',
+                metadata: {
+                  author: '科技博主',
+                  platform: 'Twitter',
+                  date: '2025-01-15'
+                },
+                createdAt: '2025-01-15T10:35:22.456Z',
+                updatedAt: '2025-01-15T10:35:22.456Z'
+              },
+              {
+                id: 'txt_345678',
+                content: '机器学习算法的突破让AI应用变得更加实用和高效。',
+                categoryId: 'cat_123456',
+                categoryName: 'AI技术',
+                source: 'manual',
+                metadata: {
+                  author: 'AI研究员',
+                  platform: 'Twitter',
+                  date: '2025-01-15'
+                },
+                createdAt: '2025-01-15T10:35:22.456Z',
+                updatedAt: '2025-01-15T10:35:22.456Z'
+              }
+            ],
+            pagination: {
+              page: 1,
+              limit: 20,
+              total: 2,
+              totalPages: 1
+            },
+            filters: {
+              categoryId: 'cat_123456',
+              search: null
+            }
+          }
+        }
+      },
+      {
+        status: 401,
+        description: 'API密钥无效',
+        example: {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or missing API key'
+          }
+        }
+      }
+    ],
+    example: `curl -X GET "http://localhost:3067/api/external/manual-tweet-texts?categoryId=cat_123456&page=1&limit=20&search=AI" \\
+  -H "x-api-key: unicatcher-api-key-demo"`
+  },
+
+  {
+    id: 'delete-manual-tweet-text',
+    method: 'DELETE',
+    path: '/api/external/manual-tweet-texts/[textId]',
+    title: '删除手采推文文本',
+    description: '删除指定的手采推文文本数据',
+    pathParams: [
+      {
+        name: 'textId',
+        type: 'string',
+        required: true,
+        description: '文本ID',
+        example: 'txt_789012'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '删除成功',
+        example: {
+          success: true,
+          message: '文本删除成功',
+          data: {
+            deletedText: {
+              id: 'txt_789012',
+              content: 'AI正在改变我们的工作方式，这是一个令人兴奋的时代。',
+              categoryId: 'cat_123456',
+              categoryName: 'AI技术'
+            }
+          }
+        }
+      },
+      {
+        status: 404,
+        description: '文本不存在',
+        example: {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Text not found'
+          }
+        }
+      },
+      {
+        status: 401,
+        description: 'API密钥无效',
+        example: {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or missing API key'
+          }
+        }
+      }
+    ],
+    example: `curl -X DELETE http://localhost:3067/api/external/manual-tweet-texts/txt_789012 \\
+  -H "x-api-key: unicatcher-api-key-demo"`
   }
 ];
 
 function ApiEndpointCard({ endpoint }: { endpoint: ApiEndpoint }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const methodColors = {
     GET: 'bg-green-100 text-green-800',
     POST: 'bg-blue-100 text-blue-800',
     PUT: 'bg-yellow-100 text-yellow-800',
     DELETE: 'bg-red-100 text-red-800'
+  };
+
+  // 生成Markdown格式的API文档
+  const generateMarkdown = () => {
+    let markdown = `# ${endpoint.title}\n\n`;
+    markdown += `**${endpoint.method}** \`${endpoint.path}\`\n\n`;
+    markdown += `${endpoint.description}\n\n`;
+
+    // 路径参数
+    if (endpoint.pathParams && endpoint.pathParams.length > 0) {
+      markdown += `## 路径参数\n\n`;
+      markdown += `| 参数名 | 类型 | 必填 | 说明 | 示例 |\n`;
+      markdown += `|--------|------|------|------|------|\n`;
+      endpoint.pathParams.forEach(param => {
+        const example = typeof param.example === 'object' ? JSON.stringify(param.example) : param.example;
+        markdown += `| ${param.name} | ${param.type} | ${param.required ? '是' : '否'} | ${param.description} | ${example} |\n`;
+      });
+      markdown += `\n`;
+    }
+
+    // 查询参数
+    if (endpoint.queryParams && endpoint.queryParams.length > 0) {
+      markdown += `## 查询参数\n\n`;
+      markdown += `| 参数名 | 类型 | 必填 | 可选值 | 说明 | 示例 |\n`;
+      markdown += `|--------|------|------|--------|------|------|\n`;
+      endpoint.queryParams.forEach(param => {
+        const options = param.options ? param.options.join(', ') : '-';
+        const example = typeof param.example === 'object' ? JSON.stringify(param.example) : param.example;
+        markdown += `| ${param.name} | ${param.type} | ${param.required ? '是' : '否'} | ${options} | ${param.description} | ${example} |\n`;
+      });
+      markdown += `\n`;
+    }
+
+    // 请求参数
+    if (endpoint.params && endpoint.params.length > 0) {
+      markdown += `## 请求参数\n\n`;
+      markdown += `| 参数名 | 类型 | 必填 | 可选值 | 说明 | 示例 |\n`;
+      markdown += `|--------|------|------|--------|------|------|\n`;
+      endpoint.params.forEach(param => {
+        const options = param.options ? param.options.join(', ') : '-';
+        const example = typeof param.example === 'object' ? JSON.stringify(param.example) : param.example;
+        markdown += `| ${param.name} | ${param.type} | ${param.required ? '是' : '否'} | ${options} | ${param.description} | ${example} |\n`;
+      });
+      markdown += `\n`;
+    }
+
+    // 响应示例
+    markdown += `## 响应示例\n\n`;
+    endpoint.responses.forEach(response => {
+      markdown += `### ${response.status} - ${response.description}\n\n`;
+      markdown += `\`\`\`json\n${JSON.stringify(response.example, null, 2)}\n\`\`\`\n\n`;
+    });
+
+    // cURL示例
+    markdown += `## cURL 示例\n\n`;
+    markdown += `\`\`\`bash\n${endpoint.example}\n\`\`\`\n\n`;
+
+    return markdown;
+  };
+
+  // 复制到剪贴板
+  const copyToClipboard = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // 防止触发展开/收起
+    try {
+      const markdown = generateMarkdown();
+      await navigator.clipboard.writeText(markdown);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('复制失败:', err);
+    }
   };
 
   return (
@@ -2940,11 +3529,32 @@ function ApiEndpointCard({ endpoint }: { endpoint: ApiEndpoint }) {
           <code className="text-lg font-mono text-gray-800">{endpoint.path}</code>
           <span className="text-gray-600">- {endpoint.title}</span>
         </div>
-        <div className="flex items-center">
-          <svg 
+        <div className="flex items-center space-x-2">
+          {/* 复制按钮 */}
+          <button
+            onClick={copyToClipboard}
+            className={`p-2 rounded-md transition-colors ${
+              copySuccess
+                ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+            title="复制Markdown文档"
+          >
+            {copySuccess ? (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            )}
+          </button>
+
+          <svg
             className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-            fill="none" 
-            viewBox="0 0 24 24" 
+            fill="none"
+            viewBox="0 0 24 24"
             stroke="currentColor"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -3205,6 +3815,11 @@ export default function ApiDocsClientPage() {
       title: '推文处理',
       description: '推文翻译、评论生成、推文信息查询等API接口',
       endpoints: apiEndpoints.filter(ep => ep.path.includes('/external') && (ep.path.includes('/translate') || ep.path.includes('/generate-comments') || ep.path.includes('/tweet-info')))
+    },
+    'manual-tweets': {
+      title: '手采推文',
+      description: '手采推文分类管理和文本数据管理API接口',
+      endpoints: apiEndpoints.filter(ep => ep.path.includes('/manual-tweet'))
     }
   };
 

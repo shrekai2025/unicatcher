@@ -446,3 +446,28 @@ model YouTubeChannelRecord {
   @@index([lastCrawledAt])
   @@index([createdAt])
 }
+
+// 手采推文分类表
+model ManualTweetCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique // 分类名称唯一
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  texts     ManualTweetText[]
+
+  @@index([name])
+}
+
+// 手采推文文本数据表
+model ManualTweetText {
+  id         Int      @id @default(autoincrement()) // 自增ID
+  categoryId String   // 分类ID
+  content    String   // 文本内容
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category   ManualTweetCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+}
