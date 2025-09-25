@@ -3,6 +3,7 @@ import "~/styles/globals.css";
 import { type Metadata } from "next";
 
 import { TRPCReactProvider } from "~/trpc/react";
+import { AppProvider } from "~/components/app-provider";
 
 export const metadata: Metadata = {
   title: "UniCatcher - 通用浏览器爬虫系统",
@@ -15,8 +16,12 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body className="font-sans antialiased">
-        <TRPCReactProvider>{children}</TRPCReactProvider>
+      <body className="font-sans antialiased bg-gray-50 min-h-screen">
+        <TRPCReactProvider>
+          <AppProvider>
+            {children}
+          </AppProvider>
+        </TRPCReactProvider>
       </body>
     </html>
   );

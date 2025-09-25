@@ -16,6 +16,11 @@ export class TaskExecutor {
   private isRunning = false;
   private timeoutId: NodeJS.Timeout | null = null;
   private isTimedOut = false;
+  private isDisposed = false; // 新增：防止重复清理
+
+  // 性能优化：智能健康检查
+  private healthCheckCounter = 0;
+  private readonly healthCheckInterval = 5; // 每5次滚动检查一次
 
   constructor() {
     this.storageService = new StorageService();
@@ -42,11 +47,7 @@ export class TaskExecutor {
       this.isTimedOut = false;
 
       // 🔧 设置任务超时机制（10分钟）
-      this.timeoutId = setTimeout(() => {
-        console.warn(`⏰ 任务超时警告: ${actualTaskId} 已运行超过 ${config.spider.taskTimeout / 1000} 秒`);
-        this.isTimedOut = true;
-        this.forceCleanupTimeout(actualTaskId);
-      }, config.spider.taskTimeout);
+      this.setTaskTimeout(actualTaskId);
 
       // 初始化浏览器和选择器
       await this.initializeBrowser();
@@ -135,12 +136,6 @@ export class TaskExecutor {
 
       return taskResult;
     } finally {
-      // 清理超时定时器
-      if (this.timeoutId) {
-        clearTimeout(this.timeoutId);
-        this.timeoutId = null;
-      }
-      
       this.isRunning = false;
       this.isTimedOut = false;
       await this.cleanup();
@@ -295,8 +290,13 @@ export class TaskExecutor {
         await this.browserManager!.scrollToBottom();
         scrollAttempts++;
         
-        // 等待新内容加载
-        await new Promise(resolve => setTimeout(resolve, config.spider.twitterList.waitTime));
+        // 智能等待：根据获取到的内容调整延迟
+        const waitTime = pageResult.newTweets.length > 0
+          ? config.spider.twitterList.waitTime
+          : config.spider.twitterList.waitTime * 1.5; // 无新内容时延长等待
+
+        console.log(`⏰ 智能等待: ${waitTime}ms (新推文: ${pageResult.newTweets.length} 条)`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         
         // 检查滚动效果
         const afterScrollPosition = await this.browserManager!.getScrollPosition();
@@ -322,14 +322,19 @@ export class TaskExecutor {
 
       } catch (error) {
         console.error('处理页面时出错:', error);
-        
-        // 尝试恢复：检查浏览器健康状态
-        const isHealthy = await this.browserManager!.healthCheck();
-        if (!isHealthy) {
-          endReason = 'ERROR_OCCURRED';
-          throw new Error('浏览器不健康，无法继续爬取');
+
+        // 智能健康检查：不是每次都检查
+        this.healthCheckCounter++;
+        if (this.healthCheckCounter >= this.healthCheckInterval) {
+          console.log('🔍 执行健康检查...');
+          const isHealthy = await this.browserManager!.healthCheck();
+          if (!isHealthy) {
+            endReason = 'ERROR_OCCURRED';
+            throw new Error('浏览器不健康，无法继续爬取');
+          }
+          this.healthCheckCounter = 0; // 重置计数器
         }
-        
+
         // 继续下一次循环
         scrollAttempts++;
       }
@@ -360,6 +365,31 @@ export class TaskExecutor {
   }
 
   /**
+   * 设置任务超时定时器
+   */
+  private setTaskTimeout(taskId: string): void {
+    this.clearTaskTimeout(); // 确保清理旧定时器
+
+    this.timeoutId = setTimeout(() => {
+      if (!this.isDisposed) {
+        console.warn(`⏰ 任务超时警告: ${taskId} 已运行超过 ${config.spider.taskTimeout / 1000} 秒`);
+        this.isTimedOut = true;
+        this.forceCleanupTimeout(taskId);
+      }
+    }, config.spider.taskTimeout);
+  }
+
+  /**
+   * 清理任务超时定时器
+   */
+  private clearTaskTimeout(): void {
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = null;
+    }
+  }
+
+  /**
    * 添加随机延迟
    */
   private async addRandomDelay(): Promise<void> {
@@ -376,20 +406,33 @@ export class TaskExecutor {
   }
 
   /**
-   * 清理资源
+   * 清理资源 - 改进版：防止重复清理，添加超时机制
    */
   private async cleanup(): Promise<void> {
+    if (this.isDisposed) return; // 防止重复清理
+
+    this.isDisposed = true;
+    this.clearTaskTimeout();
+
     try {
       if (this.browserManager) {
-        await this.browserManager.close();
+        // 添加浏览器关闭超时机制
+        await Promise.race([
+          this.browserManager.close(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('浏览器关闭超时')), 10000)
+          )
+        ]);
         this.browserManager = null;
       }
-      
-      this.twitterSelector = null;
-      console.log('资源清理完成');
     } catch (error) {
-      console.error('清理资源失败:', error);
+      console.error('浏览器关闭失败，强制清理:', error);
+      this.browserManager = null; // 强制清除引用
     }
+
+    this.twitterSelector = null;
+    this.isRunning = false;
+    console.log('资源清理完成');
   }
 
   /**
@@ -437,15 +480,9 @@ export class TaskExecutor {
   }
 
   /**
-   * 取消任务
+   * 取消任务 - 改进版：使用统一的清理方法
    */
   async cancelTask(): Promise<void> {
-    // 清理超时定时器
-    if (this.timeoutId) {
-      clearTimeout(this.timeoutId);
-      this.timeoutId = null;
-    }
-    
     this.isRunning = false;
     await this.cleanup();
     console.log('任务已取消');
@@ -474,30 +511,60 @@ export class TaskExecutor {
   }
 
   /**
-   * 重试机制包装器
+   * 重试机制包装器 - 改进版：智能重试和资源清理
    */
   async executeWithRetry(taskConfig: SpiderTaskConfig, taskId?: string): Promise<TaskResult> {
     const maxRetries = config.spider.retryAttempts;
-    const retryDelay = config.spider.retryDelay;
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
       try {
+        // 每次重试前检查是否已被取消
+        if (this.isDisposed) {
+          throw new Error('任务已被取消');
+        }
+
         console.log(`执行尝试 ${attempt}/${maxRetries + 1}`);
         return await this.executeTwitterListTask(taskConfig, taskId);
+
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('未知错误');
         console.error(`执行尝试 ${attempt} 失败:`, lastError.message);
 
+        // 清理本次尝试的资源
+        await this.cleanupForRetry();
+
         if (attempt <= maxRetries) {
+          // 智能重试延迟：指数退避
+          const retryDelay = Math.min(
+            config.spider.retryDelay * Math.pow(2, attempt - 1),
+            30000 // 最大30秒
+          );
           console.log(`${retryDelay}ms 后重试...`);
           await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
       }
     }
 
-    // 所有重试都失败了
     throw lastError || new Error('重试次数耗尽');
+  }
+
+  /**
+   * 重试清理 - 新增：为重试清理资源但保留实例
+   */
+  private async cleanupForRetry(): Promise<void> {
+    try {
+      if (this.browserManager) {
+        await this.browserManager.close();
+        this.browserManager = null;
+      }
+      this.twitterSelector = null;
+    } catch (error) {
+      console.error('重试清理失败:', error);
+      // 强制清除引用
+      this.browserManager = null;
+      this.twitterSelector = null;
+    }
   }
 }
 
@@ -508,6 +575,7 @@ export class TaskExecutorManager {
   private static instance: TaskExecutorManager | null = null;
   private executors: Map<string, TaskExecutor> = new Map();
   private runningTasks: Set<string> = new Set();
+  private taskCreationLock = false; // 新增：防止并发创建竞态
 
   private constructor() {}
 
@@ -519,33 +587,41 @@ export class TaskExecutorManager {
   }
 
   /**
-   * 提交任务
+   * 提交任务 - 改进版：原子性并发控制
    */
   async submitTask(taskConfig: SpiderTaskConfig): Promise<string> {
-    // 检查并发限制
-    if (this.runningTasks.size >= config.spider.maxConcurrentTasks) {
-      throw new Error(`并发任务数量已达上限: ${config.spider.maxConcurrentTasks}`);
+    // 原子性检查并发限制
+    if (this.taskCreationLock) {
+      throw new Error('任务创建正在进行中，请稍后重试');
     }
 
-    // 先创建数据库任务记录，获取真实的任务ID
-    const storageService = new StorageService();
-    const realTaskId = await storageService.createTask(taskConfig);
-    
-    const executor = new TaskExecutor();
-    
-    this.executors.set(realTaskId, executor);
-    this.runningTasks.add(realTaskId);
+    this.taskCreationLock = true;
+    try {
+      if (this.runningTasks.size >= config.spider.maxConcurrentTasks) {
+        throw new Error(`并发任务数量已达上限: ${config.spider.maxConcurrentTasks}`);
+      }
 
-    console.log(`任务已提交: ${realTaskId}`);
+      // 先创建数据库任务记录，获取真实的任务ID
+      const storageService = new StorageService();
+      const realTaskId = await storageService.createTask(taskConfig);
+      const executor = new TaskExecutor();
 
-    // 异步执行任务（传入真实的任务ID）
-    this.executeTaskAsync(realTaskId, taskConfig, executor);
+      // 原子性添加到运行集合
+      this.executors.set(realTaskId, executor);
+      this.runningTasks.add(realTaskId);
 
-    return realTaskId;
+      console.log(`任务已提交: ${realTaskId}`);
+
+      // 异步执行任务（传入真实的任务ID）
+      this.executeTaskAsync(realTaskId, taskConfig, executor);
+      return realTaskId;
+    } finally {
+      this.taskCreationLock = false;
+    }
   }
 
   /**
-   * 异步执行任务
+   * 异步执行任务 - 改进版：确保资源完全清理
    */
   private async executeTaskAsync(
     taskId: string,
@@ -556,26 +632,40 @@ export class TaskExecutorManager {
       const result = config.spider.enableRetry
         ? await executor.executeWithRetry(taskConfig, taskId)
         : await executor.executeTwitterListTask(taskConfig, taskId);
-      
+
       console.log(`任务完成: ${taskId}`, result);
     } catch (error) {
       console.error(`任务失败: ${taskId}`, error);
     } finally {
-      // 清理
-      this.runningTasks.delete(taskId);
-      this.executors.delete(taskId);
+      // 确保资源完全清理
+      await this.cleanupTask(taskId, executor);
     }
   }
 
   /**
-   * 取消任务
+   * 清理任务资源 - 新增：确保完全清理
+   */
+  private async cleanupTask(taskId: string, executor: TaskExecutor): Promise<void> {
+    try {
+      // 先尝试正常取消执行器
+      await executor.cancelTask();
+    } catch (error) {
+      console.error(`清理任务执行器失败: ${taskId}`, error);
+    } finally {
+      // 无论如何都要清理引用
+      this.runningTasks.delete(taskId);
+      this.executors.delete(taskId);
+      console.log(`任务资源已清理: ${taskId}`);
+    }
+  }
+
+  /**
+   * 取消任务 - 改进版：使用统一的清理方法
    */
   async cancelTask(taskId: string): Promise<void> {
     const executor = this.executors.get(taskId);
     if (executor) {
-      await executor.cancelTask();
-      this.runningTasks.delete(taskId);
-      this.executors.delete(taskId);
+      await this.cleanupTask(taskId, executor);
       console.log(`任务已取消: ${taskId}`);
     }
   }

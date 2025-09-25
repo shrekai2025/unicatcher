@@ -6,10 +6,12 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { TaskExecutorManager } from "~/server/core/tasks/executor";
+import { UnifiedTaskManager } from "~/server/core/crawler/UnifiedTaskManager";
 import { StorageService } from "~/server/core/data/storage";
 
 const storageService = new StorageService();
 const taskManager = TaskExecutorManager.getInstance();
+const unifiedTaskManager = UnifiedTaskManager.getInstance();
 
 export const tasksRouter = createTRPCRouter({
   /**
@@ -39,8 +41,8 @@ export const tasksRouter = createTRPCRouter({
           throw new Error("该List已有正在运行的爬取任务");
         }
 
-        // 提交任务到执行器管理器
-        const executorTaskId = await taskManager.submitTask({
+        // 提交任务到统一管理器（使用新架构）
+        const executorTaskId = await unifiedTaskManager.submitTwitterTask({
           listId: input.listId,
           maxTweets: input.maxTweets,
         });
@@ -86,8 +88,8 @@ export const tasksRouter = createTRPCRouter({
           throw new Error("该List已有正在运行的爬取任务");
         }
 
-        // 提交任务到执行器管理器
-        const executorTaskId = await taskManager.submitTask({
+        // 提交任务到统一管理器（使用新架构）
+        const executorTaskId = await unifiedTaskManager.submitTwitterTask({
           listId: input.listId,
           maxTweets: input.maxTweets,
         });
@@ -277,7 +279,24 @@ export const tasksRouter = createTRPCRouter({
         // 检查任务是否在运行
         const task = await storageService.getTask(input.id);
         if (task?.status === 'running') {
-          throw new Error("无法删除正在运行的任务，请先取消");
+          // 先尝试取消任务
+          console.log(`尝试取消正在运行的任务: ${input.id}`);
+          try {
+            await taskManager.cancelTask(input.id);
+
+            // 更新数据库任务状态为已取消
+            await storageService.updateTaskStatus(input.id, 'failed', {
+              success: false,
+              message: "任务已被取消并删除",
+              error: {
+                code: 'TASK_CANCELLED_AND_DELETED',
+                message: "任务已被取消并删除",
+              },
+            });
+          } catch (cancelError) {
+            console.warn(`取消任务失败: ${input.id}`, cancelError);
+            // 即使取消失败，也继续删除过程
+          }
         }
 
         // 删除任务及相关数据
@@ -285,7 +304,7 @@ export const tasksRouter = createTRPCRouter({
 
         return {
           success: true,
-          message: "任务及数据已删除",
+          message: task?.status === 'running' ? "任务已取消并删除" : "任务及数据已删除",
         };
       } catch (error) {
         throw new Error(
@@ -321,8 +340,8 @@ export const tasksRouter = createTRPCRouter({
           maxTweets: 20, // 使用默认值，或者从原任务中解析
         };
 
-        // 提交新任务
-        const executorTaskId = await taskManager.submitTask(taskConfig);
+        // 提交新任务到统一管理器
+        const executorTaskId = await unifiedTaskManager.submitTwitterTask(taskConfig);
 
         return {
           success: true,

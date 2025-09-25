@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { login } from '~/lib/simple-auth';
+import { login, getSession } from '~/lib/simple-auth';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -17,8 +17,19 @@ export default function LoginPage() {
     setError('');
 
     if (login(username, password)) {
-      router.push('/dashboard');
+      const session = getSession();
+      console.log('Login successful:', session);
+      
+      // 验证cookie是否正确设置
+      const cookieCheck = document.cookie.includes('unicatcher-auth');
+      console.log('Cookie set check:', cookieCheck);
+      
+      // 根据角色跳转到不同页面
+      const redirectPath = session.role === 'viewer' ? '/viewer' : '/dashboard';
+      console.log('Redirecting to:', redirectPath);
+      router.push(redirectPath);
     } else {
+      console.log('Login failed for:', username);
       setError('用户名或密码错误');
     }
     
@@ -84,11 +95,6 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
-        
-        <div className="text-center text-sm text-gray-500">
-          <p>默认账号: admin</p>
-          <p>默认密码: a2885828</p>
-        </div>
       </div>
     </div>
   );
