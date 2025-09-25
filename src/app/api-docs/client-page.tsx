@@ -3492,7 +3492,63 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
               updatedAt: "2024-01-15T10:30:00.000Z"
             }
           ]
-        }
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: true
+          },
+          {
+            name: 'data',
+            type: 'Array<Platform>',
+            description: '内容平台列表数组',
+            example: ["Array<Platform>"]
+          },
+          {
+            name: 'data[].id',
+            type: 'string',
+            description: '平台唯一标识符',
+            example: 'platform_123'
+          },
+          {
+            name: 'data[].name',
+            type: 'string',
+            description: '平台名称',
+            example: '微信公众号'
+          },
+          {
+            name: 'data[].platformId',
+            type: 'string',
+            description: '平台代码标识',
+            example: 'wechat'
+          },
+          {
+            name: 'data[].description',
+            type: 'string',
+            description: '平台描述',
+            example: '微信公众号平台'
+          },
+          {
+            name: 'data[].isDefault',
+            type: 'boolean',
+            description: '是否为默认平台',
+            example: true
+          },
+          {
+            name: 'data[].createdAt',
+            type: 'string',
+            description: '创建时间 (ISO 8601)',
+            example: '2024-01-15T10:30:00.000Z'
+          },
+          {
+            name: 'data[].updatedAt',
+            type: 'string',
+            description: '更新时间 (ISO 8601)',
+            example: '2024-01-15T10:30:00.000Z'
+          }
+        ]
       },
       {
         status: 401,
@@ -3622,11 +3678,25 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
         example: '小红书平台'
       },
       {
+        name: 'platformId',
+        type: 'string',
+        required: false,
+        description: '平台代码标识，只允许字母、数字、下划线和连字符',
+        example: 'xiaohongshu'
+      },
+      {
         name: 'description',
         type: 'string',
         required: false,
         description: '平台描述',
         example: '更新后的描述'
+      },
+      {
+        name: 'isDefault',
+        type: 'boolean',
+        required: false,
+        description: '是否设为默认平台',
+        example: false
       }
     ],
     responses: [
@@ -3653,7 +3723,101 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
   -H "x-api-key: unicatcher-api-key-demo" \\
   -d '{
     "name": "小红书平台",
-    "description": "更新后的描述"
+    "platformId": "xiaohongshu",
+    "description": "更新后的描述",
+    "isDefault": false
+  }'`
+  },
+
+  {
+    id: 'batch-content-platform-operations',
+    method: 'PUT',
+    path: '/api/external/writing-assistant/content-platforms',
+    title: '批量操作内容平台',
+    description: '执行批量操作：设置默认平台或初始化默认平台',
+    params: [
+      {
+        name: 'action',
+        type: 'string',
+        required: true,
+        description: '操作类型：setDefault（设置默认平台）或 initDefaults（初始化默认平台）',
+        example: 'setDefault'
+      },
+      {
+        name: 'id',
+        type: 'string',
+        required: true,
+        description: '平台ID（当action为setDefault时必需）',
+        example: 'platform_123'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '操作成功',
+        example: {
+          success: true,
+          message: '默认平台设置成功',
+          data: {
+            id: "platform_123",
+            name: "微信公众号",
+            platformId: "wechat",
+            description: "微信公众号平台",
+            isDefault: true,
+            createdAt: "2024-01-15T10:30:00.000Z",
+            updatedAt: "2024-01-15T10:45:00.000Z"
+          }
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: true
+          },
+          {
+            name: 'message',
+            type: 'string',
+            description: '操作结果消息',
+            example: '默认平台设置成功'
+          },
+          {
+            name: 'data',
+            type: 'Platform',
+            description: '平台对象',
+            example: "Platform对象"
+          }
+        ]
+      },
+      {
+        status: 400,
+        description: '请求参数无效',
+        example: {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Invalid action or missing parameters'
+          }
+        }
+      },
+      {
+        status: 401,
+        description: 'API密钥无效',
+        example: {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or missing API key'
+          }
+        }
+      }
+    ],
+    example: `curl -X PUT http://localhost:3067/api/external/writing-assistant/content-platforms \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "action": "setDefault",
+    "id": "platform_123"
   }'`
   },
 
@@ -3732,6 +3896,73 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
               updatedAt: "2024-01-15T10:30:00.000Z"
             }
           ]
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: true
+          },
+          {
+            name: 'data',
+            type: 'Array<ArticleType>',
+            description: '文章类型列表数组',
+            example: ["Array<ArticleType>"]
+          },
+          {
+            name: 'data[].id',
+            type: 'string',
+            description: '类型唯一标识符',
+            example: 'type_123'
+          },
+          {
+            name: 'data[].name',
+            type: 'string',
+            description: '类型名称',
+            example: '技术教程'
+          },
+          {
+            name: 'data[].typeId',
+            type: 'string',
+            description: '类型代码标识',
+            example: 'tutorial'
+          },
+          {
+            name: 'data[].description',
+            type: 'string',
+            description: '类型描述',
+            example: '技术相关的教程文章'
+          },
+          {
+            name: 'data[].isDefault',
+            type: 'boolean',
+            description: '是否为默认类型',
+            example: true
+          },
+          {
+            name: 'data[].createdAt',
+            type: 'string',
+            description: '创建时间 (ISO 8601)',
+            example: '2024-01-15T10:30:00.000Z'
+          },
+          {
+            name: 'data[].updatedAt',
+            type: 'string',
+            description: '更新时间 (ISO 8601)',
+            example: '2024-01-15T10:30:00.000Z'
+          }
+        ]
+      },
+      {
+        status: 401,
+        description: 'API密钥无效',
+        example: {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or missing API key'
+          }
         }
       }
     ],
@@ -3801,6 +4032,98 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
     "name": "产品介绍",
     "typeId": "product_intro",
     "description": "产品介绍相关的文章类型"
+  }'`
+  },
+
+  {
+    id: 'batch-article-type-operations',
+    method: 'PUT',
+    path: '/api/external/writing-assistant/article-types',
+    title: '批量操作文章类型',
+    description: '执行批量操作：设置默认类型或初始化默认类型',
+    params: [
+      {
+        name: 'action',
+        type: 'string',
+        required: true,
+        description: '操作类型：setDefault（设置默认类型）或 initDefaults（初始化默认类型）',
+        example: 'setDefault'
+      },
+      {
+        name: 'id',
+        type: 'string',
+        required: true,
+        description: '类型ID（当action为setDefault时必需）',
+        example: 'type_123'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '操作成功',
+        example: {
+          success: true,
+          message: '默认类型设置成功',
+          data: {
+            id: "type_123",
+            name: "技术教程",
+            typeId: "tutorial",
+            description: "技术相关的教程文章",
+            isDefault: true,
+            createdAt: "2024-01-15T10:30:00.000Z",
+            updatedAt: "2024-01-15T10:45:00.000Z"
+          }
+        },
+        fields: [
+          {
+            name: 'success',
+            type: 'boolean',
+            description: '操作是否成功',
+            example: true
+          },
+          {
+            name: 'message',
+            type: 'string',
+            description: '操作结果消息',
+            example: '默认类型设置成功'
+          },
+          {
+            name: 'data',
+            type: 'ArticleType',
+            description: '文章类型对象',
+            example: "ArticleType对象"
+          }
+        ]
+      },
+      {
+        status: 400,
+        description: '请求参数无效',
+        example: {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Invalid action or missing parameters'
+          }
+        }
+      },
+      {
+        status: 401,
+        description: 'API密钥无效',
+        example: {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or missing API key'
+          }
+        }
+      }
+    ],
+    example: `curl -X PUT http://localhost:3067/api/external/writing-assistant/article-types \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "action": "setDefault",
+    "id": "type_123"
   }'`
   },
 
@@ -4696,7 +5019,7 @@ export default function ApiDocsClientPage() {
         'content-platforms': {
           title: '内容平台管理',
           description: '内容平台的增删改查API接口',
-          endpoints: apiEndpoints.filter(ep => ep.path.includes('/writing-assistant') && ep.path.includes('/platforms'))
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/writing-assistant') && ep.path.includes('/content-platforms'))
         },
         'article-types': {
           title: '文章类型管理',
@@ -4706,7 +5029,7 @@ export default function ApiDocsClientPage() {
         'articles': {
           title: '采集文章管理',
           description: '采集文章的增删改查API接口',
-          endpoints: apiEndpoints.filter(ep => ep.path.includes('/writing-assistant') && ep.path.includes('/articles'))
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/writing-assistant') && ep.path.includes('/collected-articles'))
         },
         'stats': {
           title: '统计数据',

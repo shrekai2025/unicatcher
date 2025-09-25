@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { api } from '~/trpc/react';
 import { cn } from '~/lib/utils';
-import { Plus, Search, Filter, Edit, Trash2, Check, X, AlertCircle } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Check, X, AlertCircle, Copy } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog';
 
 interface TabItem {
@@ -14,6 +14,7 @@ interface TabItem {
 
 const tabs: TabItem[] = [
   { id: 'articles', name: '文章内容', icon: '📝' },
+  { id: 'structures', name: '内容结构', icon: '🏗️' },
   { id: 'platforms', name: '内容平台', icon: '🌐' },
   { id: 'types', name: '文章类型', icon: '🏷️' },
 ];
@@ -24,12 +25,7 @@ export default function ReferenceCollectionPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">采集参考</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            管理文章内容、内容平台和文章类型
-          </p>
-        </div>
+
 
         {/* Tab Navigation */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -55,6 +51,7 @@ export default function ReferenceCollectionPage() {
 
           <div className="p-6">
             {activeTab === 'articles' && <ArticlesTab />}
+            {activeTab === 'structures' && <ContentStructuresTab />}
             {activeTab === 'platforms' && <PlatformsTab />}
             {activeTab === 'types' && <TypesTab />}
           </div>
@@ -77,9 +74,43 @@ function ArticlesTab() {
     title: '',
   });
 
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('');
+  const [selectedType, setSelectedType] = useState<string>('');
+
   const { data: articlesData, refetch: refetchArticles } = api.collectedArticles.getAll.useQuery(filters);
   const { data: platforms } = api.contentPlatforms.getAll.useQuery();
   const { data: articleTypes } = api.articleTypes.getAll.useQuery();
+
+  const handleCopyContent = async (content: string | null) => {
+    if (!content) {
+      alert('该文章没有正文内容');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(content);
+      alert('正文已复制到剪贴板');
+    } catch (err) {
+      console.error('复制失败:', err);
+      alert('复制失败，请重试');
+    }
+  };
+
+  const handlePlatformChange = (platformId: string) => {
+    setSelectedPlatform(platformId);
+    setFilters({
+      ...filters,
+      platformIds: platformId ? [platformId] : []
+    });
+  };
+
+  const handleTypeChange = (typeId: string) => {
+    setSelectedType(typeId);
+    setFilters({
+      ...filters,
+      articleTypeIds: typeId ? [typeId] : []
+    });
+  };
 
   const createArticle = api.collectedArticles.create.useMutation({
     onSuccess: () => {
@@ -139,7 +170,37 @@ function ArticlesTab() {
           <Filter className="h-5 w-5 text-gray-400 mr-2" />
           <h3 className="text-sm font-medium text-gray-900">筛选条件</h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">平台筛选</label>
+            <select
+              value={selectedPlatform}
+              onChange={(e) => handlePlatformChange(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            >
+              <option value="">全部</option>
+              {platforms?.map((platform) => (
+                <option key={platform.id} value={platform.id}>
+                  {platform.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">类型筛选</label>
+            <select
+              value={selectedType}
+              onChange={(e) => handleTypeChange(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            >
+              <option value="">全部</option>
+              {articleTypes?.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">标题</label>
             <input
@@ -150,6 +211,8 @@ function ArticlesTab() {
               placeholder="搜索标题..."
             />
           </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">作者</label>
             <input
@@ -382,14 +445,23 @@ function ArticlesTab() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <div className="flex space-x-2">
                     <button
+                      onClick={() => handleCopyContent(article.content)}
+                      className="text-green-600 hover:text-green-900 transition-colors"
+                      title="复制正文"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={() => setEditingId(article.id)}
                       className="text-blue-600 hover:text-blue-900 transition-colors"
+                      title="编辑"
                     >
                       <Edit className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => deleteArticle.mutate({ id: article.id })}
                       className="text-red-600 hover:text-red-900 transition-colors"
+                      title="删除"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -879,6 +951,240 @@ function TypesTab() {
             <AlertCircle className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">暂无类型</h3>
             <p className="mt-1 text-sm text-gray-500">开始添加您的第一个文章类型吧！</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 内容结构 Tab
+function ContentStructuresTab() {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // 模拟数据，实际应该从API获取
+  const [structures, setStructures] = useState([
+    {
+      id: '1',
+      title: '产品介绍模板',
+      content: '产品核心功能介绍...',
+      platform: '微信公众号',
+      articleType: '产品介绍',
+    },
+  ]);
+
+  const { data: platforms } = api.contentPlatforms.getAll.useQuery();
+  const { data: articleTypes } = api.articleTypes.getAll.useQuery();
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+
+    const newStructure = {
+      id: editingId || Date.now().toString(),
+      title: formData.get('title') as string,
+      content: formData.get('content') as string,
+      platform: formData.get('platform') as string,
+      articleType: formData.get('articleType') as string,
+    };
+
+    if (editingId) {
+      setStructures(structures.map(s => s.id === editingId ? newStructure : s));
+      setEditingId(null);
+    } else {
+      setStructures([...structures, newStructure]);
+      setShowAddForm(false);
+    }
+  };
+
+  const handleEdit = (structure: any) => {
+    setEditingId(structure.id);
+    setShowAddForm(true);
+  };
+
+  const handleDelete = (id: string) => {
+    setStructures(structures.filter(s => s.id !== id));
+  };
+
+  const editingStructure = editingId ? structures.find(s => s.id === editingId) : null;
+
+  return (
+    <div className="space-y-6">
+      {/* 添加按钮 */}
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-medium text-gray-900">内容结构列表</h3>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          添加结构
+        </button>
+      </div>
+
+      {/* 添加/编辑表单模态框 */}
+      <Dialog
+        open={showAddForm || !!editingId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowAddForm(false);
+            setEditingId(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingId ? '编辑内容结构' : '添加内容结构'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">标题</label>
+              <input
+                type="text"
+                name="title"
+                defaultValue={editingStructure?.title || ''}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="请输入标题"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">正文</label>
+              <textarea
+                name="content"
+                defaultValue={editingStructure?.content || ''}
+                required
+                rows={6}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="请输入正文内容"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">内容平台</label>
+              <select
+                name="platform"
+                defaultValue={editingStructure?.platform || ''}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="">请选择平台</option>
+                {platforms?.map((platform) => (
+                  <option key={platform.id} value={platform.name}>
+                    {platform.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">文章类型</label>
+              <select
+                name="articleType"
+                defaultValue={editingStructure?.articleType || ''}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="">请选择类型</option>
+                {articleTypes?.map((type) => (
+                  <option key={type.id} value={type.name}>
+                    {type.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <button
+                type="submit"
+                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                {editingId ? '更新' : '添加'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddForm(false);
+                  setEditingId(null);
+                }}
+                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition-colors"
+              >
+                取消
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 结构列表 */}
+      <div className="bg-white shadow overflow-hidden sm:rounded-md">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                标题
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                正文预览
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                内容平台
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                文章类型
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                操作
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {structures.map((structure) => (
+              <tr key={structure.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {structure.title}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-500 max-w-xs">
+                  <div className="truncate">{structure.content}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                    {structure.platform}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                    {structure.articleType}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleEdit(structure)}
+                      className="text-blue-600 hover:text-blue-900 transition-colors"
+                      title="编辑"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(structure.id)}
+                      className="text-red-600 hover:text-red-900 transition-colors"
+                      title="删除"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {structures.length === 0 && (
+          <div className="text-center py-12">
+            <AlertCircle className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">暂无内容结构</h3>
+            <p className="mt-1 text-sm text-gray-500">开始添加您的第一个内容结构吧！</p>
           </div>
         )}
       </div>
