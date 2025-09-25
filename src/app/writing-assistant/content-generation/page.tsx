@@ -2,8 +2,30 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '~/trpc/react';
-import { Plus, FileText, Send, Loader2, Copy, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, FileText, Send, Loader2, Copy, Trash2, RefreshCw, Settings } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog';
+
+// AI配置常量
+const AI_PROVIDERS = [
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'openai-badger', label: 'OpenAI Badger' },
+  { value: 'zhipu', label: '智谱AI' },
+  { value: 'anthropic', label: 'Anthropic' },
+];
+
+const AI_MODELS: Record<string, string[]> = {
+  'openai': ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'],
+  'openai-badger': ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'],
+  'zhipu': ['glm-4.5-flash', 'glm-4.5', 'glm-4.5-air', 'glm-4.5-x', 'glm-4.5-airx'],
+  'anthropic': ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'],
+};
+
+const DEFAULT_MODELS: Record<string, string> = {
+  'openai': 'gpt-4o',
+  'openai-badger': 'gpt-4o-mini',
+  'zhipu': 'glm-4.5-flash',
+  'anthropic': 'claude-3-5-sonnet-20241022',
+};
 
 interface ArticleGenerationForm {
   topic: string;
@@ -20,6 +42,12 @@ interface ArticleGenerationForm {
     typeId?: string;
   };
   additionalRequirements: string;
+  aiConfig: {
+    provider: string;
+    model: string;
+    apiKey: string;
+    baseURL?: string;
+  };
 }
 
 export default function ContentGenerationPage() {
@@ -34,6 +62,12 @@ export default function ContentGenerationPage() {
     enableContentStructure: false,
     structureFilters: {},
     additionalRequirements: '',
+    aiConfig: {
+      provider: 'openai',
+      model: 'gpt-4o',
+      apiKey: '',
+      baseURL: '',
+    },
   });
 
   // API调用
@@ -87,12 +121,29 @@ export default function ContentGenerationPage() {
       enableContentStructure: false,
       structureFilters: {},
       additionalRequirements: '',
+      aiConfig: {
+        provider: 'openai',
+        model: 'gpt-4o',
+        apiKey: '',
+        baseURL: '',
+      },
     });
+  };
+
+  const handleProviderChange = (provider: string) => {
+    setForm(prev => ({
+      ...prev,
+      aiConfig: {
+        ...prev.aiConfig,
+        provider,
+        model: DEFAULT_MODELS[provider] || AI_MODELS[provider]?.[0] || '',
+      },
+    }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.topic || !form.platformId) return;
+    if (!form.topic || !form.platformId || !form.aiConfig.apiKey) return;
 
     createTask.mutate({
       topic: form.topic,
@@ -103,6 +154,7 @@ export default function ContentGenerationPage() {
       enableContentStructure: form.enableContentStructure,
       structureFilters: form.structureFilters,
       additionalRequirements: form.additionalRequirements || undefined,
+      aiConfig: form.aiConfig,
     });
   };
 
@@ -228,6 +280,80 @@ export default function ContentGenerationPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* AI配置 */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center mb-4">
+                  <Settings className="h-4 w-4 text-gray-600 mr-2" />
+                  <h3 className="text-sm font-medium text-gray-700">AI配置</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">AI供应商 *</label>
+                    <select
+                      value={form.aiConfig.provider}
+                      onChange={(e) => handleProviderChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    >
+                      {AI_PROVIDERS.map((provider) => (
+                        <option key={provider.value} value={provider.value}>
+                          {provider.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">模型 *</label>
+                    <select
+                      value={form.aiConfig.model}
+                      onChange={(e) => setForm(prev => ({
+                        ...prev,
+                        aiConfig: { ...prev.aiConfig, model: e.target.value }
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    >
+                      {AI_MODELS[form.aiConfig.provider]?.map((model) => (
+                        <option key={model} value={model}>
+                          {model}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">API Key *</label>
+                    <input
+                      type="password"
+                      value={form.aiConfig.apiKey}
+                      onChange={(e) => setForm(prev => ({
+                        ...prev,
+                        aiConfig: { ...prev.aiConfig, apiKey: e.target.value }
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="输入您的API密钥"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Base URL (可选)</label>
+                    <input
+                      type="text"
+                      value={form.aiConfig.baseURL}
+                      onChange={(e) => setForm(prev => ({
+                        ...prev,
+                        aiConfig: { ...prev.aiConfig, baseURL: e.target.value }
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="自定义API地址（如有）"
+                    />
+                  </div>
                 </div>
               </div>
 
