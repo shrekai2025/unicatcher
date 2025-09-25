@@ -14,15 +14,15 @@ const AI_PROVIDERS = [
 ];
 
 const AI_MODELS: Record<string, string[]> = {
-  'openai': ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'],
-  'openai-badger': ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'],
+  'openai': ['o3', 'gpt-5', 'gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'],
+  'openai-badger': ['o3', 'gpt-5', 'gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'],
   'zhipu': ['glm-4.5-flash', 'glm-4.5', 'glm-4.5-air', 'glm-4.5-x', 'glm-4.5-airx'],
   'anthropic': ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'],
 };
 
 const DEFAULT_MODELS: Record<string, string> = {
-  'openai': 'gpt-4o',
-  'openai-badger': 'gpt-4o-mini',
+  'openai': 'o3',
+  'openai-badger': 'o3',
   'zhipu': 'glm-4.5-flash',
   'anthropic': 'claude-3-5-sonnet-20241022',
 };
@@ -42,17 +42,21 @@ interface ArticleGenerationForm {
     typeId?: string;
   };
   additionalRequirements: string;
-  aiConfig: {
-    provider: string;
-    model: string;
-    apiKey: string;
-    baseURL?: string;
-  };
 }
 
 export default function ContentGenerationPage() {
   const [showForm, setShowForm] = useState(false);
   const [selectedTask, setSelectedTask] = useState<string | null>(null);
+  const [showAIConfig, setShowAIConfig] = useState(false);
+
+  // 页面级AI配置
+  const [aiConfig, setAiConfig] = useState({
+    provider: 'openai',
+    model: 'gpt-4o',
+    apiKey: '',
+    baseURL: '',
+  });
+
   const [form, setForm] = useState<ArticleGenerationForm>({
     topic: '',
     platformId: '',
@@ -62,13 +66,26 @@ export default function ContentGenerationPage() {
     enableContentStructure: false,
     structureFilters: {},
     additionalRequirements: '',
-    aiConfig: {
-      provider: 'openai',
-      model: 'gpt-4o',
-      apiKey: '',
-      baseURL: '',
-    },
   });
+
+  // 从localStorage加载AI配置
+  useEffect(() => {
+    const savedAIConfig = localStorage.getItem('ai-config');
+    if (savedAIConfig) {
+      try {
+        const parsed = JSON.parse(savedAIConfig);
+        setAiConfig(parsed);
+      } catch (error) {
+        console.error('Failed to parse saved AI config:', error);
+      }
+    }
+  }, []);
+
+  // 保存AI配置到localStorage
+  const saveAIConfig = (config: typeof aiConfig) => {
+    setAiConfig(config);
+    localStorage.setItem('ai-config', JSON.stringify(config));
+  };
 
   // API调用
   const { data: platforms } = api.contentPlatforms.getAll.useQuery();
@@ -121,29 +138,26 @@ export default function ContentGenerationPage() {
       enableContentStructure: false,
       structureFilters: {},
       additionalRequirements: '',
-      aiConfig: {
-        provider: 'openai',
-        model: 'gpt-4o',
-        apiKey: '',
-        baseURL: '',
-      },
     });
   };
 
-  const handleProviderChange = (provider: string) => {
-    setForm(prev => ({
-      ...prev,
-      aiConfig: {
-        ...prev.aiConfig,
-        provider,
-        model: DEFAULT_MODELS[provider] || AI_MODELS[provider]?.[0] || '',
-      },
-    }));
+  const handleAIProviderChange = (provider: string) => {
+    const newConfig = {
+      ...aiConfig,
+      provider,
+      model: DEFAULT_MODELS[provider] || AI_MODELS[provider]?.[0] || '',
+    };
+    saveAIConfig(newConfig);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.topic || !form.platformId || !form.aiConfig.apiKey) return;
+    if (!form.topic || !form.platformId || !aiConfig.apiKey) {
+      if (!aiConfig.apiKey) {
+        alert('请先配置AI设置中的API密钥');
+      }
+      return;
+    }
 
     createTask.mutate({
       topic: form.topic,
@@ -154,7 +168,7 @@ export default function ContentGenerationPage() {
       enableContentStructure: form.enableContentStructure,
       structureFilters: form.structureFilters,
       additionalRequirements: form.additionalRequirements || undefined,
-      aiConfig: form.aiConfig,
+      aiConfig: aiConfig,
     });
   };
 
@@ -196,15 +210,106 @@ export default function ContentGenerationPage() {
           </p>
         </div>
 
+        {/* AI配置区域 */}
+        <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Settings className="h-5 w-5 text-gray-600 mr-2" />
+                <h2 className="text-lg font-medium text-gray-900">AI配置</h2>
+                <span className="ml-2 px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                  {aiConfig.provider} - {aiConfig.model}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowAIConfig(!showAIConfig)}
+                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                {showAIConfig ? '收起' : '配置'}
+              </button>
+            </div>
+          </div>
+
+          {showAIConfig && (
+            <div className="px-6 py-4 bg-gray-50">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">AI供应商</label>
+                  <select
+                    value={aiConfig.provider}
+                    onChange={(e) => handleAIProviderChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {AI_PROVIDERS.map((provider) => (
+                      <option key={provider.value} value={provider.value}>
+                        {provider.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">模型</label>
+                  <select
+                    value={aiConfig.model}
+                    onChange={(e) => saveAIConfig({ ...aiConfig, model: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {AI_MODELS[aiConfig.provider]?.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+                  <input
+                    type="password"
+                    value={aiConfig.apiKey}
+                    onChange={(e) => saveAIConfig({ ...aiConfig, apiKey: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="输入您的API密钥"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Base URL (可选)</label>
+                  <input
+                    type="text"
+                    value={aiConfig.baseURL}
+                    onChange={(e) => saveAIConfig({ ...aiConfig, baseURL: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="自定义API地址（如有）"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center text-sm text-gray-500">
+                <div className="flex items-center mr-4">
+                  <div className={`w-2 h-2 rounded-full mr-2 ${aiConfig.apiKey ? 'bg-green-500' : 'bg-red-500'}`} />
+                  API密钥状态: {aiConfig.apiKey ? '已配置' : '未配置'}
+                </div>
+                <div className="text-xs">配置将自动保存到本地</div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* 创建新任务按钮 */}
         <div className="mb-6">
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            disabled={!aiConfig.apiKey}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             <Plus className="h-4 w-4 mr-2" />
             开始撰写文章
           </button>
+          {!aiConfig.apiKey && (
+            <p className="mt-2 text-sm text-red-600">请先配置AI设置中的API密钥</p>
+          )}
         </div>
 
         {/* 任务历史 */}
@@ -280,80 +385,6 @@ export default function ContentGenerationPage() {
                       </option>
                     ))}
                   </select>
-                </div>
-              </div>
-
-              {/* AI配置 */}
-              <div className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center mb-4">
-                  <Settings className="h-4 w-4 text-gray-600 mr-2" />
-                  <h3 className="text-sm font-medium text-gray-700">AI配置</h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">AI供应商 *</label>
-                    <select
-                      value={form.aiConfig.provider}
-                      onChange={(e) => handleProviderChange(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    >
-                      {AI_PROVIDERS.map((provider) => (
-                        <option key={provider.value} value={provider.value}>
-                          {provider.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">模型 *</label>
-                    <select
-                      value={form.aiConfig.model}
-                      onChange={(e) => setForm(prev => ({
-                        ...prev,
-                        aiConfig: { ...prev.aiConfig, model: e.target.value }
-                      }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    >
-                      {AI_MODELS[form.aiConfig.provider]?.map((model) => (
-                        <option key={model} value={model}>
-                          {model}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">API Key *</label>
-                    <input
-                      type="password"
-                      value={form.aiConfig.apiKey}
-                      onChange={(e) => setForm(prev => ({
-                        ...prev,
-                        aiConfig: { ...prev.aiConfig, apiKey: e.target.value }
-                      }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="输入您的API密钥"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Base URL (可选)</label>
-                    <input
-                      type="text"
-                      value={form.aiConfig.baseURL}
-                      onChange={(e) => setForm(prev => ({
-                        ...prev,
-                        aiConfig: { ...prev.aiConfig, baseURL: e.target.value }
-                      }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="自定义API地址（如有）"
-                    />
-                  </div>
                 </div>
               </div>
 

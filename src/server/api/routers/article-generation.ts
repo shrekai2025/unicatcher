@@ -211,7 +211,7 @@ async function processArticleGeneration(taskId: string, aiConfig: { provider: st
     }
 
     // 构建AI提示词
-    let prompt = `请根据以下要求撰写文章：
+    let prompt = `请根据以下要求撰写内容：
 
 主题：${task.topic}
 平台：${task.platform.name}`;
@@ -221,21 +221,19 @@ async function processArticleGeneration(taskId: string, aiConfig: { provider: st
       prompt += `\n字数要求：${task.platform.wordCount}`;
     }
 
-    // 添加参考文章
+    // 添加参考内容
     if (task.referenceArticleIds) {
       const referenceIds: string[] = JSON.parse(task.referenceArticleIds);
       const referenceArticles = await db.collectedArticle.findMany({
         where: { id: { in: referenceIds } },
-        select: { title: true, content: true, author: true },
+        select: { content: true },
       });
 
       if (referenceArticles.length > 0) {
-        prompt += `\n\n参考文章（请参考其行文方式，但不要引入与主题无关的信息）：`;
+        prompt += `\n\n参考内容（请参考其行文方式，但不要引入与主题无关的信息）：`;
         referenceArticles.forEach((article, index) => {
-          prompt += `\n\n参考文章${index + 1}：
-标题：${article.title}
-作者：${article.author}
-内容：${article.content || "（无正文内容）"}`;
+          prompt += `\n\n参考内容${index + 1}：
+${article.content || "（无正文内容）"}`;
         });
       }
     }
@@ -258,7 +256,7 @@ async function processArticleGeneration(taskId: string, aiConfig: { provider: st
       prompt += `\n\n附加要求：${task.additionalRequirements}`;
     }
 
-    prompt += `\n\n请直接输出文章内容，不需要额外的说明或格式标记。`;
+    prompt += `\n\n请直接输出内容，不需要额外的说明或格式标记。`;
 
     // 调用AI服务生成文章
     const dynamicAiConfig = {

@@ -41,9 +41,9 @@ export class AIServiceFactory {
   static getDefaultModel(provider: string): string {
     switch (provider) {
       case 'openai':
-        return 'gpt-4o';
+        return 'o3';
       case 'openai-badger':
-        return 'gpt-4o-mini';
+        return 'o3';
       case 'zhipu':
         return 'glm-4.5-flash';
       case 'anthropic':
@@ -59,9 +59,9 @@ export class AIServiceFactory {
   static getSupportedModels(provider: string): string[] {
     switch (provider) {
       case 'openai':
-        return ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'];
+        return ['o3', 'gpt-5', 'gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'];
       case 'openai-badger':
-        return ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
+        return ['o3', 'gpt-5', 'gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
       case 'zhipu':
         return ['glm-4.5-flash', 'glm-4.5', 'glm-4.5-air', 'glm-4.5-x', 'glm-4.5-airx'];
       case 'anthropic':
