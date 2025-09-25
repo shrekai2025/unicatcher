@@ -3464,6 +3464,820 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
     ],
     example: `curl -X DELETE http://localhost:3067/api/external/manual-tweet-texts/txt_789012 \\
   -H "x-api-key: unicatcher-api-key-demo"`
+  },
+
+  // ========== 写作辅助模块 API ==========
+
+  // 内容平台管理 API
+  {
+    id: 'get-content-platforms',
+    method: 'GET',
+    path: '/api/external/writing-assistant/content-platforms',
+    title: '获取所有内容平台',
+    description: '获取写作辅助模块的所有内容平台列表',
+    responses: [
+      {
+        status: 200,
+        description: '获取成功',
+        example: {
+          success: true,
+          data: [
+            {
+              id: "platform_123",
+              name: "微信公众号",
+              platformId: "wechat",
+              description: "微信公众号平台",
+              isDefault: true,
+              createdAt: "2024-01-15T10:30:00.000Z",
+              updatedAt: "2024-01-15T10:30:00.000Z"
+            }
+          ]
+        }
+      },
+      {
+        status: 401,
+        description: 'API密钥无效',
+        example: {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid or missing API key'
+          }
+        }
+      }
+    ],
+    example: `curl -X GET http://localhost:3067/api/external/writing-assistant/content-platforms \\
+  -H "x-api-key: unicatcher-api-key-demo"`
+  },
+
+  {
+    id: 'create-content-platform',
+    method: 'POST',
+    path: '/api/external/writing-assistant/content-platforms',
+    title: '创建内容平台',
+    description: '创建新的内容平台',
+    params: [
+      {
+        name: 'name',
+        type: 'string',
+        required: true,
+        description: '平台名称',
+        example: '小红书'
+      },
+      {
+        name: 'platformId',
+        type: 'string',
+        required: true,
+        description: '平台英文ID，只能包含字母、数字、下划线和短横线',
+        example: 'xiaohongshu'
+      },
+      {
+        name: 'description',
+        type: 'string',
+        required: false,
+        description: '平台描述',
+        example: '小红书社区平台'
+      },
+      {
+        name: 'isDefault',
+        type: 'boolean',
+        required: false,
+        description: '是否为默认平台',
+        example: false
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '创建成功',
+        example: {
+          success: true,
+          message: '内容平台创建成功',
+          data: {
+            id: "platform_456",
+            name: "小红书",
+            platformId: "xiaohongshu",
+            description: "小红书社区平台",
+            isDefault: false,
+            createdAt: "2024-01-15T10:35:00.000Z",
+            updatedAt: "2024-01-15T10:35:00.000Z"
+          }
+        }
+      },
+      {
+        status: 400,
+        description: '参数错误',
+        example: {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Missing or invalid name'
+          }
+        }
+      },
+      {
+        status: 409,
+        description: '平台名称或ID已存在',
+        example: {
+          success: false,
+          error: {
+            code: 'DUPLICATE_VALUE',
+            message: '平台名称已存在'
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/external/writing-assistant/content-platforms \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "name": "小红书",
+    "platformId": "xiaohongshu",
+    "description": "小红书社区平台",
+    "isDefault": false
+  }'`
+  },
+
+  {
+    id: 'update-content-platform',
+    method: 'PUT',
+    path: '/api/external/writing-assistant/content-platforms/[id]',
+    title: '更新内容平台',
+    description: '更新指定ID的内容平台信息',
+    pathParams: [
+      {
+        name: 'id',
+        type: 'string',
+        required: true,
+        description: '平台ID',
+        example: 'platform_456'
+      }
+    ],
+    params: [
+      {
+        name: 'name',
+        type: 'string',
+        required: false,
+        description: '平台名称',
+        example: '小红书平台'
+      },
+      {
+        name: 'description',
+        type: 'string',
+        required: false,
+        description: '平台描述',
+        example: '更新后的描述'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '更新成功',
+        example: {
+          success: true,
+          message: '内容平台更新成功',
+          data: {
+            id: "platform_456",
+            name: "小红书平台",
+            platformId: "xiaohongshu",
+            description: "更新后的描述",
+            isDefault: false,
+            createdAt: "2024-01-15T10:35:00.000Z",
+            updatedAt: "2024-01-15T10:40:00.000Z"
+          }
+        }
+      }
+    ],
+    example: `curl -X PUT http://localhost:3067/api/external/writing-assistant/content-platforms/platform_456 \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "name": "小红书平台",
+    "description": "更新后的描述"
+  }'`
+  },
+
+  {
+    id: 'delete-content-platform',
+    method: 'DELETE',
+    path: '/api/external/writing-assistant/content-platforms/[id]',
+    title: '删除内容平台',
+    description: '删除指定ID的内容平台（不能删除默认平台）',
+    pathParams: [
+      {
+        name: 'id',
+        type: 'string',
+        required: true,
+        description: '平台ID',
+        example: 'platform_456'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '删除成功',
+        example: {
+          success: true,
+          message: '内容平台删除成功'
+        }
+      },
+      {
+        status: 403,
+        description: '不能删除默认平台',
+        example: {
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: '不能删除默认平台'
+          }
+        }
+      },
+      {
+        status: 404,
+        description: '平台不存在',
+        example: {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: '内容平台不存在'
+          }
+        }
+      }
+    ],
+    example: `curl -X DELETE http://localhost:3067/api/external/writing-assistant/content-platforms/platform_456 \\
+  -H "x-api-key: unicatcher-api-key-demo"`
+  },
+
+  // 文章类型管理 API
+  {
+    id: 'get-article-types',
+    method: 'GET',
+    path: '/api/external/writing-assistant/article-types',
+    title: '获取所有文章类型',
+    description: '获取写作辅助模块的所有文章类型列表',
+    responses: [
+      {
+        status: 200,
+        description: '获取成功',
+        example: {
+          success: true,
+          data: [
+            {
+              id: "type_123",
+              name: "技术教程",
+              typeId: "tutorial",
+              description: "技术相关的教程文章",
+              isDefault: true,
+              createdAt: "2024-01-15T10:30:00.000Z",
+              updatedAt: "2024-01-15T10:30:00.000Z"
+            }
+          ]
+        }
+      }
+    ],
+    example: `curl -X GET http://localhost:3067/api/external/writing-assistant/article-types \\
+  -H "x-api-key: unicatcher-api-key-demo"`
+  },
+
+  {
+    id: 'create-article-type',
+    method: 'POST',
+    path: '/api/external/writing-assistant/article-types',
+    title: '创建文章类型',
+    description: '创建新的文章类型',
+    params: [
+      {
+        name: 'name',
+        type: 'string',
+        required: true,
+        description: '类型名称',
+        example: '产品介绍'
+      },
+      {
+        name: 'typeId',
+        type: 'string',
+        required: true,
+        description: '类型英文ID，只能包含字母、数字、下划线和短横线',
+        example: 'product_intro'
+      },
+      {
+        name: 'description',
+        type: 'string',
+        required: false,
+        description: '类型描述',
+        example: '产品介绍相关的文章类型'
+      },
+      {
+        name: 'isDefault',
+        type: 'boolean',
+        required: false,
+        description: '是否为默认类型',
+        example: false
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '创建成功',
+        example: {
+          success: true,
+          message: '文章类型创建成功',
+          data: {
+            id: "type_456",
+            name: "产品介绍",
+            typeId: "product_intro",
+            description: "产品介绍相关的文章类型",
+            isDefault: false,
+            createdAt: "2024-01-15T10:35:00.000Z",
+            updatedAt: "2024-01-15T10:35:00.000Z"
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/external/writing-assistant/article-types \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "name": "产品介绍",
+    "typeId": "product_intro",
+    "description": "产品介绍相关的文章类型"
+  }'`
+  },
+
+  // 采集文章管理 API
+  {
+    id: 'get-collected-articles',
+    method: 'GET',
+    path: '/api/external/writing-assistant/collected-articles',
+    title: '获取采集文章列表',
+    description: '获取采集文章列表，支持筛选和分页',
+    queryParams: [
+      {
+        name: 'page',
+        type: 'number',
+        required: false,
+        description: '页码，默认1',
+        example: 1
+      },
+      {
+        name: 'pageSize',
+        type: 'number',
+        required: false,
+        description: '每页数量，默认20，最大100',
+        example: 20
+      },
+      {
+        name: 'platformIds',
+        type: 'string',
+        required: false,
+        description: '平台ID列表，逗号分隔',
+        example: 'platform_123,platform_456'
+      },
+      {
+        name: 'articleTypeIds',
+        type: 'string',
+        required: false,
+        description: '文章类型ID列表，逗号分隔',
+        example: 'type_123,type_456'
+      },
+      {
+        name: 'startDate',
+        type: 'string',
+        required: false,
+        description: '开始日期（YYYY-MM-DD）',
+        example: '2024-01-01'
+      },
+      {
+        name: 'endDate',
+        type: 'string',
+        required: false,
+        description: '结束日期（YYYY-MM-DD）',
+        example: '2024-01-31'
+      },
+      {
+        name: 'author',
+        type: 'string',
+        required: false,
+        description: '作者关键词搜索',
+        example: '张三'
+      },
+      {
+        name: 'title',
+        type: 'string',
+        required: false,
+        description: '标题关键词搜索',
+        example: '技术'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '获取成功',
+        example: {
+          success: true,
+          data: {
+            articles: [
+              {
+                id: "article_123",
+                title: "React性能优化技巧",
+                author: "张三",
+                collectedAt: "2024-01-15T10:30:00.000Z",
+                platforms: [
+                  {
+                    id: "rel_123",
+                    platform: {
+                      id: "platform_123",
+                      name: "微信公众号",
+                      platformId: "wechat"
+                    }
+                  }
+                ],
+                articleTypes: [
+                  {
+                    id: "rel_456",
+                    articleType: {
+                      id: "type_123",
+                      name: "技术教程",
+                      typeId: "tutorial"
+                    }
+                  }
+                ]
+              }
+            ],
+            pagination: {
+              page: 1,
+              pageSize: 20,
+              total: 1,
+              totalPages: 1
+            }
+          }
+        }
+      }
+    ],
+    example: `curl -X GET "http://localhost:3067/api/external/writing-assistant/collected-articles?page=1&pageSize=20&author=张三" \\
+  -H "x-api-key: unicatcher-api-key-demo"`
+  },
+
+  {
+    id: 'create-collected-article',
+    method: 'POST',
+    path: '/api/external/writing-assistant/collected-articles',
+    title: '创建采集文章',
+    description: '创建新的采集文章记录',
+    params: [
+      {
+        name: 'title',
+        type: 'string',
+        required: true,
+        description: '文章标题',
+        example: 'Vue3 组件开发最佳实践'
+      },
+      {
+        name: 'author',
+        type: 'string',
+        required: true,
+        description: '文章作者',
+        example: '李四'
+      },
+      {
+        name: 'content',
+        type: 'string',
+        required: false,
+        description: '文章内容',
+        example: '这是一篇关于Vue3组件开发的详细教程...'
+      },
+      {
+        name: 'platformIds',
+        type: 'array',
+        required: true,
+        description: '关联的平台ID数组',
+        example: ['platform_123', 'platform_456']
+      },
+      {
+        name: 'articleTypeIds',
+        type: 'array',
+        required: true,
+        description: '关联的文章类型ID数组',
+        example: ['type_123', 'type_456']
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '创建成功',
+        example: {
+          success: true,
+          message: '采集文章创建成功',
+          data: {
+            id: "article_789",
+            title: "Vue3 组件开发最佳实践",
+            author: "李四",
+            content: "这是一篇关于Vue3组件开发的详细教程...",
+            collectedAt: "2024-01-15T10:35:00.000Z",
+            platforms: [
+              {
+                id: "rel_789",
+                platform: {
+                  id: "platform_123",
+                  name: "微信公众号",
+                  platformId: "wechat"
+                }
+              }
+            ],
+            articleTypes: [
+              {
+                id: "rel_890",
+                articleType: {
+                  id: "type_123",
+                  name: "技术教程",
+                  typeId: "tutorial"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        status: 400,
+        description: '参数错误',
+        example: {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Missing or invalid title'
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/external/writing-assistant/collected-articles \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "title": "Vue3 组件开发最佳实践",
+    "author": "李四",
+    "content": "这是一篇关于Vue3组件开发的详细教程...",
+    "platformIds": ["platform_123"],
+    "articleTypeIds": ["type_123"]
+  }'`
+  },
+
+  {
+    id: 'update-collected-article',
+    method: 'PUT',
+    path: '/api/external/writing-assistant/collected-articles/[id]',
+    title: '更新采集文章',
+    description: '更新指定ID的采集文章信息',
+    pathParams: [
+      {
+        name: 'id',
+        type: 'string',
+        required: true,
+        description: '文章ID',
+        example: 'article_789'
+      }
+    ],
+    params: [
+      {
+        name: 'title',
+        type: 'string',
+        required: false,
+        description: '文章标题',
+        example: 'Vue3 组件开发最佳实践（更新版）'
+      },
+      {
+        name: 'author',
+        type: 'string',
+        required: false,
+        description: '文章作者',
+        example: '李四'
+      },
+      {
+        name: 'content',
+        type: 'string',
+        required: false,
+        description: '文章内容',
+        example: '更新后的文章内容...'
+      },
+      {
+        name: 'platformIds',
+        type: 'array',
+        required: false,
+        description: '关联的平台ID数组',
+        example: ['platform_123', 'platform_456']
+      },
+      {
+        name: 'articleTypeIds',
+        type: 'array',
+        required: false,
+        description: '关联的文章类型ID数组',
+        example: ['type_123']
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '更新成功',
+        example: {
+          success: true,
+          message: '采集文章更新成功',
+          data: {
+            id: "article_789",
+            title: "Vue3 组件开发最佳实践（更新版）",
+            author: "李四",
+            content: "更新后的文章内容...",
+            collectedAt: "2024-01-15T10:35:00.000Z",
+            updatedAt: "2024-01-15T10:40:00.000Z"
+          }
+        }
+      }
+    ],
+    example: `curl -X PUT http://localhost:3067/api/external/writing-assistant/collected-articles/article_789 \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "title": "Vue3 组件开发最佳实践（更新版）",
+    "content": "更新后的文章内容..."
+  }'`
+  },
+
+  {
+    id: 'delete-collected-article',
+    method: 'DELETE',
+    path: '/api/external/writing-assistant/collected-articles/[id]',
+    title: '删除采集文章',
+    description: '删除指定ID的采集文章',
+    pathParams: [
+      {
+        name: 'id',
+        type: 'string',
+        required: true,
+        description: '文章ID',
+        example: 'article_789'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '删除成功',
+        example: {
+          success: true,
+          message: '采集文章删除成功'
+        }
+      },
+      {
+        status: 404,
+        description: '文章不存在',
+        example: {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: '采集文章不存在'
+          }
+        }
+      }
+    ],
+    example: `curl -X DELETE http://localhost:3067/api/external/writing-assistant/collected-articles/article_789 \\
+  -H "x-api-key: unicatcher-api-key-demo"`
+  },
+
+  // 统计数据 API
+  {
+    id: 'get-writing-assistant-stats',
+    method: 'GET',
+    path: '/api/external/writing-assistant/stats',
+    title: '获取写作辅助统计数据',
+    description: '获取写作辅助模块的统计信息',
+    responses: [
+      {
+        status: 200,
+        description: '获取成功',
+        example: {
+          success: true,
+          data: {
+            overview: {
+              totalArticles: 156,
+              totalPlatforms: 5,
+              totalTypes: 8,
+              recentArticles: 23
+            },
+            platforms: [
+              {
+                id: "platform_123",
+                name: "微信公众号",
+                platformId: "wechat",
+                isDefault: true,
+                articleCount: 89
+              }
+            ],
+            types: [
+              {
+                id: "type_123",
+                name: "技术教程",
+                typeId: "tutorial",
+                isDefault: true,
+                articleCount: 67
+              }
+            ],
+            summary: {
+              averageArticlesPerPlatform: 31.2,
+              averageArticlesPerType: 19.5,
+              weeklyGrowthRate: 14.74
+            }
+          }
+        }
+      }
+    ],
+    example: `curl -X GET http://localhost:3067/api/external/writing-assistant/stats \\
+  -H "x-api-key: unicatcher-api-key-demo"`
+  },
+
+  // URL转文本 API
+  {
+    id: 'writing-assistant-url2text',
+    method: 'POST',
+    path: '/api/external/writing-assistant/url2text',
+    title: 'URL转文本',
+    description: '将网页URL转换为结构化文本内容（标题、作者、正文）',
+    parameters: [
+      {
+        name: 'url',
+        type: 'string',
+        required: true,
+        description: '要转换的网页URL地址'
+      },
+      {
+        name: 'authToken',
+        type: 'string',
+        required: true,
+        description: '用于调用外部转换服务的认证Token'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '转换成功',
+        example: {
+          success: true,
+          message: 'URL转文本成功',
+          data: {
+            title: '稳定币挤兑与套利中心化',
+            author: '人大金融科技研究所',
+            content: '稳定币是一种加密资产，旨在与美元挂钩，但由流动性并不完美的美元资产支持。……经营模式、发展影响与监管框架全球稳定币发展趋势与政策演变'
+          }
+        }
+      },
+      {
+        status: 400,
+        description: '请求参数错误',
+        example: {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: '缺少或无效的URL参数'
+          }
+        }
+      },
+      {
+        status: 401,
+        description: '认证失败',
+        example: {
+          success: false,
+          error: {
+            code: 'WEBHOOK_UNAUTHORIZED',
+            message: '外部服务认证失败，请检查authToken是否正确'
+          }
+        }
+      },
+      {
+        status: 404,
+        description: 'URL无法访问',
+        example: {
+          success: false,
+          error: {
+            code: 'URL_NOT_FOUND',
+            message: '无法访问指定URL，请检查URL是否有效'
+          }
+        }
+      },
+      {
+        status: 408,
+        description: '请求超时',
+        example: {
+          success: false,
+          error: {
+            code: 'TIMEOUT',
+            message: '请求超时，请稍后重试'
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/external/writing-assistant/url2text \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "url": "https://example.com/article-about-javascript",
+    "authToken": "your-webhook-auth-token"
+  }'`
   }
 ];
 
@@ -3828,32 +4642,83 @@ export default function ApiDocsClientPage() {
     setExpandedCategory(expandedCategory === category ? null : category);
   };
 
-  // 按分类组织接口
+  // 按导航模块分类组织接口
   const categories = {
-    'tasks': {
-      title: '任务管理',
-      description: '创建、查询和管理爬取任务',
-      endpoints: apiEndpoints.filter(ep => ep.path.includes('/tasks'))
+    'twitter': {
+      title: 'Twitter 模块',
+      description: 'Twitter 相关的所有API接口',
+      icon: '🐦',
+      subcategories: {
+        'tasks': {
+          title: '任务管理',
+          description: '创建、查询和管理爬取任务',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/tasks'))
+        },
+        'data': {
+          title: '数据管理',
+          description: '获取和提取推文数据',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/data'))
+        },
+        'ai-batch': {
+          title: 'AI批处理',
+          description: 'AI自动分析推文内容，支持OpenAI、OpenAI-Badger、智谱AI、Anthropic Claude供应商',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/ai-batch'))
+        },
+        'tweet-processing': {
+          title: '推文处理',
+          description: '推文翻译、评论生成、推文信息查询等API接口',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/external') && (ep.path.includes('/translate') || ep.path.includes('/generate-comments') || ep.path.includes('/tweet-info')))
+        },
+        'manual-tweets': {
+          title: '手采推文',
+          description: '手采推文分类管理和文本数据管理API接口',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/manual-tweet'))
+        }
+      }
     },
-    'data': {
-      title: '数据管理',
-      description: '获取和提取推文数据',
-      endpoints: apiEndpoints.filter(ep => ep.path.includes('/data'))
+    'youtube': {
+      title: 'YouTube 模块',
+      description: 'YouTube 相关的所有API接口',
+      icon: '🎥',
+      subcategories: {
+        'channel-monitor': {
+          title: 'Channel监控',
+          description: 'YouTube频道监控相关API接口',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/youtube'))
+        }
+      }
     },
-    'ai-batch': {
-      title: 'AI批处理',
-      description: 'AI自动分析推文内容，支持OpenAI、OpenAI-Badger、智谱AI、Anthropic Claude供应商，单批次处理模式',
-      endpoints: apiEndpoints.filter(ep => ep.path.includes('/ai-batch'))
-    },
-    'tweet-processing': {
-      title: '推文处理',
-      description: '推文翻译、评论生成、推文信息查询等API接口',
-      endpoints: apiEndpoints.filter(ep => ep.path.includes('/external') && (ep.path.includes('/translate') || ep.path.includes('/generate-comments') || ep.path.includes('/tweet-info')))
-    },
-    'manual-tweets': {
-      title: '手采推文',
-      description: '手采推文分类管理和文本数据管理API接口',
-      endpoints: apiEndpoints.filter(ep => ep.path.includes('/manual-tweet'))
+    'writing-assistant': {
+      title: '写作辅助模块',
+      description: '写作辅助相关的所有API接口',
+      icon: '✍️',
+      subcategories: {
+        'content-platforms': {
+          title: '内容平台管理',
+          description: '内容平台的增删改查API接口',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/writing-assistant') && ep.path.includes('/platforms'))
+        },
+        'article-types': {
+          title: '文章类型管理',
+          description: '文章类型的增删改查API接口',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/writing-assistant') && ep.path.includes('/article-types'))
+        },
+        'articles': {
+          title: '采集文章管理',
+          description: '采集文章的增删改查API接口',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/writing-assistant') && ep.path.includes('/articles'))
+        },
+        'stats': {
+          title: '统计数据',
+          description: '写作辅助模块的统计信息API',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/writing-assistant') && ep.path.includes('/stats'))
+        },
+        'url2text': {
+          title: 'URL转文本',
+          description: 'URL转文本功能API接口',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/url2text'))
+        }
+      }
     }
   };
 
@@ -3943,25 +4808,28 @@ export default function ApiDocsClientPage() {
 
         {/* API接口分类 */}
         <div className="space-y-6">
-          {Object.entries(categories).map(([key, category]) => (
-            <div key={key} className="rounded-lg bg-white shadow">
-              {/* 分类头部 */}
-              <div 
+          {Object.entries(categories).map(([moduleKey, module]) => (
+            <div key={moduleKey} className="rounded-lg bg-white shadow">
+              {/* 模块头部 */}
+              <div
                 className="flex items-center justify-between p-6 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-200"
-                onClick={() => toggleCategory(key)}
+                onClick={() => toggleCategory(moduleKey)}
               >
                 <div>
-                  <h2 className="text-2xl font-semibold text-gray-900">{category.title}</h2>
-                  <p className="mt-2 text-gray-600">{category.description}</p>
+                  <div className="flex items-center space-x-3">
+                    <span className="text-2xl">{module.icon}</span>
+                    <h2 className="text-2xl font-semibold text-gray-900">{module.title}</h2>
+                  </div>
+                  <p className="mt-2 text-gray-600">{module.description}</p>
                   <div className="mt-2 text-sm text-blue-600">
-                    {category.endpoints.length} 个接口
+                    {Object.values(module.subcategories).reduce((total, sub) => total + sub.endpoints.length, 0)} 个接口
                   </div>
                 </div>
                 <div className="flex items-center">
-                  <svg 
-                    className={`h-6 w-6 text-gray-400 transition-transform ${expandedCategory === key ? 'rotate-90' : ''}`}
-                    fill="none" 
-                    viewBox="0 0 24 24" 
+                  <svg
+                    className={`h-6 w-6 text-gray-400 transition-transform ${expandedCategory === moduleKey ? 'rotate-90' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
                     stroke="currentColor"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -3969,11 +4837,27 @@ export default function ApiDocsClientPage() {
                 </div>
               </div>
 
-              {/* 分类内容 */}
-              {expandedCategory === key && (
+              {/* 模块内容 */}
+              {expandedCategory === moduleKey && (
                 <div className="p-6">
-                  {category.endpoints.map((endpoint) => (
-                    <ApiEndpointCard key={endpoint.id} endpoint={endpoint} />
+                  {Object.entries(module.subcategories).map(([subKey, subcategory]) => (
+                    <div key={subKey} className="mb-8 last:mb-0">
+                      {/* 子分类头部 */}
+                      <div className="mb-4">
+                        <h3 className="text-lg font-medium text-gray-900">{subcategory.title}</h3>
+                        <p className="text-sm text-gray-600">{subcategory.description}</p>
+                        <div className="text-xs text-blue-600 mt-1">
+                          {subcategory.endpoints.length} 个接口
+                        </div>
+                      </div>
+
+                      {/* 子分类接口列表 */}
+                      <div className="space-y-4">
+                        {subcategory.endpoints.map((endpoint) => (
+                          <ApiEndpointCard key={endpoint.id} endpoint={endpoint} />
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

@@ -6,6 +6,9 @@ import { extractsRouter } from "~/server/api/routers/extracts";
 import { tweetProcessingRouter } from "~/server/api/routers/tweet-processing";
 import { listIdsRouter } from "~/server/api/routers/list-ids";
 import { youtubeRouter } from "~/server/api/routers/youtube";
+import { contentPlatformsRouter } from "~/server/api/routers/content-platforms";
+import { articleTypesRouter } from "~/server/api/routers/article-types";
+import { collectedArticlesRouter } from "~/server/api/routers/collected-articles";
 
 /**
  * This is the primary router for your server.
@@ -20,6 +23,9 @@ export const appRouter = createTRPCRouter({
   tweetProcessing: tweetProcessingRouter,
   listIds: listIdsRouter,
   youtube: youtubeRouter,
+  contentPlatforms: contentPlatformsRouter,
+  articleTypes: articleTypesRouter,
+  collectedArticles: collectedArticlesRouter,
   // 注释掉或删除post路由，因为我们不需要它
   // post: postRouter,
 });

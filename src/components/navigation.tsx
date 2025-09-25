@@ -16,6 +16,7 @@ interface NavigationItem {
 
 const adminTopLevelNavigation: NavigationItem[] = [
   { name: '仪表板', href: '/dashboard', icon: '📊' },
+  { name: 'API文档', href: '/api-docs', icon: '📖' },
   {
     name: 'Twitter',
     icon: '🐦',
@@ -25,7 +26,6 @@ const adminTopLevelNavigation: NavigationItem[] = [
       { name: '推文处理', href: '/tweet-processing', icon: '🤖' },
       { name: 'X辅助器', href: '/x-helper', icon: '🔧' },
       { name: '数据查看', href: '/viewer', icon: '👁️' },
-      { name: 'API文档', href: '/api-docs', icon: '📖' },
     ]
   },
   {
@@ -33,6 +33,15 @@ const adminTopLevelNavigation: NavigationItem[] = [
     icon: '🎥',
     children: [
       { name: 'Channel监控', href: '/youtube/channel-monitor', icon: '📺' },
+    ]
+  },
+  {
+    name: '写作辅助',
+    icon: '✍️',
+    children: [
+      { name: '内容生成', href: '/writing-assistant/content-generation', icon: '📝' },
+      { name: '采集参考', href: '/writing-assistant/reference-collection', icon: '📚' },
+      { name: 'URL转文本', href: '/writing-assistant/url2text', icon: '🔗' },
     ]
   },
 ];

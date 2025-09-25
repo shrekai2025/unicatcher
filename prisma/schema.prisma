@@ -471,3 +471,83 @@ model ManualTweetText {
 
   @@index([categoryId])
 }
+
+// 内容平台表 - 写作辅助模块
+model ContentPlatform {
+  id          String   @id @default(cuid())
+  name        String   @unique // 平台名称（如：微信公众号、知乎、小红书等）
+  platformId  String   @unique // 平台英文ID（如：wechat, zhihu, xiaohongshu）
+  description String?  // 平台描述
+  isDefault   Boolean  @default(false) // 是否为默认项
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联的采集文章
+  collectedArticles CollectedArticlePlatform[]
+
+  @@index([isDefault])
+  @@index([platformId])
+}
+
+// 文章类型表 - 写作辅助模块
+model ArticleType {
+  id          String   @id @default(cuid())
+  name        String   @unique // 类型名称（如：教程、产品介绍、技术分享等）
+  typeId      String   @unique // 类型英文ID（如：tutorial, product, tech_sharing）
+  description String?  // 类型描述
+  isDefault   Boolean  @default(false) // 是否为默认项
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联的采集文章
+  collectedArticles CollectedArticleType[]
+
+  @@index([isDefault])
+  @@index([typeId])
+}
+
+// 采集文章表 - 写作辅助模块
+model CollectedArticle {
+  id          String   @id @default(cuid())
+  title       String   // 文章标题
+  author      String   // 原文作者
+  content     String?  // 文章内容
+  collectedAt DateTime @default(now()) // 采集时间（添加时间）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 多对多关联
+  platforms   CollectedArticlePlatform[] // 关联的内容平台（可多选）
+  articleTypes CollectedArticleType[]    // 关联的文章类型（可多选）
+
+  @@index([collectedAt])
+  @@index([author])
+}
+
+// 采集文章-内容平台关联表
+model CollectedArticlePlatform {
+  id        String @id @default(cuid())
+  articleId String
+  platformId String
+
+  article   CollectedArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  platform  ContentPlatform  @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, platformId])
+  @@index([articleId])
+  @@index([platformId])
+}
+
+// 采集文章-文章类型关联表
+model CollectedArticleType {
+  id        String @id @default(cuid())
+  articleId String
+  typeId    String
+
+  article     CollectedArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleType ArticleType      @relation(fields: [typeId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, typeId])
+  @@index([articleId])
+  @@index([typeId])
+}
