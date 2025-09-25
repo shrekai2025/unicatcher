@@ -88,8 +88,31 @@ function ArticlesTab() {
     }
 
     try {
-      await navigator.clipboard.writeText(content);
-      alert('正文已复制到剪贴板');
+      // 优先使用现代 Clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(content);
+        alert('正文已复制到剪贴板');
+      } else {
+        // 备用方案：使用传统的复制方法
+        const textArea = document.createElement('textarea');
+        textArea.value = content;
+        textArea.style.position = 'absolute';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+          document.execCommand('copy');
+          alert('正文已复制到剪贴板');
+        } catch (execErr) {
+          console.error('备用复制方法失败:', execErr);
+          alert('复制失败，请手动选择并复制文本');
+        } finally {
+          document.body.removeChild(textArea);
+        }
+      }
     } catch (err) {
       console.error('复制失败:', err);
       alert('复制失败，请重试');
@@ -111,6 +134,11 @@ function ArticlesTab() {
       articleTypeIds: typeId ? [typeId] : []
     });
   };
+
+  // 获取编辑中的文章数据
+  const editingArticle = editingId
+    ? articlesData?.articles.find(article => article.id === editingId)
+    : null;
 
   const createArticle = api.collectedArticles.create.useMutation({
     onSuccess: () => {
@@ -282,6 +310,7 @@ function ArticlesTab() {
                   <input
                     type="text"
                     name="title"
+                    defaultValue={editingArticle?.title || ''}
                     required
                     className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
                     placeholder="请输入文章标题"
@@ -292,6 +321,7 @@ function ArticlesTab() {
                   <input
                     type="text"
                     name="author"
+                    defaultValue={editingArticle?.author || ''}
                     required
                     className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
                     placeholder="请输入作者姓名"
@@ -304,6 +334,7 @@ function ArticlesTab() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">文章内容</label>
                 <textarea
                   name="content"
+                  defaultValue={editingArticle?.content || ''}
                   rows={12}
                   className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
                   placeholder="请输入文章内容..."
@@ -321,6 +352,7 @@ function ArticlesTab() {
                           type="checkbox"
                           name="platforms"
                           value={platform.id}
+                          defaultChecked={editingArticle?.platforms.some(p => p.platformId === platform.id) || false}
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
                         />
                         <span className="ml-3 text-sm text-gray-700">
@@ -342,6 +374,7 @@ function ArticlesTab() {
                           type="checkbox"
                           name="articleTypes"
                           value={type.id}
+                          defaultChecked={editingArticle?.articleTypes.some(t => t.typeId === type.id) || false}
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
                         />
                         <span className="ml-3 text-sm text-gray-700">
