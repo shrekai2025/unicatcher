@@ -589,8 +589,8 @@ model ArticleGenerationTask {
   useContentStructure     Boolean  @default(false) // 是否使用内容结构
   contentStructureId      String?  // 内容结构ID
   // AI配置字段
-  aiProvider              String   // AI供应商
-  aiModel                 String   // AI模型
+  aiProvider              String   @default("openai") // AI供应商
+  aiModel                 String   @default("gpt-4o") // AI模型
   aiBaseURL               String?  // AI API Base URL
   status                  String   @default("pending") // pending, processing, completed, failed
   errorMessage            String?  // 错误信息
