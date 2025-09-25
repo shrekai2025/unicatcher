@@ -9,6 +9,8 @@ import { youtubeRouter } from "~/server/api/routers/youtube";
 import { contentPlatformsRouter } from "~/server/api/routers/content-platforms";
 import { articleTypesRouter } from "~/server/api/routers/article-types";
 import { collectedArticlesRouter } from "~/server/api/routers/collected-articles";
+import { contentStructuresRouter } from "~/server/api/routers/content-structures";
+import { articleGenerationRouter } from "~/server/api/routers/article-generation";
 
 /**
  * This is the primary router for your server.
@@ -26,6 +28,8 @@ export const appRouter = createTRPCRouter({
   contentPlatforms: contentPlatformsRouter,
   articleTypes: articleTypesRouter,
   collectedArticles: collectedArticlesRouter,
+  contentStructures: contentStructuresRouter,
+  articleGeneration: articleGenerationRouter,
   // 注释掉或删除post路由，因为我们不需要它
   // post: postRouter,
 });

@@ -27,6 +27,7 @@ export const contentPlatformsRouter = createTRPCRouter({
       name: z.string().min(1, "平台名称不能为空"),
       platformId: z.string().min(1, "平台ID不能为空").regex(/^[a-zA-Z0-9_-]+$/, "平台ID只能包含字母、数字、下划线和短横线"),
       description: z.string().optional(),
+      wordCount: z.string().optional(),
       isDefault: z.boolean().optional().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -35,6 +36,7 @@ export const contentPlatformsRouter = createTRPCRouter({
           name: input.name,
           platformId: input.platformId,
           description: input.description,
+          wordCount: input.wordCount,
           isDefault: input.isDefault,
         },
       });
@@ -47,6 +49,7 @@ export const contentPlatformsRouter = createTRPCRouter({
       name: z.string().min(1, "平台名称不能为空").optional(),
       platformId: z.string().min(1, "平台ID不能为空").regex(/^[a-zA-Z0-9_-]+$/, "平台ID只能包含字母、数字、下划线和短横线").optional(),
       description: z.string().optional(),
+      wordCount: z.string().optional(),
       isDefault: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {

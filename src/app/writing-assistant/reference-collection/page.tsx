@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '~/trpc/react';
 import { cn } from '~/lib/utils';
-import { Plus, Search, Filter, Edit, Trash2, Check, X, AlertCircle, Copy } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Check, X, AlertCircle, Copy, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog';
 
 interface TabItem {
@@ -74,8 +74,6 @@ function ArticlesTab() {
     title: '',
   });
 
-  const [selectedPlatform, setSelectedPlatform] = useState<string>('');
-  const [selectedType, setSelectedType] = useState<string>('');
 
   const { data: articlesData, refetch: refetchArticles } = api.collectedArticles.getAll.useQuery(filters);
   const { data: platforms } = api.contentPlatforms.getAll.useQuery();
@@ -119,21 +117,6 @@ function ArticlesTab() {
     }
   };
 
-  const handlePlatformChange = (platformId: string) => {
-    setSelectedPlatform(platformId);
-    setFilters({
-      ...filters,
-      platformIds: platformId ? [platformId] : []
-    });
-  };
-
-  const handleTypeChange = (typeId: string) => {
-    setSelectedType(typeId);
-    setFilters({
-      ...filters,
-      articleTypeIds: typeId ? [typeId] : []
-    });
-  };
 
   // 获取编辑中的文章数据
   const editingArticle = editingId
@@ -201,33 +184,85 @@ function ArticlesTab() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">平台筛选</label>
-            <select
-              value={selectedPlatform}
-              onChange={(e) => handlePlatformChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            >
-              <option value="">全部</option>
+            <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-md p-2 bg-white">
+              <label className="flex items-center mb-1">
+                <input
+                  type="checkbox"
+                  checked={filters.platformIds.length === 0}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setFilters({...filters, platformIds: []});
+                    }
+                  }}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3 w-3"
+                />
+                <span className="ml-2 text-xs text-gray-700">全部</span>
+              </label>
               {platforms?.map((platform) => (
-                <option key={platform.id} value={platform.id}>
-                  {platform.name}
-                </option>
+                <label key={platform.id} className="flex items-center mb-1">
+                  <input
+                    type="checkbox"
+                    checked={filters.platformIds.includes(platform.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFilters({
+                          ...filters,
+                          platformIds: [...filters.platformIds, platform.id]
+                        });
+                      } else {
+                        setFilters({
+                          ...filters,
+                          platformIds: filters.platformIds.filter(id => id !== platform.id)
+                        });
+                      }
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3 w-3"
+                  />
+                  <span className="ml-2 text-xs text-gray-700">{platform.name}</span>
+                </label>
               ))}
-            </select>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">类型筛选</label>
-            <select
-              value={selectedType}
-              onChange={(e) => handleTypeChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            >
-              <option value="">全部</option>
+            <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-md p-2 bg-white">
+              <label className="flex items-center mb-1">
+                <input
+                  type="checkbox"
+                  checked={filters.articleTypeIds.length === 0}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setFilters({...filters, articleTypeIds: []});
+                    }
+                  }}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3 w-3"
+                />
+                <span className="ml-2 text-xs text-gray-700">全部</span>
+              </label>
               {articleTypes?.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
+                <label key={type.id} className="flex items-center mb-1">
+                  <input
+                    type="checkbox"
+                    checked={filters.articleTypeIds.includes(type.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFilters({
+                          ...filters,
+                          articleTypeIds: [...filters.articleTypeIds, type.id]
+                        });
+                      } else {
+                        setFilters({
+                          ...filters,
+                          articleTypeIds: filters.articleTypeIds.filter(id => id !== type.id)
+                        });
+                      }
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3 w-3"
+                  />
+                  <span className="ml-2 text-xs text-gray-700">{type.name}</span>
+                </label>
               ))}
-            </select>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">标题</label>
@@ -563,6 +598,7 @@ function PlatformsTab() {
     const name = formData.get('name') as string;
     const platformId = formData.get('platformId') as string;
     const description = formData.get('description') as string;
+    const wordCount = formData.get('wordCount') as string;
 
     if (editingId) {
       updatePlatform.mutate({
@@ -570,12 +606,14 @@ function PlatformsTab() {
         name,
         platformId,
         description,
+        wordCount,
       });
     } else {
       createPlatform.mutate({
         name,
         platformId,
         description,
+        wordCount,
       });
     }
   };
@@ -630,6 +668,15 @@ function PlatformsTab() {
               />
               <p className="text-xs text-gray-500 mt-1">只能包含字母、数字、下划线和短横线</p>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">字数要求</label>
+              <input
+                type="text"
+                name="wordCount"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="如：1000-1500字"
+              />
+            </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">平台描述</label>
               <textarea
@@ -677,6 +724,9 @@ function PlatformsTab() {
                 描述
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                字数要求
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
                 状态
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
@@ -703,6 +753,9 @@ function PlatformsTab() {
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {platform.description || '-'}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {platform.wordCount || '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {platform.isDefault ? (
@@ -995,39 +1048,73 @@ function TypesTab() {
 function ContentStructuresTab() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showNotesDialog, setShowNotesDialog] = useState(false);
+  const [notesContent, setNotesContent] = useState('');
 
-  // 模拟数据，实际应该从API获取
-  const [structures, setStructures] = useState([
-    {
-      id: '1',
-      title: '产品介绍模板',
-      content: '产品核心功能介绍...',
-      platform: '微信公众号',
-      articleType: '产品介绍',
-    },
-  ]);
-
+  // 使用数据库数据
+  const { data: structures, refetch: refetchStructures } = api.contentStructures.getAll.useQuery();
   const { data: platforms } = api.contentPlatforms.getAll.useQuery();
   const { data: articleTypes } = api.articleTypes.getAll.useQuery();
+
+  // CRUD 操作
+  const createStructure = api.contentStructures.create.useMutation({
+    onSuccess: () => {
+      refetchStructures();
+      setShowAddForm(false);
+    },
+  });
+
+  const updateStructure = api.contentStructures.update.useMutation({
+    onSuccess: () => {
+      refetchStructures();
+      setEditingId(null);
+    },
+  });
+
+  const deleteStructure = api.contentStructures.delete.useMutation({
+    onSuccess: () => {
+      refetchStructures();
+    },
+  });
+
+  // 从本地存储加载笔记内容
+  useEffect(() => {
+    const savedNotes = localStorage.getItem('writing-assistant-notes');
+    if (savedNotes) {
+      setNotesContent(savedNotes);
+    }
+  }, []);
+
+  // 保存笔记内容到本地存储
+  const handleSaveNotes = () => {
+    localStorage.setItem('writing-assistant-notes', notesContent);
+    alert('笔记已保存到浏览器本地存储');
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
-    const newStructure = {
-      id: editingId || Date.now().toString(),
-      title: formData.get('title') as string,
-      content: formData.get('content') as string,
-      platform: formData.get('platform') as string,
-      articleType: formData.get('articleType') as string,
-    };
+    const title = formData.get('title') as string;
+    const content = formData.get('content') as string;
+    const platformId = formData.get('platformId') as string;
+    const typeId = formData.get('typeId') as string;
 
     if (editingId) {
-      setStructures(structures.map(s => s.id === editingId ? newStructure : s));
-      setEditingId(null);
+      updateStructure.mutate({
+        id: editingId,
+        title,
+        content,
+        platformId,
+        typeId,
+      });
     } else {
-      setStructures([...structures, newStructure]);
-      setShowAddForm(false);
+      createStructure.mutate({
+        title,
+        content,
+        platformId,
+        typeId,
+      });
     }
   };
 
@@ -1037,23 +1124,32 @@ function ContentStructuresTab() {
   };
 
   const handleDelete = (id: string) => {
-    setStructures(structures.filter(s => s.id !== id));
+    deleteStructure.mutate({ id });
   };
 
-  const editingStructure = editingId ? structures.find(s => s.id === editingId) : null;
+  const editingStructure = editingId ? structures?.find(s => s.id === editingId) : null;
 
   return (
     <div className="space-y-6">
       {/* 添加按钮 */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium text-gray-900">内容结构列表</h3>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          添加结构
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowNotesDialog(true)}
+            className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            笔记
+          </button>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            添加结构
+          </button>
+        </div>
       </div>
 
       {/* 添加/编辑表单模态框 */}
@@ -1098,14 +1194,14 @@ function ContentStructuresTab() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">内容平台</label>
               <select
-                name="platform"
-                defaultValue={editingStructure?.platform || ''}
+                name="platformId"
+                defaultValue={editingStructure?.platformId || ''}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               >
                 <option value="">请选择平台</option>
                 {platforms?.map((platform) => (
-                  <option key={platform.id} value={platform.name}>
+                  <option key={platform.id} value={platform.id}>
                     {platform.name}
                   </option>
                 ))}
@@ -1114,14 +1210,14 @@ function ContentStructuresTab() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">文章类型</label>
               <select
-                name="articleType"
-                defaultValue={editingStructure?.articleType || ''}
+                name="typeId"
+                defaultValue={editingStructure?.typeId || ''}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               >
                 <option value="">请选择类型</option>
                 {articleTypes?.map((type) => (
-                  <option key={type.id} value={type.name}>
+                  <option key={type.id} value={type.id}>
                     {type.name}
                   </option>
                 ))}
@@ -1149,6 +1245,39 @@ function ContentStructuresTab() {
         </DialogContent>
       </Dialog>
 
+      {/* 笔记对话框 */}
+      <Dialog open={showNotesDialog} onOpenChange={setShowNotesDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+          <DialogHeader className="p-6 pb-4">
+            <DialogTitle>笔记本</DialogTitle>
+          </DialogHeader>
+          <div className="p-6 pt-0 flex flex-col h-full min-h-[60vh]">
+            <textarea
+              value={notesContent}
+              onChange={(e) => setNotesContent(e.target.value)}
+              className="w-full flex-1 min-h-[50vh] px-4 py-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
+              placeholder="在这里记录您的想法和内容..."
+            />
+            <div className="flex justify-end space-x-3 mt-4 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowNotesDialog(false)}
+                className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                关闭
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveNotes}
+                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                保存笔记
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* 结构列表 */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <table className="min-w-full divide-y divide-gray-200">
@@ -1172,7 +1301,7 @@ function ContentStructuresTab() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {structures.map((structure) => (
+            {structures?.map((structure) => (
               <tr key={structure.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   {structure.title}
@@ -1182,12 +1311,12 @@ function ContentStructuresTab() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                    {structure.platform}
+                    {structure.platform.name}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                    {structure.articleType}
+                    {structure.articleType.name}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -1213,7 +1342,7 @@ function ContentStructuresTab() {
           </tbody>
         </table>
 
-        {structures.length === 0 && (
+        {(!structures || structures.length === 0) && (
           <div className="text-center py-12">
             <AlertCircle className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">暂无内容结构</h3>

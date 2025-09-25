@@ -478,12 +478,17 @@ model ContentPlatform {
   name        String   @unique // 平台名称（如：微信公众号、知乎、小红书等）
   platformId  String   @unique // 平台英文ID（如：wechat, zhihu, xiaohongshu）
   description String?  // 平台描述
+  wordCount   String?  // 字数要求（描述性文字，如："1000-1500字"）
   isDefault   Boolean  @default(false) // 是否为默认项
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // 关联的采集文章
   collectedArticles CollectedArticlePlatform[]
+  // 关联的内容结构
+  contentStructures ContentStructure[]
+  // 关联的文章生成任务
+  generationTasks ArticleGenerationTask[]
 
   @@index([isDefault])
   @@index([platformId])
@@ -501,6 +506,8 @@ model ArticleType {
 
   // 关联的采集文章
   collectedArticles CollectedArticleType[]
+  // 关联的内容结构
+  contentStructures ContentStructure[]
 
   @@index([isDefault])
   @@index([typeId])
@@ -550,4 +557,66 @@ model CollectedArticleType {
   @@unique([articleId, typeId])
   @@index([articleId])
   @@index([typeId])
+}
+
+// 内容结构表 - 写作辅助模块
+model ContentStructure {
+  id          String   @id @default(cuid())
+  title       String   // 结构标题
+  content     String   // 结构内容
+  platformId  String   // 关联的内容平台ID
+  typeId      String   // 关联的文章类型ID
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联关系
+  platform    ContentPlatform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  articleType ArticleType     @relation(fields: [typeId], references: [id], onDelete: Cascade)
+
+  @@index([platformId])
+  @@index([typeId])
+  @@index([createdAt])
+}
+
+// 文章生成任务表 - 写作辅助模块
+model ArticleGenerationTask {
+  id                      String   @id @default(cuid())
+  topic                   String   // 内容主题
+  platformId              String   // 内容平台ID
+  referenceArticleIds     String?  // 参考文章IDs（JSON数组）
+  referenceArticleCount   Int      @default(0) // 参考文章数量
+  additionalRequirements  String?  // 附加要求
+  useContentStructure     Boolean  @default(false) // 是否使用内容结构
+  contentStructureId      String?  // 内容结构ID
+  status                  String   @default("pending") // pending, processing, completed, failed
+  errorMessage            String?  // 错误信息
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  // 关联关系
+  platform ContentPlatform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  result   ArticleGenerationResult?
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([platformId])
+}
+
+// 文章生成结果表 - 写作辅助模块
+model ArticleGenerationResult {
+  id               String   @id @default(cuid())
+  taskId           String   @unique // 关联任务ID
+  generatedContent String   // 生成的文章内容
+  wordCount        Int      // 实际字数
+  aiProvider       String   // AI供应商
+  aiModel          String   // AI模型
+  generatedAt      DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // 关联关系
+  task ArticleGenerationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([generatedAt])
 }

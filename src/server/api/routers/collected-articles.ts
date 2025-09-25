@@ -131,6 +131,7 @@ export const collectedArticlesRouter = createTRPCRouter({
         data: {
           title: input.title,
           author: input.author,
+          content: input.content,
           platforms: {
             create: input.platformIds.map(platformId => ({
               platformId,
@@ -173,7 +174,7 @@ export const collectedArticlesRouter = createTRPCRouter({
       // 更新基本信息
       const updateOperations: any = {
         where: { id },
-        data: updateData,
+        data: { ...updateData },
       };
 
       // 如果提供了平台ID，更新平台关联
