@@ -20,14 +20,15 @@ function unauthorizedResponse() {
 }
 
 // GET - 获取单个采集文章
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     if (!validateApiKey(request)) {
       return unauthorizedResponse();
     }
 
+    const { id } = await params;
     const article = await prisma.collectedArticle.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         platforms: {
           include: {
@@ -72,12 +73,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 // PUT - 更新采集文章
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     if (!validateApiKey(request)) {
       return unauthorizedResponse();
     }
 
+    const { id } = await params;
     const body = await request.json();
     const { title, author, content, platformIds, articleTypeIds } = body;
 
@@ -142,7 +144,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
       // 先删除现有关联
       await prisma.collectedArticlePlatform.deleteMany({
-        where: { articleId: params.id },
+        where: { articleId: id },
       });
 
       updateData.platforms = {
@@ -180,7 +182,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
       // 先删除现有关联
       await prisma.collectedArticleType.deleteMany({
-        where: { articleId: params.id },
+        where: { articleId: id },
       });
 
       updateData.articleTypes = {
@@ -191,7 +193,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     const updatedArticle = await prisma.collectedArticle.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         platforms: {
@@ -238,14 +240,15 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE - 删除采集文章
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     if (!validateApiKey(request)) {
       return unauthorizedResponse();
     }
 
+    const { id } = await params;
     await prisma.collectedArticle.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({

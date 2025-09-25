@@ -4198,7 +4198,7 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
     path: '/api/external/writing-assistant/url2text',
     title: 'URL转文本',
     description: '将网页URL转换为结构化文本内容（标题、作者、正文）',
-    parameters: [
+    params: [
       {
         name: 'url',
         type: 'string',

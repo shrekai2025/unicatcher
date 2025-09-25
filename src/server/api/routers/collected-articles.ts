@@ -163,6 +163,7 @@ export const collectedArticlesRouter = createTRPCRouter({
       id: z.string(),
       title: z.string().min(1, "标题不能为空").optional(),
       author: z.string().min(1, "作者不能为空").optional(),
+      content: z.string().optional(),
       platformIds: z.array(z.string()).optional(),
       articleTypeIds: z.array(z.string()).optional(),
     }))

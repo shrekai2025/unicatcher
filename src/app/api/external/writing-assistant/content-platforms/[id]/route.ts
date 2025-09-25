@@ -20,14 +20,15 @@ function unauthorizedResponse() {
 }
 
 // GET - 获取单个内容平台
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     if (!validateApiKey(request)) {
       return unauthorizedResponse();
     }
 
+    const { id } = await params;
     const platform = await prisma.contentPlatform.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!platform) {
@@ -60,12 +61,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 // PUT - 更新内容平台
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     if (!validateApiKey(request)) {
       return unauthorizedResponse();
     }
 
+    const { id } = await params;
     const body = await request.json();
     const { name, platformId, description, isDefault } = body;
 
@@ -107,7 +109,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     const updatedPlatform = await prisma.contentPlatform.update({
-      where: { id: params.id },
+      where: { id: id },
       data: updateData,
     });
 
@@ -156,15 +158,16 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE - 删除内容平台
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     if (!validateApiKey(request)) {
       return unauthorizedResponse();
     }
 
+    const { id } = await params;
     // 检查是否为默认平台
     const platform = await prisma.contentPlatform.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     if (!platform) {
@@ -188,7 +191,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     await prisma.contentPlatform.delete({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     return NextResponse.json({

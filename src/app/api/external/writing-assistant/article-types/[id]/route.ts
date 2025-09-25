@@ -20,14 +20,15 @@ function unauthorizedResponse() {
 }
 
 // GET - 获取单个文章类型
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     if (!validateApiKey(request)) {
       return unauthorizedResponse();
     }
 
+    const { id } = await params;
     const articleType = await prisma.articleType.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!articleType) {
@@ -60,12 +61,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 // PUT - 更新文章类型
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     if (!validateApiKey(request)) {
       return unauthorizedResponse();
     }
 
+    const { id } = await params;
     const body = await request.json();
     const { name, typeId, description, isDefault } = body;
 
@@ -107,7 +109,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     const updatedType = await prisma.articleType.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
     });
 
@@ -156,15 +158,16 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE - 删除文章类型
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     if (!validateApiKey(request)) {
       return unauthorizedResponse();
     }
 
+    const { id } = await params;
     // 检查是否为默认类型
     const articleType = await prisma.articleType.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!articleType) {
@@ -188,7 +191,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     await prisma.articleType.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({
