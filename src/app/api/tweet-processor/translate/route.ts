@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { OpenAIService } from '~/server/core/ai/providers/openai-service';
-import { ZhipuService } from '~/server/core/ai/providers/zhipu-service';
+import { AIServiceFactory } from '~/server/core/ai/ai-factory';
 import type { AIConfig } from '~/server/core/ai/base/ai-types';
 
 /**
@@ -40,7 +39,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 验证AI配置
+    // 验证AI配置 (允许直接传入aiConfig，用于内部调用)
     if (!aiConfig || !aiConfig.apiKey || !aiConfig.provider || !aiConfig.model) {
       return NextResponse.json(
         {
@@ -51,11 +50,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!['openai', 'openai-badger', 'zhipu'].includes(aiConfig.provider)) {
+    if (!['openai', 'openai-badger', 'zhipu', 'anthropic'].includes(aiConfig.provider)) {
       return NextResponse.json(
         {
           success: false,
-          error: { code: 'INVALID_REQUEST', message: 'Invalid aiConfig provider, must be openai|openai-badger|zhipu' }
+          error: { code: 'INVALID_REQUEST', message: 'Invalid aiConfig provider, must be openai|openai-badger|zhipu|anthropic' }
         },
         { status: 400 }
       );
@@ -76,12 +75,7 @@ export async function POST(request: NextRequest) {
     console.log(`[独立翻译API] 原文内容: ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}`);
 
     // 创建AI服务实例
-    let aiService;
-    if (aiConfig.provider === 'zhipu') {
-      aiService = new ZhipuService(aiConfig as AIConfig);
-    } else {
-      aiService = new OpenAIService(aiConfig as AIConfig);
-    }
+    const aiService = AIServiceFactory.createService(aiConfig as AIConfig);
 
     // 执行翻译
     const translationResult = await aiService.translateTweet(content, targetLanguage);

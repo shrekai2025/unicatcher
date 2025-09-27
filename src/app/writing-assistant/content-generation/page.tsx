@@ -53,8 +53,7 @@ export default function ContentGenerationPage() {
   const [aiConfig, setAiConfig] = useState({
     provider: 'openai',
     model: 'gpt-4o',
-    apiKey: '',
-    baseURL: '',
+    systemPrompt: '',
   });
 
   const [form, setForm] = useState<ArticleGenerationForm>({
@@ -152,10 +151,7 @@ export default function ContentGenerationPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.topic || !form.platformId || !aiConfig.apiKey) {
-      if (!aiConfig.apiKey) {
-        alert('请先配置AI设置中的API密钥');
-      }
+    if (!form.topic || !form.platformId) {
       return;
     }
 
@@ -168,7 +164,9 @@ export default function ContentGenerationPage() {
       enableContentStructure: form.enableContentStructure,
       structureFilters: form.structureFilters,
       additionalRequirements: form.additionalRequirements || undefined,
-      aiConfig: aiConfig,
+      aiProvider: aiConfig.provider,
+      aiModel: aiConfig.model,
+      systemPrompt: aiConfig.systemPrompt || undefined,
     });
   };
 
@@ -263,34 +261,29 @@ export default function ContentGenerationPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">API Key</label>
-                  <input
-                    type="password"
-                    value={aiConfig.apiKey}
-                    onChange={(e) => saveAIConfig({ ...aiConfig, apiKey: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="输入您的API密钥"
-                  />
+                <div className="col-span-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    💡 API密钥和Base URL现在在<a href="/ai-settings" className="underline font-medium">综合AI设置</a>中统一管理
+                  </p>
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Base URL (可选)</label>
-                  <input
-                    type="text"
-                    value={aiConfig.baseURL}
-                    onChange={(e) => saveAIConfig({ ...aiConfig, baseURL: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="自定义API地址（如有）"
-                  />
+              {/* 系统提示词配置 */}
+              <div className="mt-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">系统提示词 (可选)</label>
+                <textarea
+                  value={aiConfig.systemPrompt}
+                  onChange={(e) => saveAIConfig({ ...aiConfig, systemPrompt: e.target.value })}
+                  rows={8}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  placeholder="输入自定义系统提示词，用于指导AI生成内容的风格和要求..."
+                />
+                <div className="mt-1 text-xs text-gray-500">
+                  系统提示词将影响AI的写作风格和内容生成方式，留空则使用默认设置
                 </div>
               </div>
 
               <div className="mt-4 flex items-center text-sm text-gray-500">
-                <div className="flex items-center mr-4">
-                  <div className={`w-2 h-2 rounded-full mr-2 ${aiConfig.apiKey ? 'bg-green-500' : 'bg-red-500'}`} />
-                  API密钥状态: {aiConfig.apiKey ? '已配置' : '未配置'}
-                </div>
                 <div className="text-xs">配置将自动保存到本地</div>
               </div>
             </div>
@@ -301,15 +294,11 @@ export default function ContentGenerationPage() {
         <div className="mb-6">
           <button
             onClick={() => setShowForm(true)}
-            disabled={!aiConfig.apiKey}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-4 w-4 mr-2" />
             开始撰写文章
           </button>
-          {!aiConfig.apiKey && (
-            <p className="mt-2 text-sm text-red-600">请先配置AI设置中的API密钥</p>
-          )}
         </div>
 
         {/* 任务历史 */}

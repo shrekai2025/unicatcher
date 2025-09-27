@@ -44,7 +44,7 @@ export class CommentGenerator {
       console.log(`[评论生成器] 使用AI供应商: ${aiConfig.provider}`);
 
       // 4. 构建AI提示词
-      const prompt = this.buildPrompt(request, tweet, existingComments, referenceData);
+      const prompt = await this.buildPrompt(request, tweet, existingComments, referenceData);
 
       // 5. 调用AI服务生成评论
       const aiService = AIServiceFactory.createService(aiConfig);
@@ -232,12 +232,12 @@ export class CommentGenerator {
   /**
    * 构建AI提示词
    */
-  private buildPrompt(
+  private async buildPrompt(
     request: CommentGenerateRequest,
     tweet: Tweet,
     existingComments: CommentData[],
     referenceData: Array<{content: string}> = []
-  ): string {
+  ): Promise<string> {
     const { language, commentLength, commentCount, userInfo, systemPrompt } = request;
 
     // 语言设置
@@ -260,41 +260,44 @@ export class CommentGenerator {
 
     const lengthPrompt = lengthPrompts[language][commentLength];
 
-    // 构建基础提示词
-    let prompt = systemPrompt || `你是一个社交媒体评论助手。${langPrompt}。
+    // 获取系统提示词模板
+    let template = systemPrompt || '';
 
-请为以下推文生成 ${commentCount} 条评论回复：
-
-推文内容：
-"${tweet.content}"
-
-要求：
-- 评论长度：${lengthPrompt}
-- 评论数量：${commentCount} 条
-- 语言：${language === 'zh-CN' ? '简体中文' : '美国英语'}
-- 评论态度参考并跟随下面的'用户补充信息'（优先）和'现有评论'，如果没有明显倾向，则以平和、稍微肯定的态度来表达，但不要同现有评论过于雷同
-- 可以使用口语化语言，自然、真实，避免AI生成的味道，且符合社交媒体风格`;
-
-    // 添加用户信息
-    if (userInfo) {
-      prompt += `\n\n用户补充信息：\n${userInfo}`;
+    // 如果用户没有提供自定义提示词，从数据库获取
+    if (!template) {
+      const config = await db.aICommentConfig.findFirst({
+        orderBy: { createdAt: 'desc' }
+      });
+      template = config?.systemPromptTemplate || '';
     }
 
-    // 添加现有评论参考
-    if (existingComments.length > 0) {
-      prompt += `\n\n现有评论参考：\n`;
-      existingComments.slice(0, 10).forEach((comment, index) => {
-        prompt += `${index + 1}. ${comment.content}\n`;
-      });
-    }
+    // 如果数据库也没有，使用空字符串（用户自行配置）
+    let prompt = template;
 
-    // 添加参考推文数据
-    if (referenceData.length > 0) {
-      prompt += `\n\n参考推文数据：\n以下是同类型推文的表达方式参考，请学习它们的语言风格和表达方式，但不要吸收与当前推文无关的具体信息：\n`;
-      referenceData.forEach((ref, index) => {
-        prompt += `${index + 1}. ${ref.content}\n`;
-      });
-      prompt += `\n请参考以上推文的表达风格和语言习惯来生成评论，但确保评论内容与当前推文内容相关。`;
+    // 准备可选数据
+    const userInfoText = userInfo || '';
+    const typeText = request.type || '';
+    const existingCommentsText = existingComments.length > 0
+      ? existingComments.slice(0, 10).map((comment, index) => `${index + 1}. ${comment.content}`).join('\n')
+      : '';
+    const referenceDataText = referenceData.length > 0
+      ? referenceData.map((ref, index) => `${index + 1}. ${ref.content}`).join('\n')
+      : '';
+
+    // 替换所有占位符
+    if (prompt) {
+      prompt = prompt
+        .replace(/\{\{langPrompt\}\}/g, langPrompt)
+        .replace(/\{\{commentCount\}\}/g, commentCount.toString())
+        .replace(/\{\{tweetContent\}\}/g, tweet.content)
+        .replace(/\{\{lengthPrompt\}\}/g, lengthPrompt)
+        .replace(/\{\{language\}\}/g, language === 'zh-CN' ? '简体中文' : '美国英语')
+        .replace(/\{\{authorUsername\}\}/g, tweet.userUsername || '')
+        .replace(/\{\{authorNickname\}\}/g, tweet.userNickname || '')
+        .replace(/\{\{userInfo\}\}/g, userInfoText)
+        .replace(/\{\{type\}\}/g, typeText)
+        .replace(/\{\{existingComments\}\}/g, existingCommentsText)
+        .replace(/\{\{referenceData\}\}/g, referenceDataText);
     }
 
     // 输出格式要求

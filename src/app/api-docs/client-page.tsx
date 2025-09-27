@@ -2869,8 +2869,15 @@ curl -X POST http://43.153.84.145:3067/api/external/ai-batch/continue \\
         name: 'systemPrompt',
         type: 'string',
         required: false,
-        description: '自定义系统提示词',
+        description: '自定义系统提示词（会覆盖/ai-settings中配置的默认提示词）',
         example: '请生成专业且友好的评论回复'
+      },
+      {
+        name: 'type',
+        type: 'string',
+        required: false,
+        description: '评论类型，用于拼接到系统提示词中的{{type}}占位符。可根据场景自定义，如："技术讨论"、"产品反馈"、"营销推广"等',
+        example: '技术讨论型'
       },
       {
         name: 'existingComments',

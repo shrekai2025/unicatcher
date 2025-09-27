@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       language = 'zh-CN',
       userInfo = '',
       systemPrompt = '',
+      type = '',
 
       // 现有评论相关（可选，一般不会使用因为是外部传入）
       existingComments = [],
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[独立评论生成API] 为推文生成 ${commentCount} 条${commentLength}评论, 语言: ${language}, AI供应商: ${aiConfig.provider}, 推文ID: ${tweetId || 'N/A'}, 参考分类: ${referenceTweetCategoryId || '无'}, 参考数量: ${referenceCount}`);
+    console.log(`[独立评论生成API] 为推文生成 ${commentCount} 条${commentLength}评论, 语言: ${language}, AI供应商: ${aiConfig.provider}, 推文ID: ${tweetId || 'N/A'}, 参考分类: ${referenceTweetCategoryId || '无'}, 参考数量: ${referenceCount}, 类型: ${type || '无'}`);
 
     // 为了调用内部API，我们需要提供一个临时tweetId（不会存储到数据库）
     const tempTweetId = tweetId || `temp-${Date.now()}`;
@@ -171,6 +172,7 @@ export async function POST(request: NextRequest) {
         tweetUrl: tweetUrl,
         userInfo: userInfo,
         systemPrompt: systemPrompt,
+        type: type,
         includeExistingComments: existingComments.length > 0,
         commentCount: commentCount,
         commentLength: commentLength,

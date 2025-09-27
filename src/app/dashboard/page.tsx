@@ -100,13 +100,22 @@ export default function DashboardPage() {
   };
 
   const headerActions = (
-    <Link
-      href="/x-login"
-      className="inline-flex items-center px-4 py-2 rounded-md bg-black text-white hover:bg-gray-900 transition-colors"
-    >
-      <span className="mr-2">🐦</span>
-      X 无头登录
-    </Link>
+    <div className="flex items-center space-x-3">
+      <Link
+        href="/ai-settings"
+        className="inline-flex items-center px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+      >
+        <span className="mr-2">⚙️</span>
+        综合AI设置
+      </Link>
+      <Link
+        href="/x-login"
+        className="inline-flex items-center px-4 py-2 rounded-md bg-black text-white hover:bg-gray-900 transition-colors"
+      >
+        <span className="mr-2">🐦</span>
+        X 无头登录
+      </Link>
+    </div>
   );
 
   return (

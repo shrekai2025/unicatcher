@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
 import { db } from '~/server/db';
 import { AIProcessManager } from '~/server/core/ai/process-manager';
+import { AIConfigLoader } from '~/server/core/ai/config-loader';
 import type { Prisma } from '@prisma/client';
 
 // 全局实例，避免重复声明
@@ -393,15 +394,14 @@ export const tweetProcessingRouter = createTRPCRouter({
       batchSize: z.number().min(1).max(100).default(10),
       batchProcessingMode: z.enum(['optimized', 'traditional']).default('optimized'),
       systemPrompt: z.string().optional(),
-      aiConfig: z.object({
-        apiKey: z.string().min(1),
-        provider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic']).default('openai'),
-        model: z.string().default('gpt-4o'),
-        baseURL: z.string().optional(),
-      }),
+      aiProvider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic']).default('openai'),
+      aiModel: z.string().default('gpt-4o'),
     }))
     .mutation(async ({ input }) => {
-      const { filterConfig, batchSize, batchProcessingMode, systemPrompt, aiConfig } = input;
+      const { filterConfig, batchSize, batchProcessingMode, systemPrompt, aiProvider, aiModel } = input;
+
+      // 从数据库加载统一配置
+      const aiConfig = await AIConfigLoader.getConfig(aiProvider, aiModel);
       
       // 生成批次ID
       const batchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
@@ -440,6 +440,8 @@ export const tweetProcessingRouter = createTRPCRouter({
       // 🔥 重构：使用processManager统一启动任务，避免竞态条件
       // 不再手动创建数据库记录，让processManager内部处理
       try {
+        console.log(`[tRPC AI批处理] 使用统一配置: ${aiProvider}, 模型: ${aiModel}`);
+
         await processManager.startBatchProcess({
           batchId,
           filterConfig,
@@ -487,15 +489,14 @@ export const tweetProcessingRouter = createTRPCRouter({
       batchSize: z.number().min(1).max(100).default(10),
       batchProcessingMode: z.enum(['optimized', 'traditional']).default('optimized'),
       systemPrompt: z.string().optional(),
-      aiConfig: z.object({
-        apiKey: z.string().min(1),
-        provider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic']).default('openai'),
-        model: z.string().default('gpt-4o'),
-        baseURL: z.string().optional(),
-      }),
+      aiProvider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic']).default('openai'),
+      aiModel: z.string().default('gpt-4o'),
     }))
     .mutation(async ({ input }) => {
-      const { previousBatchId, filterConfig, batchSize, batchProcessingMode, systemPrompt, aiConfig } = input;
+      const { previousBatchId, filterConfig, batchSize, batchProcessingMode, systemPrompt, aiProvider, aiModel } = input;
+
+      // 从数据库加载统一配置
+      const aiConfig = await AIConfigLoader.getConfig(aiProvider, aiModel);
       
       // 生成新的批次ID
       const newBatchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
@@ -531,6 +532,8 @@ export const tweetProcessingRouter = createTRPCRouter({
       // 🔥 重构：使用processManager统一启动任务，避免竞态条件
       // 不再手动创建数据库记录，让processManager内部处理
       try {
+        console.log(`[tRPC AI批处理] 继续处理使用统一配置: ${aiProvider}, 模型: ${aiModel}`);
+
         await processManager.startBatchProcess({
           batchId: newBatchId,
           filterConfig,

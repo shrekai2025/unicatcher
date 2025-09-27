@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { AIServiceFactory } from "~/server/core/ai/ai-factory";
+import { AIConfigLoader } from "~/server/core/ai/config-loader";
 
 export const articleGenerationRouter = createTRPCRouter({
   // 创建生成任务
@@ -20,12 +21,9 @@ export const articleGenerationRouter = createTRPCRouter({
         typeId: z.string().optional(),
       }).optional(),
       additionalRequirements: z.string().optional(),
-      aiConfig: z.object({
-        provider: z.string().min(1, "请选择AI供应商"),
-        model: z.string().min(1, "请选择模型"),
-        apiKey: z.string().min(1, "请输入API密钥"),
-        baseURL: z.string().optional(),
-      }),
+      aiProvider: z.string().min(1, "请选择AI供应商"),
+      aiModel: z.string().min(1, "请选择模型"),
+      systemPrompt: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       // 1. 获取参考文章（如果启用）
@@ -77,9 +75,9 @@ export const articleGenerationRouter = createTRPCRouter({
           additionalRequirements: input.additionalRequirements,
           useContentStructure: input.enableContentStructure,
           contentStructureId,
-          aiProvider: input.aiConfig.provider,
-          aiModel: input.aiConfig.model,
-          aiBaseURL: input.aiConfig.baseURL,
+          aiProvider: input.aiProvider,
+          aiModel: input.aiModel,
+          aiBaseURL: null,
           status: "pending",
         },
         include: {
@@ -88,7 +86,7 @@ export const articleGenerationRouter = createTRPCRouter({
       });
 
       // 4. 异步处理文章生成
-      processArticleGeneration(task.id, input.aiConfig).catch(console.error);
+      processArticleGeneration(task.id, input.aiProvider, input.aiModel, input.systemPrompt).catch(console.error);
 
       return task;
     }),
@@ -188,7 +186,7 @@ export const articleGenerationRouter = createTRPCRouter({
 });
 
 // 异步处理文章生成的函数
-async function processArticleGeneration(taskId: string, aiConfig: { provider: string; model: string; apiKey: string; baseURL?: string }) {
+async function processArticleGeneration(taskId: string, aiProvider: string, aiModel: string, systemPrompt?: string) {
   const db = (await import("~/server/db")).db;
 
   try {
@@ -258,15 +256,11 @@ ${article.content || "（无正文内容）"}`;
 
     prompt += `\n\n请直接输出内容，不需要额外的说明或格式标记。`;
 
-    // 调用AI服务生成文章
-    const dynamicAiConfig = {
-      provider: aiConfig.provider as any,
-      apiKey: aiConfig.apiKey,
-      model: aiConfig.model,
-      baseURL: aiConfig.baseURL || undefined,
-    };
+    // 从数据库加载统一配置
+    const aiConfig = await AIConfigLoader.getConfig(aiProvider, aiModel);
 
-    const aiService = AIServiceFactory.createService(dynamicAiConfig);
+    // 调用AI服务生成文章
+    const aiService = AIServiceFactory.createService(aiConfig);
     const generatedContent = await aiService.generateText(prompt);
 
     // 计算字数
@@ -278,8 +272,8 @@ ${article.content || "（无正文内容）"}`;
         taskId: task.id,
         generatedContent,
         wordCount,
-        aiProvider: dynamicAiConfig.provider,
-        aiModel: dynamicAiConfig.model,
+        aiProvider,
+        aiModel,
       },
     });
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { AIConfigLoader } from '~/server/core/ai/config-loader';
 
 /**
  * 推文翻译独立外部API (无需数据库)
@@ -27,7 +28,8 @@ export async function POST(request: NextRequest) {
     const {
       content,
       targetLanguage = 'zh-CN',
-      aiConfig,
+      aiProvider = 'openai',
+      aiModel = 'gpt-4o',
       // 可选的推文元数据，用于记录但不存储到数据库
       tweetId,
       tweetUrl,
@@ -46,44 +48,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 验证AI配置
-    if (!aiConfig) {
+    // 验证AI提供商
+    if (!['openai', 'openai-badger', 'zhipu', 'anthropic'].includes(aiProvider)) {
       return NextResponse.json(
         {
           success: false,
-          error: { code: 'INVALID_REQUEST', message: 'Missing aiConfig' }
+          error: { code: 'INVALID_REQUEST', message: 'Invalid aiProvider: must be openai|openai-badger|zhipu|anthropic' }
         },
         { status: 400 }
       );
     }
 
-    if (!aiConfig.apiKey || typeof aiConfig.apiKey !== 'string') {
+    // 从数据库加载统一配置
+    let aiConfig;
+    try {
+      aiConfig = await AIConfigLoader.getConfig(aiProvider, aiModel);
+    } catch (error) {
+      console.error('[独立翻译API] 加载配置失败:', error);
       return NextResponse.json(
         {
           success: false,
-          error: { code: 'INVALID_REQUEST', message: 'Invalid aiConfig: apiKey is required' }
+          error: {
+            code: 'CONFIG_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to load AI config'
+          }
         },
-        { status: 400 }
-      );
-    }
-
-    if (!aiConfig.provider || !['openai', 'openai-badger', 'zhipu'].includes(aiConfig.provider)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: { code: 'INVALID_REQUEST', message: 'Invalid aiConfig: provider must be openai|openai-badger|zhipu' }
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!aiConfig.model || typeof aiConfig.model !== 'string') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: { code: 'INVALID_REQUEST', message: 'Invalid aiConfig: model is required' }
-        },
-        { status: 400 }
+        { status: 500 }
       );
     }
 
@@ -98,7 +88,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[独立翻译API] 翻译内容长度: ${content.length}字符, 目标语言: ${targetLanguage}, AI供应商: ${aiConfig.provider}, 推文ID: ${tweetId || 'N/A'}`);
+    console.log(`[独立翻译API] 翻译内容长度: ${content.length}字符, 目标语言: ${targetLanguage}, AI供应商: ${aiProvider}, 推文ID: ${tweetId || 'N/A'}`);
 
     // 调用内部翻译接口
     const internalResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/tweet-processor/translate`, {
@@ -147,8 +137,8 @@ export async function POST(request: NextRequest) {
         // 翻译配置信息
         originalLanguage: result.data?.originalLanguage,
         targetLanguage: result.data?.targetLanguage || targetLanguage,
-        translationProvider: aiConfig.provider,
-        translationModel: aiConfig.model,
+        translationProvider: aiProvider,
+        translationModel: aiModel,
         translatedAt: new Date().toISOString()
       }
     });

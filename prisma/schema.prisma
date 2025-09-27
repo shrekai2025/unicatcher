@@ -624,3 +624,28 @@ model ArticleGenerationResult {
   @@index([taskId])
   @@index([generatedAt])
 }
+
+// AI评论配置表 - 存储AI评论生成的系统提示词模板
+model AICommentConfig {
+  id                   String   @id @default(cuid())
+  systemPromptTemplate String   // 带占位符的系统提示词模板
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("ai_comment_config")
+}
+
+// AI服务商配置表 - 统一存储各个AI服务商的key和baseURL
+model AIProviderConfig {
+  id        String   @id @default(cuid())
+  provider  String   @unique // openai, openai-badger, zhipu, anthropic
+  apiKey    String   // API密钥
+  baseURL   String?  // 可选的自定义base URL
+  isActive  Boolean  @default(true) // 是否启用
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([provider])
+  @@index([isActive])
+  @@map("ai_provider_config")
+}

@@ -98,9 +98,11 @@ export default function TweetProcessingPage() {
   const [newListIdForm, setNewListIdForm] = useState({ listId: '', name: '' });
 
   // AI 配置状态
-  const [aiConfig, setAIConfig] = useState<AIConfig>({
-    apiKey: '',
-    provider: 'openai' as const,
+  const [aiConfig, setAIConfig] = useState<{
+    provider: 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
+    model: string;
+  }>({
+    provider: 'openai',
     model: 'gpt-4o',
   });
 
@@ -489,11 +491,6 @@ export default function TweetProcessingPage() {
 
   // 启动 AI 处理
   const handleStartAIProcess = () => {
-    if (!aiConfig.apiKey) {
-      alert('请先配置 OpenAI API Key');
-      return;
-    }
-
     const requestConfig = {
       filterConfig: {
         listIds: effectiveListIds.length > 0 ? effectiveListIds : undefined,
@@ -504,7 +501,8 @@ export default function TweetProcessingPage() {
       batchSize,
       batchProcessingMode,
       systemPrompt: systemPrompt.trim() === DEFAULT_SYSTEM_PROMPT.trim() ? '' : systemPrompt.trim(),
-      aiConfig,
+      aiProvider: aiConfig.provider,
+      aiModel: aiConfig.model,
     };
 
     console.log('[前台] 🚀 启动AI批量处理任务');
@@ -515,11 +513,10 @@ export default function TweetProcessingPage() {
       AI配置: {
         provider: aiConfig.provider,
         model: aiConfig.model,
-        baseURL: aiConfig.baseURL,
       },
       系统提示词长度: requestConfig.systemPrompt?.length || '使用默认',
     });
-    
+
     startAIProcess.mutate(requestConfig);
   };
 
@@ -920,7 +917,7 @@ export default function TweetProcessingPage() {
                 {!isProcessing ? (
                   <button
                     onClick={handleStartAIProcess}
-                    disabled={!aiConfig.apiKey || startAIProcess.isPending}
+                    disabled={startAIProcess.isPending}
                     className="px-4 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300"
                   >
                     {startAIProcess.isPending ? '启动中...' : '开始处理'}
@@ -1671,17 +1668,12 @@ export default function TweetProcessingPage() {
             </div>
             
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">API Key</label>
-                <input
-                  type="password"
-                  value={aiConfig.apiKey}
-                  onChange={(e) => setAIConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                  placeholder="输入 OpenAI API Key"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  💡 API密钥和Base URL现在在<a href="/ai-settings" className="underline font-medium">综合AI设置</a>中统一管理
+                </p>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">AI 提供商</label>
                 <select

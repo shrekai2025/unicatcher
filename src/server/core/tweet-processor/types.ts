@@ -104,6 +104,7 @@ export interface CommentGenerateRequest {
   tweetId: string;
   userInfo?: string; // 用户提供的额外信息
   systemPrompt?: string; // 自定义系统提示词
+  type?: string; // 评论类型，用于拼接到系统提示词中
   includeExistingComments?: boolean; // 是否基于现有评论，默认false
   commentCount: 1 | 2 | 3 | 4 | 5 | 6 | 7; // 生成评论数量
   commentLength: 'short' | 'medium' | 'long'; // 评论长度

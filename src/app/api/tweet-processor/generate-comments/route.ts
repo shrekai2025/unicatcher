@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
       tweetUrl,
       userInfo,
       systemPrompt,
+      type,
       includeExistingComments = false,
       commentCount = 2,
       commentLength = 'medium',
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`[AI评论生成API] 处理请求: ${tweetId} (用户信息: ${userInfo ? '有' : '无'}, 基于现有评论: ${includeExistingComments}, 数量: ${commentCount}, 长度: ${commentLength}, 语言: ${language}, 参考分类: ${referenceTweetCategoryId || '无'}, 参考数量: ${referenceCount})`);
+    console.log(`[AI评论生成API] 处理请求: ${tweetId} (用户信息: ${userInfo ? '有' : '无'}, 基于现有评论: ${includeExistingComments}, 数量: ${commentCount}, 长度: ${commentLength}, 语言: ${language}, 参考分类: ${referenceTweetCategoryId || '无'}, 参考数量: ${referenceCount}, 类型: ${type || '无'})`);
 
     // 构建请求对象
     const generateRequest: CommentGenerateRequest = {
@@ -168,6 +169,7 @@ export async function POST(request: NextRequest) {
       tweetUrl,
       userInfo,
       systemPrompt,
+      type,
       includeExistingComments,
       commentCount: commentCount as 1 | 2 | 3 | 4 | 5 | 6 | 7,
       commentLength: commentLength as 'short' | 'medium' | 'long',
