@@ -7,6 +7,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { StorageService } from "~/server/core/data/storage";
 import { AIServiceFactory } from "~/server/core/ai/ai-factory";
+import { AIConfigLoader } from "~/server/core/ai/config-loader";
 import { db } from "~/server/db";
 
 const storageService = new StorageService();
@@ -575,16 +576,12 @@ export const tweetsRouter = createTRPCRouter({
     .input(
       z.object({
         tweetId: z.string().min(1, "推文ID不能为空"),
-        aiConfig: z.object({
-          apiKey: z.string().min(1),
-          provider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic']).default('openai'),
-          model: z.string().default('gpt-4o'),
-          baseURL: z.string().optional(),
-        }),
+        aiProvider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic']).default('openai'),
+        aiModel: z.string().default('gpt-4o'),
       })
     )
     .mutation(async ({ input }) => {
-      const { tweetId, aiConfig } = input;
+      const { tweetId, aiProvider, aiModel } = input;
 
       try {
         // 获取推文数据
@@ -605,6 +602,9 @@ export const tweetsRouter = createTRPCRouter({
 
         console.log(`[推文翻译] 开始翻译推文: ${tweetId}`);
 
+        // 从数据库加载统一配置
+        const aiConfig = await AIConfigLoader.getConfig(aiProvider, aiModel);
+
         // 创建AI服务实例
         const aiService = AIServiceFactory.createService(aiConfig);
 
@@ -620,8 +620,8 @@ export const tweetsRouter = createTRPCRouter({
             translatedContent: translationResult.translatedContent,
             originalLanguage: translationResult.originalLanguage,
             isTranslated: translationResult.isTranslated,
-            translationProvider: aiConfig.provider,
-            translationModel: aiConfig.model,
+            translationProvider: aiProvider,
+            translationModel: aiModel,
             translatedAt: new Date(),
           },
           select: {

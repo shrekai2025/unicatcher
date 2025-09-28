@@ -166,8 +166,8 @@ export default function XHelperPage() {
       return;
     }
 
-    if (!translationAIConfig.apiKey || !commentAIConfig.apiKey) {
-      alert('请先配置AI密钥');
+    if (!translationAIConfig.provider || !commentAIConfig.provider) {
+      alert('请先配置AI供应商');
       setShowAIConfig(true);
       return;
     }
@@ -185,8 +185,10 @@ export default function XHelperPage() {
         },
         body: JSON.stringify({
           tweetUrl,
-          translationAIConfig,
-          commentAIConfig,
+          translationAIProvider: translationAIConfig.provider,
+          translationAIModel: translationAIConfig.model,
+          commentAIProvider: commentAIConfig.provider,
+          commentAIModel: commentAIConfig.model,
           userExtraInfo,
           systemPrompt
         })
@@ -380,7 +382,8 @@ export default function XHelperPage() {
         body: JSON.stringify({
           content: currentTask.tweetContent,
           targetLanguage: 'zh-CN',
-          aiConfig: translationAIConfig
+          aiProvider: translationAIConfig.provider,
+          aiModel: translationAIConfig.model
         })
       });
 

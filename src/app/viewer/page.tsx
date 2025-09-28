@@ -61,15 +61,20 @@ export default function ViewerPage() {
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
   const [currentVideo, setCurrentVideo] = useState<VideoData | null>(null);
 
-  // AI翻译配置状态
+  // AI翻译配置状态（只保存 provider 和 model，apiKey 从数据库统一读取）
   const [showAIConfigModal, setShowAIConfigModal] = useState(false);
   const [aiConfig, setAIConfig] = useState<AIConfig>(() => {
-    // 从localStorage读取翻译AI配置
+    // 从localStorage读取翻译AI配置（只需要 provider 和 model）
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('unicatcher-translation-ai-config');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          return {
+            provider: parsed.provider || 'openai',
+            model: parsed.model || 'gpt-4o',
+            apiKey: '', // 不再使用，保留字段以兼容类型
+          };
         } catch (e) {
           console.warn('翻译AI配置解析失败:', e);
         }
@@ -362,15 +367,11 @@ export default function ViewerPage() {
 
   // 处理翻译按钮点击
   const handleTranslate = async (tweetId: string) => {
-    if (!aiConfig.apiKey) {
-      setShowAIConfigModal(true);
-      return;
-    }
-
     setTranslationError('');
     await translateTweet.mutateAsync({
       tweetId,
-      aiConfig,
+      aiProvider: aiConfig.provider,
+      aiModel: aiConfig.model,
     });
   };
 
@@ -1265,33 +1266,24 @@ export default function ViewerPage() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
               <h3 className="text-lg font-semibold mb-4">翻译AI配置</h3>
-              
+
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm text-blue-800">
+                  💡 API密钥现在在 <a href="/ai-settings" className="underline font-medium">AI设置页面</a> 统一管理，这里只需选择使用的供应商和模型。
+                </p>
+              </div>
+
               <form onSubmit={(e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
                 const config = {
-                  apiKey: formData.get('apiKey') as string,
+                  apiKey: '',
                   provider: formData.get('provider') as 'openai' | 'openai-badger' | 'zhipu' | 'anthropic',
                   model: formData.get('model') as string,
-                  baseURL: formData.get('baseURL') as string || undefined,
                 };
                 saveAIConfig(config);
               }}>
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      API密钥
-                    </label>
-                    <input
-                      type="password"
-                      name="apiKey"
-                      defaultValue={aiConfig.apiKey}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="输入您的API密钥"
-                      required
-                    />
-                  </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       AI供应商
@@ -1343,19 +1335,6 @@ export default function ViewerPage() {
                       <option value="claude-3-opus-20240229">Claude-3-Opus</option>
                       <option value="claude-3-sonnet-20240229">Claude-3-Sonnet</option>
                     </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      基础URL (可选)
-                    </label>
-                    <input
-                      type="url"
-                      name="baseURL"
-                      defaultValue={aiConfig.baseURL || ''}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="自定义API端点URL"
-                    />
                   </div>
                 </div>
 

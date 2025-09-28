@@ -26,8 +26,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       tweetUrl,
-      translationAIConfig,
-      commentAIConfig,
+      translationAIProvider = 'openai',
+      translationAIModel = 'gpt-4o',
+      commentAIProvider = 'openai',
+      commentAIModel = 'gpt-4o',
       userExtraInfo = '',
       systemPrompt = ''
     } = body;
@@ -43,21 +45,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!translationAIConfig || !translationAIConfig.provider || !translationAIConfig.apiKey) {
+    // 验证AI提供商
+    if (!['openai', 'openai-badger', 'zhipu', 'anthropic'].includes(translationAIProvider)) {
       return NextResponse.json(
         {
           success: false,
-          error: { code: 'INVALID_AI_CONFIG', message: 'Missing or invalid translation AI configuration' }
+          error: { code: 'INVALID_REQUEST', message: 'Invalid translationAIProvider: must be openai|openai-badger|zhipu|anthropic' }
         },
         { status: 400 }
       );
     }
 
-    if (!commentAIConfig || !commentAIConfig.provider || !commentAIConfig.apiKey) {
+    if (!['openai', 'openai-badger', 'zhipu', 'anthropic'].includes(commentAIProvider)) {
       return NextResponse.json(
         {
           success: false,
-          error: { code: 'INVALID_AI_CONFIG', message: 'Missing or invalid comment AI configuration' }
+          error: { code: 'INVALID_REQUEST', message: 'Invalid commentAIProvider: must be openai|openai-badger|zhipu|anthropic' }
         },
         { status: 400 }
       );
@@ -93,7 +96,7 @@ export async function POST(request: NextRequest) {
     console.log(`[X Helper API] 创建任务: ${task.id}`);
 
     // 异步处理推文
-    processTweetAsync(task.id, tweetUrl, tweetId, translationAIConfig, commentAIConfig, userExtraInfo, systemPrompt)
+    processTweetAsync(task.id, tweetUrl, tweetId, translationAIProvider, translationAIModel, commentAIProvider, commentAIModel, userExtraInfo, systemPrompt)
       .catch(error => {
         console.error(`[X Helper API] 异步处理失败:`, error);
         // 更新任务状态为失败
@@ -143,8 +146,10 @@ async function processTweetAsync(
   taskId: string,
   tweetUrl: string,
   tweetId: string,
-  translationAIConfig: any,
-  commentAIConfig: any,
+  translationAIProvider: string,
+  translationAIModel: string,
+  commentAIProvider: string,
+  commentAIModel: string,
   userExtraInfo: string,
   systemPrompt: string
 ) {
@@ -185,8 +190,8 @@ async function processTweetAsync(
 
     // 2. 翻译推文
     console.log(`[X Helper Async] === 第2步：开始翻译推文 ===`);
-    console.log(`[X Helper Async] 翻译供应商: ${translationAIConfig.provider}`);
-    console.log(`[X Helper Async] 翻译模型: ${translationAIConfig.model}`);
+    console.log(`[X Helper Async] 翻译供应商: ${translationAIProvider}`);
+    console.log(`[X Helper Async] 翻译模型: ${translationAIModel}`);
     const translationResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/external/translate`, {
       method: 'POST',
       headers: {
@@ -195,7 +200,9 @@ async function processTweetAsync(
       },
       body: JSON.stringify({
         content: tweetData.content,
-        aiConfig: translationAIConfig
+        targetLanguage: 'zh-CN',
+        aiProvider: translationAIProvider,
+        aiModel: translationAIModel
       })
     });
 
@@ -224,8 +231,8 @@ async function processTweetAsync(
 
     // 3. 生成AI评论（不参考现有评论）
     console.log(`[X Helper Async] === 第3步：开始生成AI评论 ===`);
-    console.log(`[X Helper Async] 评论供应商: ${commentAIConfig.provider}`);
-    console.log(`[X Helper Async] 评论模型: ${commentAIConfig.model}`);
+    console.log(`[X Helper Async] 评论供应商: ${commentAIProvider}`);
+    console.log(`[X Helper Async] 评论模型: ${commentAIModel}`);
     console.log(`[X Helper Async] 系统提示词: ${systemPrompt ? '已设置' : '使用默认'}`);
     console.log(`[X Helper Async] 用户信息: ${userExtraInfo ? '已提供' : '无'}`);
     console.log(`[X Helper Async] 参考现有评论: false`);
@@ -238,8 +245,9 @@ async function processTweetAsync(
       body: JSON.stringify({
         tweetId,
         content: tweetData.content,
-        aiConfig: commentAIConfig,
-        includeExistingComments: false, // 关键：不参考现有评论
+        aiProvider: commentAIProvider,
+        aiModel: commentAIModel,
+        includeExistingComments: false,
         userInfo: userExtraInfo,
         systemPrompt: systemPrompt,
         commentLength: 'medium',

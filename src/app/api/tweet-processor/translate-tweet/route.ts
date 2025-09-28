@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '~/server/db';
-import { OpenAIService } from '~/server/core/ai/providers/openai-service';
-import { ZhipuService } from '~/server/core/ai/providers/zhipu-service';
-import type { AIConfig } from '~/server/core/ai/base/ai-types';
+import { AIServiceFactory } from '~/server/core/ai/ai-factory';
+import { AIConfigLoader } from '~/server/core/ai/config-loader';
 
 /**
  * 推文翻译API
@@ -16,7 +15,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       tweetId,
-      aiConfig,
+      aiProvider = 'openai',
+      aiModel = 'gpt-4o',
       targetLanguage = 'zh-CN'
     } = body;
 
@@ -31,28 +31,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 验证AI配置
-    if (!aiConfig || !aiConfig.apiKey || !aiConfig.provider || !aiConfig.model) {
+    // 验证AI提供商
+    if (!['openai', 'openai-badger', 'zhipu', 'anthropic'].includes(aiProvider)) {
       return NextResponse.json(
         {
           success: false,
-          error: { code: 'INVALID_REQUEST', message: 'Missing or invalid aiConfig (apiKey, provider, model required)' }
+          error: { code: 'INVALID_REQUEST', message: 'Invalid aiProvider, must be openai|openai-badger|zhipu|anthropic' }
         },
         { status: 400 }
       );
     }
 
-    if (!['openai', 'openai-badger', 'zhipu'].includes(aiConfig.provider)) {
+    // 从数据库加载统一配置
+    let aiConfig;
+    try {
+      aiConfig = await AIConfigLoader.getConfig(aiProvider, aiModel);
+    } catch (error) {
+      console.error('[推文翻译API] 加载配置失败:', error);
       return NextResponse.json(
         {
           success: false,
-          error: { code: 'INVALID_REQUEST', message: 'Invalid aiConfig provider, must be openai|openai-badger|zhipu' }
+          error: {
+            code: 'CONFIG_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to load AI config'
+          }
         },
-        { status: 400 }
+        { status: 500 }
       );
     }
 
-    console.log(`[推文翻译API] 处理推文翻译: ${tweetId}, 供应商: ${aiConfig.provider}`);
+    console.log(`[推文翻译API] 处理推文翻译: ${tweetId}, 供应商: ${aiProvider}`);
 
     // 获取推文数据
     const tweet = await db.tweet.findUnique({
@@ -77,12 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 创建AI服务实例
-    let aiService;
-    if (aiConfig.provider === 'zhipu') {
-      aiService = new ZhipuService(aiConfig as AIConfig);
-    } else {
-      aiService = new OpenAIService(aiConfig as AIConfig);
-    }
+    const aiService = AIServiceFactory.createService(aiConfig);
 
     // 执行翻译
     const translationResult = await aiService.translateTweet(tweet.content, targetLanguage);
@@ -94,8 +97,8 @@ export async function POST(request: NextRequest) {
         translatedContent: translationResult.translatedContent,
         originalLanguage: translationResult.originalLanguage,
         isTranslated: translationResult.isTranslated,
-        translationProvider: aiConfig.provider,
-        translationModel: aiConfig.model,
+        translationProvider: aiProvider,
+        translationModel: aiModel,
         translatedAt: new Date()
       },
       select: {
