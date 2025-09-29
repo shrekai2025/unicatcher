@@ -184,7 +184,7 @@ export async function GET(request: NextRequest) {
         categoryName: text.category.name,
         tweetId: text.tweetId,
         userUsername: text.userUsername,
-        publishedAt: text.publishedAt,
+        publishedAt: text.publishedAt ? text.publishedAt.toString() : null,
         createdAt: text.createdAt,
         updatedAt: text.updatedAt
       }))
