@@ -105,30 +105,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 批量创建文本数据
-    // 注意：SQLite不支持skipDuplicates，需要手动处理重复
-    let createdCount = 0;
-    for (const item of data) {
-      try {
-        await prisma.manualTweetText.create({
-          data: {
-            categoryId: item.categoryId,
-            content: item.content.trim(),
-            tweetId: item.tweetId,
-            userUsername: item.userUsername,
-            publishedAt: BigInt(item.publishedAt)
-          }
-        });
-        createdCount++;
-      } catch (error: any) {
-        // 如果是唯一性约束错误，跳过
-        if (error.code === 'P2002') {
-          continue;
-        }
-        throw error;
-      }
-    }
-
-    const texts = { count: createdCount };
+    const texts = await prisma.manualTweetText.createMany({
+      data: data.map(item => ({
+        categoryId: item.categoryId,
+        content: item.content.trim(),
+        tweetId: item.tweetId,
+        userUsername: item.userUsername,
+        publishedAt: BigInt(item.publishedAt)
+      }))
+    });
 
     return NextResponse.json({
       success: true,

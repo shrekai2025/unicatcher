@@ -464,9 +464,9 @@ model ManualTweetText {
   id            Int      @id @default(autoincrement()) // 自增ID
   categoryId    String   // 分类ID
   content       String   // 文本内容
-  tweetId       String?  @unique // 推文ID（临时可选，迁移后改为必填）
-  userUsername  String?  // 推特用户名（临时可选，迁移后改为必填）
-  publishedAt   BigInt?  // 发布时间戳（临时可选，迁移后改为必填）
+  tweetId       String   @unique // 推文ID（必填，唯一）
+  userUsername  String   // 推特用户名（必填）
+  publishedAt   BigInt   // 发布时间戳（必填）
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
