@@ -51,6 +51,36 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+
+      if (!item.tweetId || typeof item.tweetId !== 'string') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: 'INVALID_REQUEST', message: 'Missing or invalid tweetId in data item' }
+          },
+          { status: 400 }
+        );
+      }
+
+      if (!item.userUsername || typeof item.userUsername !== 'string') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: 'INVALID_REQUEST', message: 'Missing or invalid userUsername in data item' }
+          },
+          { status: 400 }
+        );
+      }
+
+      if (!item.publishedAt || typeof item.publishedAt !== 'number') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: 'INVALID_REQUEST', message: 'Missing or invalid publishedAt (must be timestamp) in data item' }
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // 验证所有分类ID是否存在
@@ -75,12 +105,30 @@ export async function POST(request: NextRequest) {
     }
 
     // 批量创建文本数据
-    const texts = await prisma.manualTweetText.createMany({
-      data: data.map(item => ({
-        categoryId: item.categoryId,
-        content: item.content.trim()
-      }))
-    });
+    // 注意：SQLite不支持skipDuplicates，需要手动处理重复
+    let createdCount = 0;
+    for (const item of data) {
+      try {
+        await prisma.manualTweetText.create({
+          data: {
+            categoryId: item.categoryId,
+            content: item.content.trim(),
+            tweetId: item.tweetId,
+            userUsername: item.userUsername,
+            publishedAt: BigInt(item.publishedAt)
+          }
+        });
+        createdCount++;
+      } catch (error: any) {
+        // 如果是唯一性约束错误，跳过
+        if (error.code === 'P2002') {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    const texts = { count: createdCount };
 
     return NextResponse.json({
       success: true,
