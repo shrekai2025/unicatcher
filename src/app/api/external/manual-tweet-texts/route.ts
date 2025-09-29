@@ -182,6 +182,9 @@ export async function GET(request: NextRequest) {
         content: text.content,
         categoryId: text.categoryId,
         categoryName: text.category.name,
+        tweetId: text.tweetId,
+        userUsername: text.userUsername,
+        publishedAt: text.publishedAt,
         createdAt: text.createdAt,
         updatedAt: text.updatedAt
       }))

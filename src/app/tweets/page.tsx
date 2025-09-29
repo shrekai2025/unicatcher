@@ -926,25 +926,33 @@ export default function TweetsPage() {
                 <div key={tweet.id} className="px-6 py-4">
                   <div className="flex items-start space-x-4">
                     <div className="flex-shrink-0">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-600 font-medium text-sm">
-                          {tweet.categoryName?.[0] || 'M'}
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center border-2 border-blue-300">
+                        <span className="text-blue-700 font-semibold text-sm">
+                          {tweet.userUsername?.[0]?.toUpperCase() || 'U'}
                         </span>
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-sm font-medium text-gray-900">
-                          推文ID: {tweet.id}
+                      <div className="flex items-center space-x-3 mb-2">
+                        <span className="text-sm font-medium text-blue-600">
+                          @{tweet.userUsername}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          推文ID: {tweet.tweetId}
                         </span>
                         <span className="text-xs text-gray-500">
                           分类: {tweet.categoryName}
                         </span>
+                      </div>
+                      <div className="flex items-center space-x-3 mb-2">
                         <span className="text-xs text-gray-500">
-                          {new Date(tweet.createdAt).toLocaleString('zh-CN')}
+                          发布时间: {tweet.publishedAt ? new Date(Number(tweet.publishedAt)).toLocaleString('zh-CN') : '未知'}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          采集时间: {new Date(tweet.createdAt).toLocaleString('zh-CN')}
                         </span>
                       </div>
-                      <div className="text-gray-700 text-sm">
+                      <div className="text-gray-700 text-sm leading-relaxed">
                         {tweet.content}
                       </div>
                     </div>
