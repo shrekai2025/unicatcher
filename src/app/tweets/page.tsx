@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { DashboardLayout } from '~/components/dashboard-layout';
 import { api } from '~/trpc/react';
 import { getSession } from '~/lib/simple-auth';
@@ -8,6 +8,7 @@ import { CommentDialog } from '~/components/ui/comment-dialog';
 import { GenerateCommentDialog } from '~/components/ui/generate-comment-dialog';
 
 export default function TweetsPage() {
+  const [activeTab, setActiveTab] = useState<'auto' | 'manual'>('auto');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTweets, setSelectedTweets] = useState<string[]>([]);
@@ -16,6 +17,10 @@ export default function TweetsPage() {
   const [updatedTweets, setUpdatedTweets] = useState<{ [key: string]: any }>({});
   const [crawlingComments, setCrawlingComments] = useState<string[]>([]);
   const [commentStats, setCommentStats] = useState<{ [key: string]: any }>({});
+
+  // 手动采集推文的状态
+  const [manualTweets, setManualTweets] = useState<any[]>([]);
+  const [loadingManualTweets, setLoadingManualTweets] = useState(false);
 
   // 评论弹窗状态
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
@@ -72,6 +77,35 @@ export default function TweetsPage() {
   });
 
   const exportTweets = api.tweets.export.useMutation();
+
+  // 获取手动采集的推文
+  const fetchManualTweets = async () => {
+    if (activeTab !== 'manual') return;
+
+    setLoadingManualTweets(true);
+    try {
+      const response = await fetch('/api/external/manual-tweet-texts', {
+        headers: {
+          'x-api-key': 'unicatcher-api-key-demo'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setManualTweets(data.data || []);
+      }
+    } catch (error) {
+      console.error('获取手动采集推文失败:', error);
+    } finally {
+      setLoadingManualTweets(false);
+    }
+  };
+
+  // 当切换到手动采集tab时获取数据
+  React.useEffect(() => {
+    if (activeTab === 'manual') {
+      fetchManualTweets();
+    }
+  }, [activeTab]);
 
   const handleSearch = () => {
     setCurrentPage(1);
@@ -460,8 +494,37 @@ export default function TweetsPage() {
 
   return (
     <DashboardLayout actions={headerActions}>
-      {/* 搜索和操作区域 */}
-      <div className="mb-6 bg-white shadow rounded-lg p-6">
+      {/* Tab导航 */}
+      <div className="mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('auto')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'auto'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              🤖 自动爬虫
+            </button>
+            <button
+              onClick={() => setActiveTab('manual')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'manual'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              ✋ 手动采集
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      {/* 搜索和操作区域 - 只在自动爬虫tab显示 */}
+      {activeTab === 'auto' && (
+        <div className="mb-6 bg-white shadow rounded-lg p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex-1 max-w-lg">
             <input
@@ -482,10 +545,12 @@ export default function TweetsPage() {
             </button>
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
-      {/* 推文列表 */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      {/* 自动爬虫推文列表 */}
+      {activeTab === 'auto' && (
+        <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h3 className="text-lg leading-6 font-medium text-gray-900">
@@ -823,7 +888,73 @@ export default function TweetsPage() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
+
+      {/* 手动采集推文列表 */}
+      {activeTab === 'manual' && (
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg leading-6 font-medium text-gray-900">
+                手动采集推文列表
+              </h3>
+              <button
+                onClick={() => fetchManualTweets()}
+                disabled={loadingManualTweets}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {loadingManualTweets ? '刷新中...' : '刷新'}
+              </button>
+            </div>
+          </div>
+
+          <div className="divide-y divide-gray-200">
+            {loadingManualTweets ? (
+              <div className="px-6 py-12 text-center">
+                <div className="text-gray-500">加载中...</div>
+              </div>
+            ) : manualTweets.length === 0 ? (
+              <div className="px-6 py-12 text-center">
+                <div className="text-gray-500 mb-4">暂无手动采集的推文</div>
+                <p className="text-sm text-gray-400">
+                  通过 POST /api/external/manual-tweet-texts 接口添加推文数据
+                </p>
+              </div>
+            ) : (
+              manualTweets.map((tweet: any) => (
+                <div key={tweet.id} className="px-6 py-4">
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-medium text-sm">
+                          {tweet.categoryName?.[0] || 'M'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="text-sm font-medium text-gray-900">
+                          推文ID: {tweet.id}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          分类: {tweet.categoryName}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(tweet.createdAt).toLocaleString('zh-CN')}
+                        </span>
+                      </div>
+                      <div className="text-gray-700 text-sm">
+                        {tweet.content}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 评论弹窗 */}
       <CommentDialog
