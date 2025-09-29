@@ -77,11 +77,39 @@ export function ApiEndpointCard({ endpoint }: { endpoint: ApiEndpoint }) {
     e.stopPropagation(); // 防止触发展开/收起
     try {
       const markdown = generateMarkdown();
-      await navigator.clipboard.writeText(markdown);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+
+      // 尝试使用现代 Clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(markdown);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      } else {
+        // 降级方案：使用 document.execCommand
+        const textArea = document.createElement('textarea');
+        textArea.value = markdown;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+
+        if (successful) {
+          setCopySuccess(true);
+          setTimeout(() => setCopySuccess(false), 2000);
+        } else {
+          // 最后降级：弹出文本框让用户手动复制
+          prompt('请手动复制以下内容:', markdown);
+        }
+      }
     } catch (err) {
       console.error('复制失败:', err);
+      // 降级方案：弹出文本框让用户手动复制
+      const markdown = generateMarkdown();
+      prompt('复制失败，请手动复制以下内容:', markdown);
     }
   };
 
