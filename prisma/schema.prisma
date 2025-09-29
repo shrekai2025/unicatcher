@@ -655,3 +655,19 @@ model AIProviderConfig {
   @@index([isActive])
   @@map("ai_provider_config")
 }
+
+// URL2Text结果存储表 - 写作辅助模块
+model URL2TextResult {
+  id          String   @id @default(cuid())
+  originalUrl String   // 原始任务URL
+  title       String?  // 提取的标题
+  author      String?  // 提取的作者
+  content     String?  // 提取的内容（text字段）
+  error       String?  // 错误信息
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([originalUrl])
+  @@index([createdAt])
+  @@map("url2text_result")
+}

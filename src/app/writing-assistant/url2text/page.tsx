@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { cn } from '~/lib/utils';
-import { Settings, Link as LinkIcon, Copy, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Settings, Link as LinkIcon, Copy, CheckCircle, AlertCircle, Loader2, History, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
 
@@ -23,6 +23,34 @@ interface ApiResponse {
   };
 }
 
+interface HistoryResult {
+  id: string;
+  originalUrl: string;
+  title?: string;
+  author?: string;
+  content?: string;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface HistoryApiResponse {
+  success: boolean;
+  data?: {
+    results: HistoryResult[];
+    pagination: {
+      total: number;
+      limit: number;
+      offset: number;
+      hasMore: boolean;
+    };
+  };
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
 export default function Url2TextPage() {
   const [authToken, setAuthToken] = useState('');
   const [url, setUrl] = useState('');
@@ -31,6 +59,11 @@ export default function Url2TextPage() {
   const [error, setError] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(false);
   const [copied, setCopied] = useState(false);
+  // 历史结果相关状态
+  const [historyResults, setHistoryResults] = useState<HistoryResult[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<HistoryResult | null>(null);
 
   // 从localStorage加载认证token
   useEffect(() => {
@@ -38,7 +71,66 @@ export default function Url2TextPage() {
     if (savedToken) {
       setAuthToken(savedToken);
     }
+    // 页面加载时获取历史结果
+    loadHistoryResults();
   }, []);
+
+  // 获取历史结果
+  const loadHistoryResults = async () => {
+    setIsLoadingHistory(true);
+    setHistoryError(null);
+
+    try {
+      const response = await fetch('/api/external/writing-assistant/url2text-result?limit=20&offset=0', {
+        method: 'GET',
+        headers: {
+          'x-api-key': 'unicatcher-api-key-demo',
+        },
+      });
+
+      const data: HistoryApiResponse = await response.json();
+
+      if (data.success && data.data) {
+        setHistoryResults(data.data.results);
+      } else {
+        setHistoryError(data.error?.message || '获取历史记录失败');
+      }
+    } catch (err) {
+      console.error('Load history error:', err);
+      setHistoryError('网络请求失败');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // 查看历史结果详情
+  const viewHistoryItem = (item: HistoryResult) => {
+    setSelectedHistoryItem(item);
+    if (item.title && item.author && item.content) {
+      setResult({
+        title: item.title,
+        author: item.author,
+        content: item.content
+      });
+    }
+    setUrl(item.originalUrl);
+    setError(item.error || null);
+  };
+
+  // 复制历史结果内容
+  const copyHistoryContent = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+    } catch (err) {
+      // 降级方案
+      const textArea = document.createElement('textarea');
+      textArea.value = content;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    }
+  };
 
   // 保存认证token到localStorage
   const saveAuthToken = (token: string) => {
@@ -80,6 +172,10 @@ export default function Url2TextPage() {
 
       if (data.success && data.data) {
         setResult(data.data);
+        // 转换成功后刷新历史记录
+        setTimeout(() => {
+          loadHistoryResults();
+        }, 1000);
       } else {
         setError(data.error?.message || '转换失败，请稍后重试');
       }
@@ -255,6 +351,128 @@ export default function Url2TextPage() {
             </div>
           </div>
         )}
+
+        {/* 历史结果列表 */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <History className="h-5 w-5 text-gray-500 mr-2" />
+                <h2 className="text-lg font-medium text-gray-900">历史记录</h2>
+                <span className="ml-2 text-sm text-gray-500">({historyResults.length} 条)</span>
+              </div>
+              <button
+                onClick={loadHistoryResults}
+                disabled={isLoadingHistory}
+                className="flex items-center px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-1", isLoadingHistory && "animate-spin")} />
+                刷新
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6">
+            {isLoadingHistory ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400 mr-2" />
+                <span className="text-gray-500">加载中...</span>
+              </div>
+            ) : historyError ? (
+              <div className="flex items-center justify-center py-8">
+                <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+                <span className="text-red-600">{historyError}</span>
+              </div>
+            ) : historyResults.length === 0 ? (
+              <div className="text-center py-8">
+                <History className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">暂无历史记录</p>
+                <p className="text-sm text-gray-400 mt-1">转换一些 URL 后，这里将显示历史结果</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {historyResults.map((item) => (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      "border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer",
+                      selectedHistoryItem?.id === item.id && "border-blue-300 bg-blue-50"
+                    )}
+                    onClick={() => viewHistoryItem(item)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        {/* URL 和时间 */}
+                        <div className="flex items-center mb-2">
+                          <LinkIcon className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+                          <span className="text-sm text-blue-600 truncate flex-1" title={item.originalUrl}>
+                            {item.originalUrl}
+                          </span>
+                          <span className="text-xs text-gray-400 ml-2 whitespace-nowrap">
+                            {new Date(item.createdAt).toLocaleString('zh-CN')}
+                          </span>
+                        </div>
+
+                        {/* 标题和作者 */}
+                        {(item.title || item.author) && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+                            {item.title && (
+                              <div>
+                                <span className="text-xs text-gray-500">标题：</span>
+                                <span className="text-sm text-gray-900 ml-1">{item.title}</span>
+                              </div>
+                            )}
+                            {item.author && (
+                              <div>
+                                <span className="text-xs text-gray-500">作者：</span>
+                                <span className="text-sm text-gray-900 ml-1">{item.author}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* 内容预览或错误信息 */}
+                        {item.error ? (
+                          <div className="flex items-center text-red-600">
+                            <AlertCircle className="h-4 w-4 mr-1" />
+                            <span className="text-sm">{item.error}</span>
+                          </div>
+                        ) : item.content ? (
+                          <div className="text-sm text-gray-600 line-clamp-2">
+                            {item.content.substring(0, 100)}...
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-400">无内容</div>
+                        )}
+                      </div>
+
+                      {/* 操作按钮 */}
+                      <div className="ml-4 flex items-center space-x-2">
+                        {item.content && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyHistoryContent(item.content!);
+                            }}
+                            className="text-gray-400 hover:text-gray-600 p-1"
+                            title="复制内容"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </button>
+                        )}
+                        {(item.title || item.author || item.content) && !item.error && (
+                          <div className="flex items-center text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* 配置模态框 */}
         <Dialog

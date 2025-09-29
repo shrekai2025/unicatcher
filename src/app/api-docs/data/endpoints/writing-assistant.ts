@@ -1136,5 +1136,146 @@ export const writingAssistantEndpoints: ApiEndpoint[] = [
     "url": "https://example.com/article-about-javascript",
     "authToken": "your-webhook-auth-token"
   }'`
+  },
+
+  // URL转文本结果存储 API
+  {
+    id: 'store-url2text-result',
+    method: 'POST',
+    path: '/api/external/writing-assistant/url2text-result',
+    title: '存储URL转文本结果',
+    description: '由webhook调用，用于存储URL转文本的处理结果到数据库',
+    params: [
+      {
+        name: 'originalUrl',
+        type: 'string',
+        required: true,
+        description: '原始任务URL地址'
+      },
+      {
+        name: 'title',
+        type: 'string',
+        required: false,
+        description: '提取的标题'
+      },
+      {
+        name: 'author',
+        type: 'string',
+        required: false,
+        description: '提取的作者'
+      },
+      {
+        name: 'text',
+        type: 'string',
+        required: false,
+        description: '提取的正文内容'
+      },
+      {
+        name: 'error',
+        type: 'string',
+        required: false,
+        description: '处理过程中的错误信息'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '存储成功',
+        example: {
+          success: true,
+          message: 'URL2Text结果已成功存储',
+          data: {
+            id: 'result_123',
+            originalUrl: 'https://example.com/article',
+            hasTitle: true,
+            hasAuthor: true,
+            hasContent: true,
+            hasError: false,
+            createdAt: '2024-01-15T10:30:00.000Z'
+          }
+        }
+      },
+      {
+        status: 400,
+        description: '参数错误',
+        example: {
+          success: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: '缺少或无效的originalUrl参数'
+          }
+        }
+      }
+    ],
+    example: `curl -X POST http://localhost:3067/api/external/writing-assistant/url2text-result \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: unicatcher-api-key-demo" \\
+  -d '{
+    "originalUrl": "https://example.com/article",
+    "title": "文章标题",
+    "author": "作者名",
+    "text": "文章正文内容...",
+    "error": null
+  }'`
+  },
+
+  // 获取URL转文本结果 API
+  {
+    id: 'get-url2text-results',
+    method: 'GET',
+    path: '/api/external/writing-assistant/url2text-result',
+    title: '获取URL转文本结果',
+    description: '获取存储的URL转文本处理结果列表，支持按URL筛选和分页',
+    queryParams: [
+      {
+        name: 'originalUrl',
+        type: 'string',
+        required: false,
+        description: '原始URL地址，用于筛选特定URL的结果'
+      },
+      {
+        name: 'limit',
+        type: 'number',
+        required: false,
+        description: '返回结果数量限制，默认10，最大100'
+      },
+      {
+        name: 'offset',
+        type: 'number',
+        required: false,
+        description: '分页偏移量，默认0'
+      }
+    ],
+    responses: [
+      {
+        status: 200,
+        description: '获取成功',
+        example: {
+          success: true,
+          data: {
+            results: [
+              {
+                id: 'result_123',
+                originalUrl: 'https://example.com/article',
+                title: '文章标题',
+                author: '作者名',
+                content: '文章正文内容...',
+                error: null,
+                createdAt: '2024-01-15T10:30:00.000Z',
+                updatedAt: '2024-01-15T10:30:00.000Z'
+              }
+            ],
+            pagination: {
+              total: 1,
+              limit: 10,
+              offset: 0,
+              hasMore: false
+            }
+          }
+        }
+      }
+    ],
+    example: `curl -X GET "http://localhost:3067/api/external/writing-assistant/url2text-result?originalUrl=https://example.com/article&limit=10&offset=0" \\
+  -H "x-api-key: unicatcher-api-key-demo"`
   }
 ];
