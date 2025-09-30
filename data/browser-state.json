@@ -5,7 +5,7 @@
       "value": "v1%3A175334063137680436",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1789836193.667188,
+      "expires": 1793771352.224908,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
@@ -15,7 +15,7 @@
       "value": "v1%3A175334063137680436",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1789836193.667135,
+      "expires": 1793771352.224858,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
@@ -125,7 +125,7 @@
       "value": "u%3D1097029752966266880",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1786812193.667203,
+      "expires": 1790747352.224921,
       "httpOnly": false,
       "secure": true,
       "sameSite": "None"
@@ -135,37 +135,17 @@
       "value": "fd7381e13e9646e6aa4adedc74324a07",
       "domain": ".x.com",
       "path": "/",
-      "expires": 1789836192,
+      "expires": 1793771365,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "IDE",
-      "value": "AHWqTUlPenOplBTXMcFXnqFa1AeObUb5jJkqKURqLop31E1ArOjSlEXZF_M7HDxRhXk",
+      "value": "AHWqTUmIa2jNt7MMiOxSISv2sgwArlOVjiZ_8Bk607yEap_hjMlzaSot2annuernilU",
       "domain": ".doubleclick.net",
       "path": "/",
-      "expires": 1789815842.284613,
-      "httpOnly": true,
-      "secure": true,
-      "sameSite": "None"
-    },
-    {
-      "name": "__cf_bm",
-      "value": "RpMjcsTv4fgT_Sj_MEaqCKdiS14s2GfTslTmwAP6sfM-1755276193-1.0.1.1-GT646fCGIwkxYznel5B.4Zopq9vBXT0Uo8Q6LcT.LP3qQFBGbEXyJGo6VVqtHnNxIyDyGsUyqxzb570801ZVTMZjDxueirrFotLwjXHMQRo",
-      "domain": ".x.com",
-      "path": "/",
-      "expires": 1755277993.887989,
-      "httpOnly": true,
-      "secure": true,
-      "sameSite": "None"
-    },
-    {
-      "name": "__cf_bm",
-      "value": "A4TRT_64DJ24V8da2PdroXTu_xDop6M3MNJbKCWWdbw-1755276196-1.0.1.1-ih9cFR9iVivKtZklFTpAIzYBJZITW871qqX2iY7hoYiVV3SB.MtjQWfQ.eQuJ6fbG3M0P4trExw2APYJkYJwwiwFKeRKtXpTiyxTvI2h6Bo",
-      "domain": ".twitter.com",
-      "path": "/",
-      "expires": 1755277996.1759,
+      "expires": 1793771314.992003,
       "httpOnly": true,
       "secure": true,
       "sameSite": "None"

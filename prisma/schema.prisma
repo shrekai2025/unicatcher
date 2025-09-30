@@ -72,11 +72,13 @@ model VerificationToken {
 // 爬虫任务表 - 记录爬取任务的状态和配置
 model SpiderTask {
   id          String   @id @default(cuid())
-  type        String   // 任务类型：twitter_list
-  listId      String   // Twitter List ID
+  type        String   // 任务类型：twitter_list, youtube_channel
+  listId      String?  // Twitter List ID (可选，YouTube任务不需要)
+  channelHandle String? // YouTube频道handle (YouTube任务专用)
   status      String   // 任务状态：created, queued, running, completed, failed
   result      String?  // 成功信息或错误信息（JSON格式）
   tweetCount  Int      @default(0) // 已爬取的推文数量
+  videoCount  Int      @default(0) // 已爬取的视频数量 (YouTube任务专用)
   startedAt   DateTime?
   completedAt DateTime?
   createdAt   DateTime @default(now())
@@ -84,10 +86,77 @@ model SpiderTask {
 
   // 关联的推文数据
   tweets Tweet[]
+  // 关联的YouTube视频数据
+  youtubeVideos YouTubeVideo[]
 
   @@index([status])
   @@index([type])
   @@index([listId])
+  @@index([channelHandle])
+}
+
+// YouTube视频数据表 - 存储爬取到的YouTube视频信息
+model YouTubeVideo {
+  id               String   @id // 视频ID（从YouTube URL提取）
+  title            String   // 视频标题
+  channelName      String   // 频道名称
+  channelHandle    String   // 频道handle (@username 或 channel/UC...)
+  channelUrl       String   // 频道链接
+  videoUrl         String   // 视频链接
+  thumbnailUrl     String?  // 缩略图链接
+  duration         String?  // 视频时长（如: "10:23"）
+  viewCount        Int      @default(0) // 播放次数
+  publishedAt      String?  // 发布时间文本（相对时间，如: "2 days ago"）
+  publishedTimestamp BigInt? // 发布时间戳（计算得出的绝对时间）
+  scrapedAt        BigInt   // 爬取时间戳
+
+  // 数据分析相关字段
+  analysisStatus    String?   // 分析状态: pending, synced, analyzed, failed
+  syncedAt          DateTime? // 数据同步时间
+  analyzedAt        DateTime? // 分析完成时间
+  analysisBatchId   String?   // 分析批次ID
+
+  // AI处理相关字段
+  keywords          String?   // AI提取的关键词（JSON数组格式）
+  topicTags         String?   // 命中的主题标签（JSON数组格式）
+  contentTypes      String?   // 内容类型（JSON数组格式）- 如教程、产品介绍等
+  isValueless       Boolean?  // 是否为无价值视频
+  aiProcessedAt     DateTime? // AI处理完成时间
+  aiProcessStatus   String?   // AI处理状态: pending, processing, completed, failed
+  aiRetryCount      Int      @default(0) // AI处理重试次数
+
+  // 翻译相关字段
+  translatedTitle       String?   // 翻译后的标题
+  originalLanguage      String?   // 原始语言代码
+  isTranslated          Boolean   @default(false) // 是否已翻译
+  translationProvider   String?   // 翻译供应商
+  translationModel      String?   // 翻译使用的模型
+  translatedAt          DateTime? // 翻译时间
+
+  // 逻辑删除相关字段
+  isDeleted  Boolean   @default(false) // 是否已被逻辑删除
+  deletedAt  DateTime? // 删除时间
+  deletedBy  String?   // 删除操作的用户
+
+  // 关联任务
+  taskId     String
+  task       SpiderTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([channelHandle])
+  @@index([publishedTimestamp])
+  @@index([taskId])
+  @@index([analysisStatus])
+  @@index([syncedAt])
+  @@index([isDeleted])
+  @@index([isDeleted, publishedTimestamp])
+  @@index([isDeleted, channelHandle])
+  @@index([aiProcessStatus])
+  @@index([isDeleted, aiProcessStatus])
+  @@index([isDeleted, channelHandle, publishedTimestamp])
+  @@index([viewCount])
 }
 
 // 推文数据表 - 存储爬取到的推文内容
@@ -116,6 +185,28 @@ model Tweet {
   analyzedAt        DateTime? // 分析完成时间
   analysisBatchId   String?   // 分析批次ID
   
+  // AI处理相关字段
+  keywords          String?   // AI提取的关键词（JSON数组格式）- 暂时保留
+  topicTags         String?   // 命中的主题标签（JSON数组格式）
+  contentTypes      String?   // 内容类型（JSON数组格式）- 如教程、产品介绍等
+  isValueless       Boolean?  // 是否为无价值推文（打招呼、日常生活等）
+  aiProcessedAt     DateTime? // AI处理完成时间
+  aiProcessStatus   String?   // AI处理状态: pending, processing, completed, failed
+  aiRetryCount      Int      @default(0) // AI处理重试次数
+  
+  // 翻译相关字段
+  translatedContent     String?   // 翻译后的中文内容
+  originalLanguage      String?   // 原始语言代码（如: en, ja, ko等）
+  isTranslated          Boolean   @default(false) // 是否已翻译
+  translationProvider   String?   // 翻译供应商: openai, zhipu, openai-badger
+  translationModel      String?   // 翻译使用的模型
+  translatedAt          DateTime? // 翻译时间
+  
+  // 逻辑删除相关字段
+  isDeleted  Boolean   @default(false) // 是否已被逻辑删除
+  deletedAt  DateTime? // 删除时间
+  deletedBy  String?   // 删除操作的用户
+  
   // 关联任务
   taskId     String
   task       SpiderTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -128,6 +219,112 @@ model Tweet {
   @@index([taskId])
   @@index([analysisStatus])
   @@index([syncedAt])
+  @@index([isDeleted])
+  @@index([isDeleted, publishedAt])
+  @@index([isDeleted, listId])
+  @@index([aiProcessStatus])
+  @@index([userUsername])
+  @@index([isDeleted, aiProcessStatus])
+  @@index([isDeleted, listId, publishedAt])
+}
+
+// 推文处理任务表 - 记录单推文处理任务的状态
+model TweetProcessTask {
+  id            String    @id @default(cuid())
+  tweetId       String    // 目标推文ID
+  taskType      String    // 任务类型: update_data, crawl_comments, generate_comments, x_helper_process
+  status        String    // 任务状态: queued, running, completed, failed
+  result        String?   // 任务结果（JSON格式）
+  errorMessage  String?   // 错误信息
+  startedAt     DateTime? // 开始时间
+  completedAt   DateTime? // 完成时间
+  lastUpdatedAt DateTime? // 数据最后更新时间（用于10分钟检查）
+
+  // X Helper 专用字段
+  tweetUrl          String?   // 推文链接
+  tweetContent      String?   // 推文正文
+  authorUsername    String?   // 发推者用户名
+  authorNickname    String?   // 发推者昵称
+  authorProfileImage String?  // 发推者头像
+  translatedContent String?   // 翻译结果
+  aiComments        String?   // AI生成的评论(JSON格式)
+  userExtraInfo     String?   // 用户额外信息
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tweetId, taskType])
+  @@index([status])
+  @@index([lastUpdatedAt])
+  @@index([createdAt])
+  @@index([taskType])
+}
+
+// 推文评论表 - 存储推文的评论数据
+model TweetComment {
+  id                String    @id @default(cuid())
+  tweetId           String    // 推文ID
+  commentId         String    @unique // 评论ID
+  content           String    // 评论内容
+  authorUsername    String    // 评论作者用户名
+  authorNickname    String    // 评论作者昵称
+  authorProfileImage String?  // 评论作者头像
+  replyCount        Int       @default(0) // 回复数
+  likeCount         Int       @default(0) // 点赞数
+  publishedAt       BigInt    // 发布时间戳
+  scrapedAt         BigInt    // 爬取时间戳
+  isReply           Boolean   @default(false) // 是否为回复
+  parentCommentId   String?   // 父评论ID
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([tweetId, publishedAt])
+  @@index([commentId])
+  @@index([tweetId])
+  @@index([parentCommentId])
+}
+
+// 评论爬取会话记录表 - 记录评论爬取任务的状态
+model CommentCrawlSession {
+  id              String    @id @default(cuid())
+  tweetId         String    // 推文ID
+  status          String    // 状态: running, completed, failed
+  totalComments   Int       @default(0) // 总评论数
+  newComments     Int       @default(0) // 新增评论数
+  lastCommentId   String?   // 最后处理的评论ID
+  isIncremental   Boolean   @default(false) // 是否为增量更新
+
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tweetId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+// AI生成评论记录表 - 记录AI评论生成的历史
+model AIGeneratedComment {
+  id                      String    @id @default(cuid())
+  tweetId                 String    // 推文ID
+  userInfo                String?   // 用户提供的额外信息
+  systemPrompt            String?   // 自定义系统提示词
+  commentLength           String    // 评论长度: short, medium, long
+  commentCount            Int       // 生成评论数量
+  generatedComments       String    // 生成的评论（JSON数组格式）
+  basedOnExisting         Boolean   @default(false) // 是否基于现有评论
+  existingCommentsSnapshot String?  // 现有评论快照（JSON格式）
+  aiProvider              String    // AI供应商
+  aiModel                 String    // AI模型
+
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([tweetId])
+  @@index([createdAt])
 }
 
 // 数据同步记录表 - 记录外部系统的数据获取历史
@@ -156,4 +353,692 @@ model DataSyncRecord {
   @@index([batchId])
   @@index([extractType])
   @@index([createdAt])
+}
+
+// 主题标签配置表 - 管理AI处理时需要匹配的主题标签
+model TopicTag {
+  id          String   @id @default(cuid())
+  name        String   @unique // 主题标签名称
+  description String?  // 标签描述
+  isActive    Boolean  @default(true) // 是否启用
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([name])
+}
+
+// 内容类型配置表 - 管理AI处理时需要匹配的内容类型
+model ContentType {
+  id          String   @id @default(cuid())
+  name        String   @unique // 内容类型名称（如：教程、产品介绍、产品试用等）
+  description String?  // 类型描述
+  isActive    Boolean  @default(true) // 是否启用
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([name])
+}
+
+// AI处理记录表 - 记录AI批处理的历史和状态
+model AIProcessRecord {
+  id            String    @id @default(cuid())
+  batchId       String    @unique // 批次ID
+  status        String    // 处理状态: processing, completed, failed, cancelled
+  totalTweets   Int       @default(0) // 总推文数
+  processedTweets Int     @default(0) // 已处理推文数
+  failedTweets  Int       @default(0) // 处理失败推文数
+  startedAt     DateTime  @default(now()) // 开始时间
+  completedAt   DateTime? // 完成时间
+  errorMessage  String?   // 错误信息
+  
+  // 处理配置
+  filterConfig  String?   // 筛选配置（JSON格式）
+  aiProvider    String    @default("openai") // AI提供商
+  aiModel       String    @default("gpt-4o") // AI模型
+  systemPrompt  String?   // 系统提示词
+  batchProcessingMode String? @default("optimized") // 批量处理模式
+  
+  // 详细记录 - 新增字段
+  requestDetails String?  // AI请求详情（JSON格式，包含完整请求参数）
+  responseDetails String? // AI响应详情（JSON格式，包含原始响应和解析结果）
+  processingLogs String?  // 处理日志（JSON数组格式，记录关键步骤）
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([startedAt])
+  @@index([batchId])
+  @@index([createdAt])
+}
+
+// List ID记录表 - 存储用户创建的List ID和名称
+model ListIdRecord {
+  id        String   @id @default(cuid())
+  listId    String   // Twitter List ID
+  name      String   // 用户自定义的名称
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([listId]) // 确保同一个listId不会重复
+  @@index([listId])
+  @@index([createdAt])
+}
+
+// YouTube频道记录表 - 存储用户监控的YouTube频道信息
+model YouTubeChannelRecord {
+  id            String   @id @default(cuid())
+  channelHandle String   // YouTube频道handle (@username 或 channel/UC... 或 username)
+  channelName   String   // 频道名称（用户自定义或自动获取）
+  channelUrl    String?  // 完整的频道链接
+  isActive      Boolean  @default(true) // 是否启用监控
+  lastCrawledAt DateTime? // 最后爬取时间
+  videoCount    Int      @default(0) // 已爬取的视频总数
+  notes         String?  // 用户备注
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([channelHandle]) // 确保同一个channelHandle不会重复
+  @@index([channelHandle])
+  @@index([isActive])
+  @@index([lastCrawledAt])
+  @@index([createdAt])
+}
+
+// 手采推文分类表
+model ManualTweetCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique // 分类名称唯一
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  texts     ManualTweetText[]
+
+  @@index([name])
+}
+
+// 手采推文文本数据表
+model ManualTweetText {
+  id            Int      @id @default(autoincrement()) // 自增ID
+  categoryId    String   // 分类ID
+  content       String   // 文本内容
+  tweetId       String   @unique // 推文ID（必填，唯一）
+  userUsername  String   // 推特用户名（必填）
+  publishedAt   BigInt   // 发布时间戳（必填）
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category      ManualTweetCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+  @@index([userUsername])
+  @@index([publishedAt])
+  @@index([tweetId])
+}
+
+// 内容平台表 - 写作辅助模块
+model ContentPlatform {
+  id          String   @id @default(cuid())
+  name        String   @unique // 平台名称（如：微信公众号、知乎、小红书等）
+  platformId  String   @unique // 平台英文ID（如：wechat, zhihu, xiaohongshu）
+  description String?  // 平台描述
+  wordCount   String?  // 字数要求（描述性文字，如："1000-1500字"）
+  isDefault   Boolean  @default(false) // 是否为默认项
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联的采集文章
+  collectedArticles CollectedArticlePlatform[]
+  // 关联的内容结构
+  contentStructures ContentStructure[]
+  // 关联的文章生成任务
+  generationTasks ArticleGenerationTask[]
+
+  @@index([isDefault])
+  @@index([platformId])
+}
+
+// 文章类型表 - 写作辅助模块
+model ArticleType {
+  id          String   @id @default(cuid())
+  name        String   @unique // 类型名称（如：教程、产品介绍、技术分享等）
+  typeId      String   @unique // 类型英文ID（如：tutorial, product, tech_sharing）
+  description String?  // 类型描述
+  isDefault   Boolean  @default(false) // 是否为默认项
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联的采集文章
+  collectedArticles CollectedArticleType[]
+  // 关联的内容结构
+  contentStructures ContentStructure[]
+
+  @@index([isDefault])
+  @@index([typeId])
+}
+
+// 采集文章表 - 写作辅助模块
+model CollectedArticle {
+  id          String   @id @default(cuid())
+  title       String   // 文章标题
+  author      String   // 原文作者
+  content     String?  // 文章内容
+  collectedAt DateTime @default(now()) // 采集时间（添加时间）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 多对多关联
+  platforms   CollectedArticlePlatform[] // 关联的内容平台（可多选）
+  articleTypes CollectedArticleType[]    // 关联的文章类型（可多选）
+
+  @@index([collectedAt])
+  @@index([author])
+}
+
+// 采集文章-内容平台关联表
+model CollectedArticlePlatform {
+  id        String @id @default(cuid())
+  articleId String
+  platformId String
+
+  article   CollectedArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  platform  ContentPlatform  @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, platformId])
+  @@index([articleId])
+  @@index([platformId])
+}
+
+// 采集文章-文章类型关联表
+model CollectedArticleType {
+  id        String @id @default(cuid())
+  articleId String
+  typeId    String
+
+  article     CollectedArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleType ArticleType      @relation(fields: [typeId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, typeId])
+  @@index([articleId])
+  @@index([typeId])
+}
+
+// 内容结构表 - 写作辅助模块
+model ContentStructure {
+  id          String   @id @default(cuid())
+  title       String   // 结构标题
+  content     String   // 结构内容
+  platformId  String   // 关联的内容平台ID
+  typeId      String   // 关联的文章类型ID
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联关系
+  platform    ContentPlatform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  articleType ArticleType     @relation(fields: [typeId], references: [id], onDelete: Cascade)
+
+  @@index([platformId])
+  @@index([typeId])
+  @@index([createdAt])
+}
+
+// 文章生成任务表 - 写作辅助模块
+model ArticleGenerationTask {
+  id                      String   @id @default(cuid())
+  topic                   String   // 内容主题
+  platformId              String   // 内容平台ID
+  username                String?  // 用户名，用于个性化风格
+  contentType             String?  // 内容类型，如"科普"、"观点表达"等
+  referenceArticleIds     String?  // 参考文章IDs（JSON数组）
+  referenceArticleCount   Int      @default(0) // 参考文章数量
+  additionalRequirements  String?  // 附加要求
+  useContentStructure     Boolean  @default(false) // 是否使用内容结构
+  contentStructureId      String?  // 内容结构ID
+  // AI配置字段
+  aiProvider              String   @default("openai") // AI供应商
+  aiModel                 String   @default("gpt-4o") // AI模型
+  aiBaseURL               String?  // AI API Base URL
+  status                  String   @default("pending") // pending, processing, completed, failed
+  errorMessage            String?  // 错误信息
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  // 关联关系
+  platform ContentPlatform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  result   ArticleGenerationResult?
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([platformId])
+  @@index([username])
+  @@index([contentType])
+}
+
+// 文章生成结果表 - 写作辅助模块
+model ArticleGenerationResult {
+  id               String   @id @default(cuid())
+  taskId           String   @unique // 关联任务ID
+
+  // 三阶段生成内容
+  generationStage  String   @default("final") @map("generation_stage") // 'outline', 'draft', 'final'
+  outlineContent   String?  @map("outline_content") // 大纲内容
+  draftContent     String?  @map("draft_content") // 初稿内容
+  finalContent     String?  @map("final_content") // 最终内容
+  generatedContent String   // 兼容原有字段，等同于finalContent
+  selfReviewNotes  String?  @map("self_review_notes") // 自查优化说明
+  stageTokens      String?  @map("stage_tokens") // 各阶段token消耗 JSON格式
+
+  // 基础信息
+  wordCount        Int      // 实际字数
+  aiProvider       String   // AI供应商
+  aiModel          String   // AI模型
+
+  // 用户反馈字段
+  userRating       Int?     @map("user_rating") // 1-5评分
+  userFeedback     String?  @map("user_feedback") // 具体反馈文本
+  feedbackTags     String?  @map("feedback_tags") // JSON格式的反馈标签
+  adjustmentTarget String?  @map("adjustment_target") // 'overview' | 'profile'
+  isImproved       Boolean  @default(false) @map("is_improved") // 是否已改进
+
+  // 时间字段
+  generatedAt      DateTime @default(now()) @map("generated_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // 关联关系
+  task ArticleGenerationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([generatedAt])
+  @@index([generationStage])
+  @@index([userRating])
+  @@index([adjustmentTarget])
+  @@map("article_generation_result")
+}
+
+// 反馈模式表 - 用户反馈的问题模式统计
+model FeedbackPattern {
+  id           String   @id @default(cuid())
+  username     String
+  contentType  String   @map("content_type") // 内容类型
+  feedbackType String   @map("feedback_type") // 'negative', 'positive', 'suggestion'
+  pattern      String   // 具体问题模式，如"太书面化"、"表达不够口语化"
+  frequency    Int      @default(1) // 出现频次
+  lastOccurred DateTime @map("last_occurred") // 最后出现时间
+  isResolved   Boolean  @default(false) @map("is_resolved") // 是否已解决
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([username, contentType, pattern])
+  @@index([username, contentType])
+  @@index([feedbackType, isResolved])
+  @@index([frequency])
+  @@index([lastOccurred])
+  @@map("feedback_pattern")
+}
+
+// AI评论配置表 - 存储AI评论生成的系统提示词模板
+model AICommentConfig {
+  id                   String   @id @default(cuid())
+  systemPromptTemplate String   // 带占位符的系统提示词模板
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("ai_comment_config")
+}
+
+// AI服务商配置表 - 统一存储各个AI服务商的key和baseURL
+model AIProviderConfig {
+  id        String   @id @default(cuid())
+  provider  String   @unique // openai, openai-badger, zhipu, anthropic, deepseek
+  apiKey    String   // API密钥
+  baseURL   String?  // 可选的自定义base URL
+  isActive  Boolean  @default(true) // 是否启用
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([provider])
+  @@index([isActive])
+  @@map("ai_provider_config")
+}
+
+// URL2Text结果存储表 - 写作辅助模块
+model URL2TextResult {
+  id          String   @id @default(cuid())
+  originalUrl String   // 原始任务URL
+  title       String?  // 提取的标题
+  author      String?  // 提取的作者
+  content     String?  // 提取的内容（text字段）
+  error       String?  // 错误信息
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([originalUrl])
+  @@index([createdAt])
+  @@map("url2text_result")
+}
+
+
+// 写作分析推文数据表 - 写作辅助模块的统一推文数据表
+model WritingAnalysisTweet {
+  id            String   @id @default(cuid())
+  content       String   // 推文内容
+  tweetId       String   @unique // 原始推文ID（用于排重）
+  userUsername  String   // 用户名
+  userNickname  String?  // 用户昵称（显示名）
+  publishedAt   BigInt   // 发布时间戳
+
+  // 数据来源标识
+  sourceType    String   // 数据来源：tweet, manual
+  sourceId      String   // 原始记录的ID
+
+  // 基础统计字段（从Tweet表继承，Manual类型默认为0）
+  replyCount    Int      @default(0) // 评论数
+  retweetCount  Int      @default(0) // 转发数
+  likeCount     Int      @default(0) // 点赞数
+  viewCount     Int      @default(0) // 浏览数
+
+  // 额外信息字段
+  profileImageUrl String? // 用户头像URL
+  tweetUrl      String?   // 推文完整链接
+  scrapedAt     BigInt?   // 爬取时间戳
+
+  // 数据提取相关信息
+  extractBatchId String?  // 提取批次ID
+  extractedAt   DateTime? // 提取时间
+  extractType   String?   @default("writing_assistant") // 提取类型
+
+  // 逻辑删除相关字段
+  isDeleted     Boolean  @default(false) // 是否已被逻辑删除
+  deletedAt     DateTime? // 删除时间
+  deletedBy     String?  // 删除操作的用户
+
+  // 写作风格分析字段（基于参考文档设计）
+  analysisStatus    String?   @default("pending") // 分析状态：pending, processing, completed, failed
+
+  // 文本预处理结果
+  cleanedContent    String?   // 清洗后的文本内容
+  textLength        Int?      // 字符数
+  wordCount         Int?      // 分词后词数
+  sentenceCount     Int?      // 句子数
+
+  // 语言风格分析结果（JSON格式存储）
+  lexicalFeatures   String?   // 词汇特征：词汇丰富度、复杂度、高频词等
+  syntaxFeatures    String?   // 句式特征：句长分布、句型占比、标点符号使用
+  rhetoricalFeatures String?  // 修辞特征：修辞手法、语气词、口语化程度等
+
+  // 内容分析结果
+  topicClassification String? // 主题分类结果（一级、二级主题）
+  contentDepthLevel  String?  // 内容深度等级：shallow, medium, deep
+  structurePattern   String?  // 结构模式分析结果
+
+  // 互动效果评分
+  engagementScore    Float?   // 互动评分（NES）
+  contentQualityScore Float?  // 内容质量评分（CQ）
+  overallScore       Float?   // 综合评分（OS）
+
+  // 处理时间记录
+  analyzedAt        DateTime? // 分析完成时间
+  batchId           String?   // 分析批次ID
+
+  // 标准时间字段
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // 关联的类型标注
+  typeAnnotations   TweetTypeAnnotation[]
+
+  @@index([userUsername])
+  @@index([publishedAt])
+  @@index([sourceType])
+  @@index([analysisStatus])
+  @@index([userUsername, publishedAt])
+  @@index([isDeleted])
+  @@index([extractBatchId])
+  @@index([extractedAt])
+  @@index([isDeleted, extractedAt])
+  @@index([createdAt])
+  @@map("writing_analysis_tweet")
+}
+
+// 推文类型配置表
+model TweetTypeConfig {
+  id                   String   @id @default(cuid())
+  typeName             String   @unique @map("type_name")
+  typeCategory         String   @map("type_category")
+  description          String?
+  typicalStructure     String?  @map("typical_structure")
+  commonOpenings       String?  @map("common_openings") // JSON
+  toneCharacteristics  String?  @map("tone_characteristics")
+  isActive             Boolean  @default(true) @map("is_active")
+
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("tweet_type_config")
+}
+
+// 推文类型标注表
+model TweetTypeAnnotation {
+  id               String   @id @default(cuid())
+  tweetId          String   @map("tweet_id")
+  username         String
+  tweetTypes       String   @map("tweet_types") // JSON: 推文类型及权重
+  confidenceScore  Float    @map("confidence_score")
+  annotationMethod String   @map("annotation_method") // auto/manual/hybrid
+  annotatedAt      DateTime @default(now()) @map("annotated_at")
+
+  // 关联到写作分析推文
+  tweet WritingAnalysisTweet @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+
+  @@index([username])
+  @@index([tweetId])
+  @@index([annotatedAt])
+  @@index([username, annotatedAt])
+  @@index([annotationMethod])
+  @@index([confidenceScore])
+  @@map("tweet_type_annotation")
+}
+
+// 用户风格档案表
+model UserStyleProfile {
+  id                       String   @id @default(cuid())
+  username                 String
+  contentType              String   @map("content_type") // 内容类型：如"科普"、"观点表达"等
+
+  // 词汇特征
+  signatureWords           String?  @map("signature_words") // JSON
+  vocabDiversity           Float?   @map("vocab_diversity")
+  wordComplexity           Float?   @map("word_complexity")
+
+  // 句式特征
+  avgSentenceLength        Float?   @map("avg_sentence_length")
+  sentenceTypeDist         String?  @map("sentence_type_dist") // JSON
+  punctuationPattern       String?  @map("punctuation_pattern") // JSON
+
+  // 专业度与行业知识处理
+  technicalTermUsage       Float?   @map("technical_term_usage") // 0-1
+  dataCitationStyle        String?  @map("data_citation_style") // JSON
+  professionalTopicStyle   String?  @map("professional_topic_style") // JSON
+  industryKnowledgeLevel   String?  @map("industry_knowledge_level") // basic/intermediate/expert
+
+  // 该类型下的常用开头和结尾模式
+  commonOpenings           String?  @map("common_openings") // JSON: 该类型常用开头
+  commonClosings           String?  @map("common_closings") // JSON: 该类型常用结尾
+  avgContentLength         Float?   @map("avg_content_length") // 该类型平均内容长度
+  toneFeatures             String?  @map("tone_features") // JSON: 该类型语调特征
+
+  // 样本统计
+  sampleCount              Int?     @map("sample_count") // 该类型样本数量
+  lastAnalyzedAt           DateTime? @map("last_analyzed_at") // 最后分析时间
+
+  // 生成配置
+  generationConfig         String?  @map("generation_config") // JSON
+
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  @@unique([username, contentType])
+  @@index([username])
+  @@index([contentType])
+  @@index([lastAnalyzedAt])
+  @@map("user_style_profile")
+}
+
+// 用户写作概览表 - LLM驱动的写作风格分析
+model UserWritingOverview {
+  id               String   @id @default(cuid())
+  username         String   @unique
+
+  // 概览内容（JSON格式存储完整的UserWritingOverview接口）
+  overviewContent  String   @map("overview_content") // JSON
+
+  // 元数据
+  totalTweetsAnalyzed Int    @default(0) @map("total_tweets_analyzed")
+  lastUpdated      DateTime @map("last_updated")
+  version          Int      @default(1)
+
+  // 更新历史（JSON格式记录主要更新）
+  updateHistory    String?  @map("update_history")
+
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // 关联的更新日志
+  updateLogs       OverviewUpdateLog[]
+
+  @@index([username])
+  @@index([lastUpdated])
+  @@index([version])
+  @@map("user_writing_overview")
+}
+
+// 概览更新日志表
+model OverviewUpdateLog {
+  id              String   @id @default(cuid())
+  username        String
+
+  // 更新信息
+  updateType      String   @map("update_type") // INITIAL, INCREMENTAL, MAJOR_REVISION
+  newTweetsCount  Int?     @map("new_tweets_count")
+  changesMade     String?  @map("changes_made") // JSON: 具体更改内容
+
+  // LLM信息
+  llmModel        String?  @map("llm_model")
+  promptTokens    Int?     @map("prompt_tokens")
+  completionTokens Int?    @map("completion_tokens")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // 关联到用户写作概览
+  userOverview    UserWritingOverview @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  @@index([username])
+  @@index([updateType])
+  @@index([createdAt])
+  @@index([username, createdAt])
+  @@map("overview_update_log")
+}
+
+// 写作辅助AI配置表 - 专门用于写作概览和生成功能的AI配置
+model WritingAssistantAIConfig {
+  id                String   @id @default(cuid())
+  configName        String   @unique // 配置名称，如：default, premium, fast等
+  provider          String   // AI供应商：openai, anthropic, zhipu等
+  model             String   // 模型名称
+  temperature       Float    @default(0.3) // 温度参数
+  maxTokens         Int      @default(4000) // 最大token数
+  isActive          Boolean  @default(true) // 是否启用
+  isDefault         Boolean  @default(false) // 是否为默认配置
+  description       String?  // 配置描述
+
+  // 特定配置
+  analysisModel     String?  // 用于分析的模型（可与生成模型不同）
+  generationModel   String?  // 用于生成的模型
+  updateCheckModel  String?  // 用于更新检查的快速模型
+
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([configName])
+  @@index([isActive])
+  @@index([isDefault])
+  @@map("writing_assistant_ai_config")
+}
+
+// 推文生成任务表
+model TweetGenerationTask {
+  id                String   @id @default(cuid())
+
+  // 基本输入参数
+  username          String   // 目标用户名 @testuser
+  contentType       String   // 内容类型,对应TWEET_TYPES
+  topic             String?  // 可选的主题/话题
+
+  // 生成配置
+  generateCount     Int      @default(3) // 生成推文数量
+  lengthPreference  String   @default("auto") // auto | short | medium | long
+
+  // AI配置
+  aiProvider        String   @default("openai")
+  aiModel           String   @default("gpt-4o")
+  temperature       Float    @default(0.7) // 较高温度保持创意
+
+  // 任务状态
+  status            String   @default("pending") // pending | processing | completed | failed
+  errorMessage      String?
+
+  // 时间字段
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // 关联的生成结果
+  results           TweetGenerationResult[]
+
+  @@index([username])
+  @@index([contentType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("tweet_generation_task")
+}
+
+// 推文生成结果表
+model TweetGenerationResult {
+  id                String   @id @default(cuid())
+  taskId            String   // 关联任务
+
+  // 生成内容
+  generatedContent  String   // 生成的推文内容
+  contentLength     Int      // 字符数
+
+  // 风格一致性评分
+  styleScore        Float?   // AI自评的风格匹配度 0-1
+  styleAnalysis     String?  // JSON: 风格分析说明
+
+  // 使用的风格数据快照
+  styleDataSnapshot String?  // JSON: 记录使用了哪些风格特征
+
+  // 用户反馈
+  userRating        Int?     // 1-5星评分
+  userFeedback      String?  // 用户反馈文本
+  isSelected        Boolean  @default(false) // 是否被用户选中使用
+
+  // 元数据
+  aiProvider        String
+  aiModel           String
+  generatedAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  task              TweetGenerationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userRating])
+  @@index([isSelected])
+  @@index([generatedAt])
+  @@map("tweet_generation_result")
 }

@@ -15,6 +15,7 @@ function validateApiKey(request: NextRequest): boolean {
 // 数据提取API
 export async function POST(request: NextRequest) {
   let validatedData: any = null;
+  let effectiveListIds: string[] | undefined = undefined;
   
   try {
     // API Key验证
@@ -31,7 +32,8 @@ export async function POST(request: NextRequest) {
     const schema = z.object({
       batchId: z.string().min(1, "批次ID不能为空"),
       maxCount: z.number().int().min(1).max(10000, "最大获取数量不能超过10000"),
-      listId: z.string().optional(),
+      listId: z.string().optional(), // 兼容旧的单个listId
+      listIds: z.array(z.string()).optional(), // 新增：支持多个listIds
       username: z.string().optional(),
       isExtracted: z.boolean().optional().default(false), // false=未提取(pending), true=已提取(synced)
       isRT: z.boolean().optional(),      // 是否仅筛选转推
@@ -51,10 +53,14 @@ export async function POST(request: NextRequest) {
 
     validatedData = schema.parse(body);
 
+    // 处理listId兼容性：如果提供了listId，将其转换为listIds数组
+    effectiveListIds = validatedData.listIds || (validatedData.listId ? [validatedData.listId] : undefined);
+
     console.log('[DATA EXTRACT] 开始数据提取:', {
       batchId: validatedData.batchId,
       maxCount: validatedData.maxCount,
-      listId: validatedData.listId,
+      listId: validatedData.listId, // 保留旧字段用于兼容
+      listIds: effectiveListIds,
       username: validatedData.username,
       isExtracted: validatedData.isExtracted,
       isRT: validatedData.isRT,
@@ -68,7 +74,8 @@ export async function POST(request: NextRequest) {
     const extractResult = await storageService.extractTweetData({
       batchId: validatedData.batchId,
       maxCount: validatedData.maxCount,
-      listId: validatedData.listId,
+      listId: validatedData.listId,     // 保留兼容性
+      listIds: effectiveListIds,        // 新增多listIds支持
       username: validatedData.username,
       isExtracted: validatedData.isExtracted,
       isRT: validatedData.isRT,
@@ -94,7 +101,8 @@ export async function POST(request: NextRequest) {
         extractedAt: extractResult.extractedAt,
         isDryRun: extractResult.isDryRun,
         filters: {
-          listId: validatedData.listId,
+          listId: validatedData.listId,   // 保留兼容性
+          listIds: effectiveListIds,      // 新增
           username: validatedData.username,
           isExtracted: validatedData.isExtracted,
           isRT: validatedData.isRT,
@@ -127,7 +135,8 @@ export async function POST(request: NextRequest) {
             availableCount: insufficientDataError.availableCount,
             shortage: insufficientDataError.shortage,
             filters: validatedData ? {
-              listId: validatedData.listId,
+              listId: validatedData.listId,     // 保留兼容性
+              listIds: effectiveListIds,        // 新增
               username: validatedData.username,
               isExtracted: validatedData.isExtracted,
               isRT: validatedData.isRT,

@@ -52,6 +52,8 @@ export class TwitterSelector {
    * 设置网络捕获 - 在构造函数中立即开始监听
    */
   private async setupNetworkCapture(): Promise<void> {
+    let captureCount = 0;
+    
     // 监听所有网络响应
     this.page.on('response', (response) => {
       try {
@@ -63,6 +65,7 @@ export class TwitterSelector {
           const match = url.match(/amplify_video\/(\d+)\//);
           if (match && match[1]) {
             const mediaId = match[1];
+            captureCount++;
             const existing = this.capturedVideoUrls.get(mediaId);
             if (!existing?.video) { // 只在首次捕获时记录日志
               console.log(`🎯 捕获视频URL [${mediaId}]: ${url.substring(0, 100)}...`);
@@ -80,6 +83,7 @@ export class TwitterSelector {
           const match = url.match(/amplify_video_thumb\/(\d+)\//);
           if (match && match[1]) {
             const mediaId = match[1];
+            captureCount++;
             const existing = this.capturedVideoUrls.get(mediaId) || {};
             if (!existing.preview) { // 只在首次捕获时记录日志
               console.log(`🖼️ 捕获预览图 [${mediaId}]: ${url}`);
@@ -96,17 +100,33 @@ export class TwitterSelector {
       }
     });
     
-    console.log('🔍 网络捕获已启动，监听视频URL...');
+    // 每5秒汇总一次捕获情况（调试模式下输出详细统计）
+    if (process.env.SPIDER_DEBUG === 'true') {
+      setInterval(() => {
+        if (captureCount > 0) {
+          console.log(`📊 媒体资源捕获统计: ${captureCount} 个，视频缓存: ${this.capturedVideoUrls.size} 个`);
+          captureCount = 0; // 重置计数器
+        }
+      }, 5000);
+    } else {
+      // 生产模式：只在捕获到重要资源时输出简要信息
+      setInterval(() => {
+        if (captureCount > 0) {
+          console.log(`🎬 捕获媒体: ${captureCount} 个`);
+          captureCount = 0;
+        }
+      }, 10000); // 更长的间隔
+    }
   }
 
   /**
    * 等待Timeline容器加载
    */
   async waitForTimeline(): Promise<void> {
-    console.log('正在等待Timeline容器加载...');
+    console.log('🔍 等待页面加载...');
     
     // 定义多个可能的选择器
-    const possibleSelectors = [
+    const possibleSelectors: string[] = [
       this.selectors.timelineContainer,
       '[data-testid="primaryColumn"]',
       '[data-testid="timeline"]', 
@@ -114,21 +134,19 @@ export class TwitterSelector {
       '[aria-label*="Timeline"]',
       'section[role="region"]',
       'div[data-testid="cellInnerDiv"]'
-    ];
+    ].filter((selector): selector is string => typeof selector === 'string' && selector.length > 0);
     
     let lastError: Error | null = null;
     
     // 尝试每个选择器
-    for (const selector of possibleSelectors) {
+    for (let i = 0; i < possibleSelectors.length; i++) {
       try {
-        console.log(`尝试选择器: ${selector}`);
-        await this.page.waitForSelector(selector, {
+        await this.page.waitForSelector(possibleSelectors[i]!, {
           timeout: 10000, // 减少单个选择器的等待时间
         });
-        console.log(`Timeline容器已加载 (使用选择器: ${selector})`);
+        console.log(`✅ Timeline容器已加载 (方案${i + 1})`);
         return;
       } catch (error) {
-        console.log(`选择器 ${selector} 失败，尝试下一个...`);
         lastError = error instanceof Error ? error : new Error('选择器等待失败');
         continue;
       }
@@ -136,8 +154,6 @@ export class TwitterSelector {
     
     // 如果所有选择器都失败，尝试检查页面是否至少有基本内容
     try {
-      console.log('尝试检查页面基本内容...');
-      
       // 检查是否被重定向到登录页面
       const loginButton = await this.page.$('[data-testid="loginButton"], [href="/login"], input[name="text"]');
       if (loginButton) {
@@ -147,21 +163,20 @@ export class TwitterSelector {
       // 检查是否有推文内容
       const tweetElements = await this.page.$$('article, [data-testid="tweet"]');
       if (tweetElements.length > 0) {
-        console.log(`找到 ${tweetElements.length} 个推文元素，继续执行`);
+        console.log(`✅ 检测到 ${tweetElements.length} 个推文，继续执行`);
         return;
       }
       
       // 最后检查页面是否至少加载了基本结构
       const mainContent = await this.page.$('main, #react-root, body');
       if (mainContent) {
-        console.log('页面基本结构已加载，尝试继续');
-        // 额外等待一下，让内容加载
+        console.log('⚠️ 页面结构已加载，等待内容...');
         await this.page.waitForTimeout(5000);
         return;
       }
       
     } catch (checkError) {
-      console.error('页面内容检查失败:', checkError);
+      console.error('❌ 页面检查失败:', checkError);
     }
     
     // 所有尝试都失败了
@@ -174,11 +189,28 @@ export class TwitterSelector {
    * 🎯 正确逻辑：Timeline: List > cellInnerDiv (跳过第一个) > 推文
    * 🔧 修复：避免抓取展开详情页的评论
    */
-  async getTweetElements(): Promise<any[]> {
+  async getTweetElements(isUsernameMode: boolean = false): Promise<any[]> {
     try {
-      // 首先定位List时间线容器
-      const timelineContainer = await this.page.$(this.selectors.timelineContainer);
-      
+      // Username模式直接跳过List时间线容器检测，使用回退方案
+      if (isUsernameMode) {
+        console.log('🎯 Username模式，直接使用回退选择器');
+        return this.getTweetElementsFallback();
+      }
+
+      // List模式：首先定位List时间线容器
+      let timelineContainer = await this.page.$(this.selectors.timelineContainer);
+
+      // 如果没有找到时间线容器，等待3秒后重试（缩短等待时间）
+      if (!timelineContainer) {
+        console.log('⏳ 未找到List时间线容器，等待3秒后重试...');
+        await this.page.waitForTimeout(3000);
+        timelineContainer = await this.page.$(this.selectors.timelineContainer);
+
+        if (timelineContainer) {
+          console.log('✅ 等待后成功找到时间线容器');
+        }
+      }
+
       if (timelineContainer) {
         console.log('✅ 找到List时间线容器，开始按cellInnerDiv逻辑搜索...');
         
@@ -200,6 +232,13 @@ export class TwitterSelector {
         const allTweets: any[] = [];
         for (const cell of tweetCells) {
           try {
+            // 检查是否为UserCell（推荐关注卡片），跳过
+            const isUserCell = await cell.$('[data-testid="UserCell"]');
+            if (isUserCell) {
+              console.log('⚠️ 跳过UserCell推荐关注卡片');
+              continue;
+            }
+
             // 在每个cellInnerDiv内查找推文
             const tweetsInCell = await cell.$$(this.selectors.tweetContainer);
             if (tweetsInCell.length > 0) {
@@ -217,46 +256,58 @@ export class TwitterSelector {
       } else {
         // 回退方案：如果找不到特定容器，尝试其他容器选择器
         console.warn('⚠️ 未找到List时间线容器，尝试回退方案...');
-        const fallbackSelectors = [
-          '[data-testid="primaryColumn"]',
-          'main[role="main"]',
-          '[aria-label*="Timeline"]'
-        ];
-        
-        for (const selector of fallbackSelectors) {
-          console.log(`⚠️ 尝试回退选择器: ${selector}`);
-          const container = await this.page.$(selector);
-          if (container) {
-            // 尝试在回退容器中也使用cellInnerDiv逻辑
-            const cellElements = await container.$$('[data-testid="cellInnerDiv"]');
-            if (cellElements.length > 1) {
-              const tweetCells = cellElements.slice(1);
-              const allTweets: any[] = [];
-              for (const cell of tweetCells) {
-                const tweetsInCell = await cell.$$(this.selectors.tweetContainer);
-                allTweets.push(...tweetsInCell);
-              }
-              console.log(`📊 回退方案找到 ${allTweets.length} 个推文`);
-              return allTweets;
-            } else {
-              // 如果没有cellInnerDiv，直接搜索推文
-              const tweets = await container.$$(this.selectors.tweetContainer);
-              console.log(`📊 回退方案找到 ${tweets.length} 个推文`);
-              return tweets;
-            }
-          }
-        }
-        
-        // 最后的回退：全局搜索（保持原有行为但记录警告）
-        console.warn('⚠️ 警告：所有回退方案失败，使用全局搜索（可能包含非List推文）');
-        const tweets = await this.page.$$(this.selectors.tweetContainer);
-        console.log(`📊 全局搜索找到 ${tweets.length} 个推文元素`);
-        return tweets;
+        return this.getTweetElementsFallback();
       }
     } catch (error) {
       console.error('获取推文元素失败:', error);
       return [];
     }
+  }
+
+  /**
+   * 回退方案：使用通用选择器获取推文
+   */
+  private async getTweetElementsFallback(): Promise<any[]> {
+    const fallbackSelectors = [
+      '[data-testid="primaryColumn"]',
+      'main[role="main"]',
+      '[aria-label*="Timeline"]'
+    ];
+
+    for (const selector of fallbackSelectors) {
+      const container = await this.page.$(selector);
+      if (container) {
+        // 尝试在回退容器中也使用cellInnerDiv逻辑
+        const cellElements = await container.$$('[data-testid="cellInnerDiv"]');
+        if (cellElements.length > 1) {
+          const tweetCells = cellElements.slice(1);
+          const allTweets: any[] = [];
+          for (const cell of tweetCells) {
+            // 检查是否为UserCell（推荐关注卡片），跳过
+            const isUserCell = await cell.$('[data-testid="UserCell"]');
+            if (isUserCell) {
+              continue; // 静默跳过，减少日志
+            }
+
+            const tweetsInCell = await cell.$$(this.selectors.tweetContainer);
+            allTweets.push(...tweetsInCell);
+          }
+          console.log(`📊 回退方案 [${selector}] 找到 ${allTweets.length} 个推文`);
+          return allTweets;
+        } else {
+          // 如果没有cellInnerDiv，直接搜索推文
+          const tweets = await container.$$(this.selectors.tweetContainer);
+          console.log(`📊 回退方案 [${selector}] 找到 ${tweets.length} 个推文`);
+          return tweets;
+        }
+      }
+    }
+
+    // 最后的回退：全局搜索
+    console.warn('⚠️ 所有回退方案失败，使用全局搜索');
+    const tweets = await this.page.$$(this.selectors.tweetContainer);
+    console.log(`📊 全局搜索找到 ${tweets.length} 个推文`);
+    return tweets;
   }
 
   /**
@@ -497,26 +548,45 @@ export class TwitterSelector {
 
   /**
    * 提取推文正文（包含处理Show more按钮）
+   * 🔧 排除引用推文(Quote Tweet)的内容
    */
   async extractTweetText(tweetElement: any): Promise<string> {
     try {
       // 尝试查找和点击Show more按钮
       const expandedSuccessfully = await this.findAndClickShowMoreButton(tweetElement);
-      
-      // 提取推文文本（展开后的完整内容）
-      const textElement = await tweetElement.$(this.selectors.tweetText);
-      if (!textElement) {
+
+      // 查找所有推文文本元素
+      const textElements = await tweetElement.$$(this.selectors.tweetText);
+
+      if (textElements.length === 0) {
         return '';
       }
-      
-      const text = await textElement.textContent();
+
+      // 如果只有一个文本元素,直接返回
+      if (textElements.length === 1) {
+        const text = await textElements[0].textContent();
+        const fullText = text?.trim() || '';
+
+        if (expandedSuccessfully && fullText.length > 100) {
+          console.log(`✅ 成功提取完整推文文本 (${fullText.length} 字符)`);
+        }
+
+        return fullText;
+      }
+
+      // 如果有多个文本元素,第一个是主推文,后面的是引用推文
+      // 只取第一个(主推文)
+      const mainTextElement = textElements[0];
+      const text = await mainTextElement.textContent();
       const fullText = text?.trim() || '';
-      
+
+      console.log(`🔍 检测到引用推文，只提取主推文内容 (${fullText.length} 字符)`);
+
       // 记录文本长度以便调试
       if (expandedSuccessfully && fullText.length > 100) {
         console.log(`✅ 成功提取完整推文文本 (${fullText.length} 字符)`);
       }
-      
+
       return fullText;
     } catch (error) {
       console.error('提取推文正文失败:', error);
@@ -602,9 +672,9 @@ export class TwitterSelector {
         console.warn('⚠️ 无法提取用户名，将影响推文URL生成');
       }
 
-      return { 
-        nickname, 
-        username: username ? `@${username}` : '' // 添加@前缀用于显示
+      return {
+        nickname,
+        username: username || '' // 不添加@前缀，保持纯用户名
       };
     } catch (error) {
       console.error('提取用户信息失败:', error);
@@ -1149,13 +1219,33 @@ export class TwitterSelector {
   async processCurrentPage(
     listId: string,
     existingTweetIds: Set<string>,
-    processedTweetIds: Set<string> // 全局任务级别的已处理推文ID
+    processedTweetIds: Set<string>, // 全局任务级别的已处理推文ID
+    targetUsername?: string // 按Username爬取时的目标用户名(不带@)
   ): Promise<PageProcessResult> {
     try {
       console.log('开始处理当前页面的推文...');
-      
-      // 获取所有推文元素
-      const allTweetElements = await this.getTweetElements();
+
+      // 验证当前URL，防止意外跳转到其他页面
+      const currentUrl = this.page.url();
+      if (targetUsername && !currentUrl.includes(`/${targetUsername}`)) {
+        console.warn(`⚠️ 检测到页面URL不匹配！当前: ${currentUrl}, 期望包含: /${targetUsername}`);
+        console.warn('⚠️ 可能误点了推荐关注链接，尝试导航回目标页面...');
+        try {
+          // 使用domcontentloaded而非networkidle，更快但可靠性稍低
+          await this.page.goto(`https://x.com/${targetUsername}`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 15000
+          });
+          await this.page.waitForTimeout(2000);
+          console.log('✅ 已恢复到目标用户页面');
+        } catch (navError) {
+          console.error('⚠️ 导航恢复失败，继续尝试处理当前页面:', navError);
+          // 不抛出错误，继续处理
+        }
+      }
+
+      // 获取所有推文元素（Username模式直接使用回退方案）
+      const allTweetElements = await this.getTweetElements(!!targetUsername);
       const tweetElements = await this.skipFirstTweet(allTweetElements);
       
       console.log(`找到 ${tweetElements.length} 条推文待处理`);
@@ -1168,14 +1258,30 @@ export class TwitterSelector {
 
       for (const tweetElement of tweetElements) {
         try {
-          // 不再跳过Retweet，只统计数量以便日志观察
-          if (await this.isRetweet(tweetElement)) {
-            retweetSkipCount++;
-          }
+          // 按Username爬取时的过滤逻辑
+          if (targetUsername) {
+            // 跳过转发
+            if (await this.isRetweet(tweetElement)) {
+              retweetSkipCount++;
+              continue;
+            }
 
-          // 不再跳过回复，仅统计并继续采集
-          if (await this.isReplyTweet(tweetElement)) {
-            replySkipCount++;
+            // 检查推文作者是否为目标用户
+            const userInfo = await this.extractUserInfo(tweetElement);
+            if (userInfo.username && userInfo.username !== targetUsername) {
+              console.log(`⚠️ 跳过非目标用户推文: ${userInfo.username}`);
+              continue;
+            }
+          } else {
+            // 按List爬取时的原有逻辑：不跳过Retweet，只统计数量
+            if (await this.isRetweet(tweetElement)) {
+              retweetSkipCount++;
+            }
+
+            // 不再跳过回复，仅统计并继续采集
+            if (await this.isReplyTweet(tweetElement)) {
+              replySkipCount++;
+            }
           }
 
           // 提取推文ID检查重复
@@ -1221,6 +1327,7 @@ export class TwitterSelector {
       console.log(`  ├─ 任务内重复: ${taskInternalDuplicates}`);
       console.log(`  ├─ 检测到转推: ${retweetSkipCount} (已全部采集)`);
       console.log(`  ├─ 跳过回复: ${replySkipCount}`);
+      console.log(`  ├─ 页面推文元素: ${tweetElements.length}`);
       console.log(`  └─ 总处理数: ${newTweets.length + duplicateCount + taskInternalDuplicates + replySkipCount}`);
 
       return {
@@ -1231,6 +1338,7 @@ export class TwitterSelector {
         replySkipCount, // 新增返回值
         shouldContinue,
         totalProcessed: newTweets.length + duplicateCount + taskInternalDuplicates + retweetSkipCount + replySkipCount,
+        totalTweetElements: tweetElements.length, // 页面上实际找到的推文元素数量
       };
     } catch (error) {
       console.error('处理页面失败:', error);
