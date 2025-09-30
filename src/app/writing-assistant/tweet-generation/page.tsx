@@ -136,7 +136,7 @@ export default function TweetGenerationPage() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {typesData.types.map((type) => {
                     const userTypeData = userStats?.data.types.find(t => t.contentType === type.value);
-                    const hasSamples = userTypeData && userTypeData.sampleCount > 0;
+                    const hasSamples = userTypeData && userTypeData.sampleCount != null && userTypeData.sampleCount > 0;
 
                     return (
                       <button
@@ -151,7 +151,7 @@ export default function TweetGenerationPage() {
                         <div className="font-medium text-gray-900">{type.label}</div>
                         <div className="text-sm text-gray-500 mt-1">
                           {hasSamples ? (
-                            <span className="text-green-600">✓ {userTypeData.sampleCount}条样本</span>
+                            <span className="text-green-600">✓ {userTypeData?.sampleCount ?? 0}条样本</span>
                           ) : (
                             <span className="text-orange-500">○ 未分析</span>
                           )}
