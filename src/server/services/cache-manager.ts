@@ -256,20 +256,32 @@ export class DeduplicationManager {
 
     // 创建可取消的任务
     let cancelled = false;
+    const abortController: AbortController | null = null;
+
     const cancelFn = () => {
       cancelled = true;
+      // abortController功能暂未实现,保留接口
+      // 立即从运行列表中移除
+      this.runningTasks.delete(key);
+      console.log(`任务已标记为取消: ${key}`);
     };
 
     // 开始新任务
     const taskPromise = (async () => {
-      try {
-        const result = await task();
+      // 定期检查取消标志
+      const checkCancelled = () => {
         if (cancelled) {
           throw new Error('Task was cancelled');
         }
+      };
+
+      try {
+        checkCancelled();
+        const result = await task();
+        checkCancelled();
         return result;
       } catch (error) {
-        if (cancelled) {
+        if (cancelled || (error instanceof Error && error.message === 'Task was cancelled')) {
           throw new Error('Task was cancelled');
         }
         throw error;
@@ -293,7 +305,8 @@ export class DeduplicationManager {
       this.addToHistory(metadata);
       return result;
     } catch (error) {
-      metadata.status = cancelled ? 'cancelled' : 'failed';
+      const isCancelled = cancelled || (error instanceof Error && error.message === 'Task was cancelled');
+      metadata.status = isCancelled ? 'cancelled' : 'failed';
       this.addToHistory(metadata);
       throw error;
     } finally {
@@ -352,11 +365,17 @@ export class DeduplicationManager {
   cancelTask(key: string): boolean {
     const task = this.runningTasks.get(key);
     if (!task) {
+      console.log(`任务不存在或已完成: ${key}`);
       return false;
     }
 
     if (task.cancel) {
+      // 更新状态
+      task.status = 'cancelled';
+      // 执行取消
       task.cancel();
+      // 添加到历史
+      this.addToHistory(task);
       console.log(`任务已取消: ${key}`);
       return true;
     }
@@ -367,10 +386,13 @@ export class DeduplicationManager {
   // 取消所有任务
   cancelAllTasks(): number {
     let cancelledCount = 0;
+    const tasksToCancel = Array.from(this.runningTasks.entries());
 
-    for (const [key, task] of this.runningTasks.entries()) {
+    for (const [key, task] of tasksToCancel) {
       if (task.cancel) {
+        task.status = 'cancelled';
         task.cancel();
+        this.addToHistory(task);
         cancelledCount++;
       }
     }

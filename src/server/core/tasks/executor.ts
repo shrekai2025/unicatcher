@@ -227,9 +227,10 @@ export class TaskExecutor {
 
         // 处理当前页面的推文
         const pageResult = await this.twitterSelector!.processCurrentPage(
-          taskConfig.listId,
+          taskConfig.listId || '0',
           existingTweetIds,
-          processedTweetIds
+          processedTweetIds,
+          taskConfig.username
         );
 
         // 保存新推文

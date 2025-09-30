@@ -10,6 +10,8 @@ import { GenerateCommentDialog } from '~/components/ui/generate-comment-dialog';
 export default function TweetsPage() {
   const [activeTab, setActiveTab] = useState<'auto' | 'manual' | 'extracts'>('auto');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterListId, setFilterListId] = useState('');
+  const [filterUsername, setFilterUsername] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTweets, setSelectedTweets] = useState<string[]>([]);
   const [expandedTweets, setExpandedTweets] = useState<string[]>([]);
@@ -64,6 +66,8 @@ export default function TweetsPage() {
     page: currentPage,
     limit: 10,
     search: searchQuery || undefined,
+    listId: filterListId || undefined,
+    username: filterUsername || undefined,
   });
 
   // 提取推文查询
@@ -567,24 +571,75 @@ export default function TweetsPage() {
       {/* 搜索和操作区域 - 只在自动爬虫tab显示 */}
       {activeTab === 'auto' && (
         <div className="mb-6 bg-white shadow rounded-lg p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex-1 max-w-lg">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="搜索推文内容、用户名..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+        <div className="flex flex-col gap-4">
+          {/* 搜索栏 */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex-1 max-w-lg">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="搜索推文内容、用户名..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleSearch}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              >
+                搜索
+              </button>
+            </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={handleSearch}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-            >
-              搜索
-            </button>
+
+          {/* 筛选器 */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-gray-200">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                按List ID筛选
+              </label>
+              <input
+                type="text"
+                value={filterListId}
+                onChange={(e) => {
+                  setFilterListId(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="输入List ID (如: 1234567890)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                按Username筛选
+              </label>
+              <input
+                type="text"
+                value={filterUsername}
+                onChange={(e) => {
+                  setFilterUsername(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="输入用户名 (如: elonmusk)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            {(filterListId || filterUsername) && (
+              <div className="flex items-end">
+                <button
+                  onClick={() => {
+                    setFilterListId('');
+                    setFilterUsername('');
+                    setCurrentPage(1);
+                  }}
+                  className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                >
+                  清除筛选
+                </button>
+              </div>
+            )}
           </div>
         </div>
         </div>
@@ -1313,7 +1368,7 @@ export default function TweetsPage() {
               const formData = new FormData(e.currentTarget);
               const config = {
                 apiKey: formData.get('apiKey') as string,
-                provider: formData.get('provider') as 'openai' | 'openai-badger' | 'zhipu' | 'anthropic',
+                provider: formData.get('provider') as 'openai' | 'openai-badger' | 'zhipu' | 'anthropic' | 'deepseek',
                 model: formData.get('model') as string,
                 baseURL: formData.get('baseURL') as string || undefined,
               };
@@ -1343,7 +1398,7 @@ export default function TweetsPage() {
                     defaultValue={aiConfig.provider}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                     onChange={(e) => {
-                      const provider = e.target.value as 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
+                      const provider = e.target.value as 'openai' | 'openai-badger' | 'zhipu' | 'anthropic' | 'deepseek';
                       const modelSelect = e.target.form?.querySelector('select[name="model"]') as HTMLSelectElement;
                       if (modelSelect) {
                         if (provider === 'openai-badger') {
@@ -1352,6 +1407,8 @@ export default function TweetsPage() {
                           modelSelect.value = 'glm-4.5-flash';
                         } else if (provider === 'anthropic') {
                           modelSelect.value = 'claude-3-5-sonnet-20241022';
+                        } else if (provider === 'deepseek') {
+                          modelSelect.value = 'deepseek-chat';
                         } else {
                           modelSelect.value = 'gpt-4o';
                         }
@@ -1362,6 +1419,7 @@ export default function TweetsPage() {
                     <option value="openai-badger">OpenAI-Badger</option>
                     <option value="zhipu">智谱AI (GLM)</option>
                     <option value="anthropic">Anthropic Claude</option>
+                    <option value="deepseek">DeepSeek</option>
                   </select>
                 </div>
 
@@ -1384,6 +1442,8 @@ export default function TweetsPage() {
                     <option value="claude-3-5-sonnet-20241022">Claude-3.5-Sonnet</option>
                     <option value="claude-3-opus-20240229">Claude-3-Opus</option>
                     <option value="claude-3-sonnet-20240229">Claude-3-Sonnet</option>
+                    <option value="deepseek-chat">DeepSeek-Chat</option>
+                    <option value="deepseek-coder">DeepSeek-Coder</option>
                   </select>
                 </div>
 

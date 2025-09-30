@@ -132,10 +132,19 @@ ${allTypes}
 3. 给出每个类型的匹配度（0.1-1.0之间的小数）
 4. 提供简要的选择理由
 
-输出格式（JSON）：
+**重要：必须返回标准JSON格式，所有字符串值必须使用双引号(")，不能使用单引号(')！**
+
+输出格式（严格的JSON）：
 {
   "types": [
     {"type": "类型名称", "score": 0.8, "reason": "选择理由"}
+  ]
+}
+
+示例输出：
+{
+  "types": [
+    {"type": "观点见解", "score": 0.9, "reason": "推文表达了对某个问题的深入见解"}
   ]
 }`;
 
@@ -168,7 +177,53 @@ ${allTypes}
         cleanedResult = jsonMatch[0];
       }
 
-      const parsed = JSON.parse(cleanedResult);
+      let parsed;
+      try {
+        // 直接尝试解析标准JSON
+        parsed = JSON.parse(cleanedResult);
+      } catch (firstError) {
+        // 第一次解析失败，尝试修复
+        console.warn('JSON解析失败，尝试修复...原始内容:', cleanedResult.substring(0, 200));
+
+        try {
+          // 修复策略1: 处理单引号值（但保留reason中的引号内容）
+          let fixedResult = cleanedResult;
+
+          // 将值中使用单引号的情况改为双引号，同时转义内部的双引号和反斜杠
+          fixedResult = fixedResult.replace(/"([^"]+)":\s*'([^']*(?:'[^']*)*)'(?=\s*[,}])/g, (match, key, value) => {
+            // 先转义反斜杠，再转义双引号
+            const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            return `"${key}": "${escaped}"`;
+          });
+
+          parsed = JSON.parse(fixedResult);
+          console.log('JSON修复成功');
+        } catch (secondError) {
+          // 修复策略2: 使用更激进的方法
+          console.warn('第一次修复失败，尝试更激进的修复...');
+
+          try {
+            // 移除所有字符串值中的转义单引号
+            let aggressiveFix = cleanedResult;
+
+            // 将 \' 替换为普通单引号，然后再处理
+            aggressiveFix = aggressiveFix.replace(/\\'/g, "'");
+
+            // 将单引号值转为双引号
+            aggressiveFix = aggressiveFix.replace(/"([^"]+)":\s*'([^']*)'(?=\s*[,}])/g, (match, key, value) => {
+              // 转义内部的双引号和反斜杠
+              const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+              return `"${key}": "${escaped}"`;
+            });
+
+            parsed = JSON.parse(aggressiveFix);
+            console.log('激进修复成功');
+          } catch (thirdError) {
+            console.error('JSON修复失败，原始响应:', result.substring(0, 500));
+            throw firstError;
+          }
+        }
+      }
 
       if (parsed.types && Array.isArray(parsed.types)) {
         return parsed.types.filter((item: any) =>

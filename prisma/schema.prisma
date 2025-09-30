@@ -692,7 +692,7 @@ model AICommentConfig {
 // AI服务商配置表 - 统一存储各个AI服务商的key和baseURL
 model AIProviderConfig {
   id        String   @id @default(cuid())
-  provider  String   @unique // openai, openai-badger, zhipu, anthropic
+  provider  String   @unique // openai, openai-badger, zhipu, anthropic, deepseek
   apiKey    String   // API密钥
   baseURL   String?  // 可选的自定义base URL
   isActive  Boolean  @default(true) // 是否启用

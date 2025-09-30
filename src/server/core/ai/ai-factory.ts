@@ -5,7 +5,7 @@
 
 import { BaseAIService } from './base/ai-service.interface';
 import type { AIConfig } from './base/ai-types';
-import { OpenAIService, ZhipuService, AnthropicService } from './providers';
+import { OpenAIService, ZhipuService, AnthropicService, DeepSeekService } from './providers';
 
 export class AIServiceFactory {
   /**
@@ -23,6 +23,9 @@ export class AIServiceFactory {
       case 'anthropic':
         return new AnthropicService(config);
 
+      case 'deepseek':
+        return new DeepSeekService(config);
+
       default:
         throw new Error(`不支持的AI供应商: ${config.provider}`);
     }
@@ -32,7 +35,7 @@ export class AIServiceFactory {
    * 获取所有支持的供应商
    */
   static getSupportedProviders(): string[] {
-    return ['openai', 'openai-badger', 'zhipu', 'anthropic'];
+    return ['openai', 'openai-badger', 'zhipu', 'anthropic', 'deepseek'];
   }
 
   /**
@@ -48,6 +51,8 @@ export class AIServiceFactory {
         return 'glm-4.5-flash';
       case 'anthropic':
         return 'claude-3-5-sonnet-20241022';
+      case 'deepseek':
+        return 'deepseek-chat';
       default:
         throw new Error(`不支持的AI供应商: ${provider}`);
     }
@@ -66,6 +71,8 @@ export class AIServiceFactory {
         return ['glm-4.5-flash', 'glm-4.5', 'glm-4.5-air', 'glm-4.5-x', 'glm-4.5-airx'];
       case 'anthropic':
         return ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'];
+      case 'deepseek':
+        return ['deepseek-chat', 'deepseek-coder'];
       default:
         return [];
     }

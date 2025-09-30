@@ -82,6 +82,7 @@ export const tweetsRouter = createTRPCRouter({
         search: z.string().optional(),
         taskId: z.string().optional(),
         listId: z.string().optional(),
+        username: z.string().optional(),
       })
     )
     .query(async ({ input }) => {
@@ -90,7 +91,8 @@ export const tweetsRouter = createTRPCRouter({
           input.taskId,
           input.listId,
           input.page,
-          input.limit
+          input.limit,
+          input.username
         );
 
         return {
@@ -576,7 +578,7 @@ export const tweetsRouter = createTRPCRouter({
     .input(
       z.object({
         tweetId: z.string().min(1, "推文ID不能为空"),
-        aiProvider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic']).default('openai'),
+        aiProvider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic', 'deepseek']).default('openai'),
         aiModel: z.string().default('gpt-4o'),
       })
     )

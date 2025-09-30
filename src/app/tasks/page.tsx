@@ -6,8 +6,10 @@ import { api } from '~/trpc/react';
 
 export default function TasksPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [taskMode, setTaskMode] = useState<'list' | 'username'>('list'); // Tab切换状态
   const [createForm, setCreateForm] = useState({
     listId: '',
+    username: '',
     maxTweets: 20,
   });
   const [currentPage, setCurrentPage] = useState(1);
@@ -25,7 +27,15 @@ export default function TasksPage() {
   const createTask = api.tasks.create.useMutation({
     onSuccess: () => {
       setIsCreateModalOpen(false);
-      setCreateForm({ listId: '', maxTweets: 20 });
+      setCreateForm({ listId: '', username: '', maxTweets: 20 });
+      void tasksQuery.refetch();
+    },
+  });
+
+  const createByUsername = api.tasks.createByUsername.useMutation({
+    onSuccess: () => {
+      setIsCreateModalOpen(false);
+      setCreateForm({ listId: '', username: '', maxTweets: 20 });
       void tasksQuery.refetch();
     },
   });
@@ -50,15 +60,30 @@ export default function TasksPage() {
 
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.listId.trim()) {
-      alert('请输入Twitter List ID');
-      return;
+
+    if (taskMode === 'list') {
+      if (!createForm.listId.trim()) {
+        alert('请输入Twitter List ID');
+        return;
+      }
+      createTask.mutate({
+        listId: createForm.listId.trim(),
+        maxTweets: createForm.maxTweets,
+      });
+    } else {
+      if (!createForm.username.trim()) {
+        alert('请输入Twitter用户名');
+        return;
+      }
+      if (createForm.username.includes('@')) {
+        alert('用户名不要包含@符号');
+        return;
+      }
+      createByUsername.mutate({
+        username: createForm.username.trim(),
+        maxTweets: createForm.maxTweets,
+      });
     }
-    
-    createTask.mutate({
-      listId: createForm.listId.trim(),
-      maxTweets: createForm.maxTweets,
-    });
   };
 
   const handleCancelTask = (taskId: string) => {
@@ -239,26 +264,73 @@ export default function TasksPage() {
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 创建爬取任务
               </h3>
+
+              {/* Tab切换 */}
+              <div className="flex border-b border-gray-200 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setTaskMode('list')}
+                  className={`flex-1 py-2 text-sm font-medium ${
+                    taskMode === 'list'
+                      ? 'border-b-2 border-blue-500 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  List模式
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTaskMode('username')}
+                  className={`flex-1 py-2 text-sm font-medium ${
+                    taskMode === 'username'
+                      ? 'border-b-2 border-blue-500 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Username模式
+                </button>
+              </div>
+
               <form onSubmit={handleCreateTask}>
                 <div className="mt-2 px-7 py-3">
                   <div className="space-y-4">
-                    <div>
-                      <label htmlFor="listId" className="block text-sm font-medium text-gray-700 text-left">
-                        Twitter List ID *
-                      </label>
-                      <input
-                        type="text"
-                        id="listId"
-                        value={createForm.listId}
-                        onChange={(e) => setCreateForm({ ...createForm, listId: e.target.value })}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        placeholder="输入List ID"
-                        required
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        从 Twitter List URL 中获取的数字 ID
-                      </p>
-                    </div>
+                    {taskMode === 'list' ? (
+                      <div>
+                        <label htmlFor="listId" className="block text-sm font-medium text-gray-700 text-left">
+                          Twitter List ID *
+                        </label>
+                        <input
+                          type="text"
+                          id="listId"
+                          value={createForm.listId}
+                          onChange={(e) => setCreateForm({ ...createForm, listId: e.target.value })}
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          placeholder="输入List ID"
+                          required
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          从 Twitter List URL 中获取的数字 ID
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <label htmlFor="username" className="block text-sm font-medium text-gray-700 text-left">
+                          Twitter Username *
+                        </label>
+                        <input
+                          type="text"
+                          id="username"
+                          value={createForm.username}
+                          onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          placeholder="输入用户名"
+                          required
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          请输入用户名(不要带@符号)
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <label htmlFor="maxTweets" className="block text-sm font-medium text-gray-700 text-left">
                         最大推文数量
@@ -290,10 +362,10 @@ export default function TasksPage() {
                     </button>
                     <button
                       type="submit"
-                      disabled={createTask.isPending}
+                      disabled={createTask.isPending || createByUsername.isPending}
                       className="flex-1 px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50"
                     >
-                      {createTask.isPending ? '创建中...' : '创建任务'}
+                      {(createTask.isPending || createByUsername.isPending) ? '创建中...' : '创建任务'}
                     </button>
                   </div>
                 </div>

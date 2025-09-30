@@ -62,6 +62,7 @@ export class UnifiedTaskManager {
   private createExecutor(config: TaskConfig): BaseTaskExecutor {
     switch (config.type) {
       case 'twitter_list':
+      case 'twitter_user':
         return new TwitterTaskExecutor();
       case 'youtube_channel':
         return new YouTubeTaskExecutor();
@@ -104,9 +105,18 @@ export class UnifiedTaskManager {
     if (executor instanceof TwitterTaskExecutor) {
       // 转换为旧格式以兼容现有的重试逻辑
       if (taskConfig.type === 'twitter_list') {
-        const twitterConfig = taskConfig as TwitterTaskConfig;
+        const twitterConfig = taskConfig as any;
         const oldConfig = {
           listId: twitterConfig.listId,
+          maxTweets: twitterConfig.maxTweets,
+          duplicateStopCount: twitterConfig.duplicateStopCount
+        };
+        return await executor.executeWithRetry(oldConfig, taskId);
+      } else if (taskConfig.type === 'twitter_user') {
+        const twitterConfig = taskConfig as any;
+        const oldConfig = {
+          listId: '0',
+          username: twitterConfig.username,
           maxTweets: twitterConfig.maxTweets,
           duplicateStopCount: twitterConfig.duplicateStopCount
         };
@@ -210,15 +220,26 @@ export class UnifiedTaskManager {
    * 向后兼容：提交旧格式的 Twitter 任务
    */
   async submitTwitterTask(taskConfig: any): Promise<string> {
-    // 转换为新格式
-    const newConfig: TwitterTaskConfig = {
-      type: 'twitter_list',
-      listId: taskConfig.listId,
-      maxTweets: taskConfig.maxTweets,
-      duplicateStopCount: taskConfig.duplicateStopCount
-    };
-
-    return this.submitTask(newConfig);
+    // 检查是否已经是新格式（包含type字段）
+    if (taskConfig.type === 'twitter_user') {
+      // Username模式
+      const newConfig: TwitterTaskConfig = {
+        type: 'twitter_user',
+        username: taskConfig.username,
+        maxTweets: taskConfig.maxTweets,
+        duplicateStopCount: taskConfig.duplicateStopCount
+      } as any;
+      return this.submitTask(newConfig);
+    } else {
+      // List模式（默认或type为twitter_list）
+      const newConfig: TwitterTaskConfig = {
+        type: 'twitter_list',
+        listId: taskConfig.listId,
+        maxTweets: taskConfig.maxTweets,
+        duplicateStopCount: taskConfig.duplicateStopCount
+      } as any;
+      return this.submitTask(newConfig);
+    }
   }
 
   /**

@@ -145,13 +145,12 @@ export class StorageService {
   }
 
   /**
-   * 获取List中已存在的推文ID列表（排除逻辑删除）
+   * 获取已存在的推文ID列表（全局排重，排除逻辑删除）
    */
-  async getExistingTweetIds(listId: string): Promise<Set<string>> {
+  async getExistingTweetIds(listId?: string): Promise<Set<string>> {
     try {
       const tweets = await db.tweet.findMany({
-        where: { 
-          listId,
+        where: {
           isDeleted: false,
         },
         select: { id: true },
@@ -273,7 +272,8 @@ export class StorageService {
     taskId?: string,
     listId?: string,
     page = 1,
-    limit = 20
+    limit = 20,
+    username?: string
   ): Promise<{
     tweets: any[];
     total: number;
@@ -286,6 +286,7 @@ export class StorageService {
       };
       if (taskId) where.taskId = taskId;
       if (listId) where.listId = listId;
+      if (username) where.userUsername = username;
 
       const skip = (page - 1) * limit;
 

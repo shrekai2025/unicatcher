@@ -24,6 +24,7 @@ export class UnifiedStorageService extends StorageService {
   async createUnifiedTask(config: TaskConfig): Promise<string> {
     switch (config.type) {
       case 'twitter_list':
+      case 'twitter_user':
         return this.createTwitterTask(config as TwitterTaskConfig);
       case 'youtube_channel':
         return this.createYouTubeTask(config as YouTubeTaskConfig);
@@ -37,11 +38,21 @@ export class UnifiedStorageService extends StorageService {
    */
   private async createTwitterTask(config: TwitterTaskConfig): Promise<string> {
     // 调用父类的现有方法，保持向后兼容
-    return super.createTask({
-      listId: config.listId,
-      maxTweets: config.maxTweets,
-      duplicateStopCount: config.duplicateStopCount
-    });
+    if (config.type === 'twitter_list') {
+      return super.createTask({
+        listId: (config as any).listId,
+        maxTweets: config.maxTweets,
+        duplicateStopCount: config.duplicateStopCount
+      });
+    } else {
+      // twitter_user 模式
+      return super.createTask({
+        listId: '0',
+        username: (config as any).username,
+        maxTweets: config.maxTweets,
+        duplicateStopCount: config.duplicateStopCount
+      });
+    }
   }
 
   /**

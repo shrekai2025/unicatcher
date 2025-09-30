@@ -5,6 +5,7 @@ import { api } from '~/trpc/react';
 
 export default function WritingOverviewsPage() {
   const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
+  const [newUsername, setNewUsername] = useState('');
 
   // 获取所有用户概览列表
   const overviewsQuery = api.writingOverviews.getAllUserOverviews.useQuery();
@@ -46,6 +47,29 @@ export default function WritingOverviewsPage() {
     }
   };
 
+  const handleGenerateNewOverview = async () => {
+    const username = newUsername.trim();
+    if (!username) {
+      alert('请输入用户名');
+      return;
+    }
+
+    if (username.includes('@')) {
+      alert('用户名不能包含@符号');
+      return;
+    }
+
+    if (confirm(`确定要为 ${username} 生成/更新写作概览吗？这可能需要一些时间。`)) {
+      try {
+        await triggerUpdate.mutateAsync({ username });
+        setNewUsername('');
+        alert('操作成功完成！');
+      } catch (error) {
+        alert(`操作失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      }
+    }
+  };
+
   const handleDelete = async (username: string) => {
     if (confirm(`确定要删除 ${username} 的写作概览吗？此操作不可恢复。`)) {
       await deleteOverview.mutateAsync({ username });
@@ -70,6 +94,39 @@ export default function WritingOverviewsPage() {
           <h1 className="text-3xl font-bold text-gray-900">写作概览管理</h1>
           <p className="mt-2 text-gray-600">
             查看和管理所有用户的写作概览，手动触发更新
+          </p>
+        </div>
+
+        {/* 生成新概览区域 */}
+        <div className="mb-6 bg-white shadow rounded-lg p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            为指定用户生成/更新写作概览
+          </h2>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1">
+              <input
+                type="text"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    void handleGenerateNewOverview();
+                  }
+                }}
+                placeholder="输入用户名 (例如: elonmusk, 不要包含@符号)"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <button
+              onClick={handleGenerateNewOverview}
+              disabled={triggerUpdate.isPending || !newUsername.trim()}
+              className="px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {triggerUpdate.isPending ? '处理中...' : '生成/更新概览'}
+            </button>
+          </div>
+          <p className="mt-2 text-sm text-gray-500">
+            💡 提示：如果该用户已有概览，将执行更新操作；如果没有概览，将生成初始概览
           </p>
         </div>
 

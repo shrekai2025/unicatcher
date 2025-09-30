@@ -40,17 +40,29 @@ export class TwitterTaskExecutor extends BaseTaskExecutor {
     const startTime = Date.now();
 
     // 兼容性处理：支持新旧两种调用方式
-    let taskConfig: SpiderTaskConfig;
+    let taskConfig: SpiderTaskConfig = {
+      listId: '0',
+      maxTweets: 20
+    };
     let actualTaskId: string;
 
     if ('type' in configOrTaskConfig) {
       // 新的 TaskConfig 格式
       const twitterConfig = configOrTaskConfig as TwitterTaskConfig;
-      taskConfig = {
-        listId: twitterConfig.listId,
-        maxTweets: twitterConfig.maxTweets,
-        duplicateStopCount: twitterConfig.duplicateStopCount
-      };
+      if (twitterConfig.type === 'twitter_list') {
+        taskConfig = {
+          listId: (twitterConfig as any).listId,
+          maxTweets: twitterConfig.maxTweets,
+          duplicateStopCount: twitterConfig.duplicateStopCount
+        };
+      } else if (twitterConfig.type === 'twitter_user') {
+        taskConfig = {
+          listId: '0', // 按Username爬取时listId固定为"0"
+          username: (twitterConfig as any).username,
+          maxTweets: twitterConfig.maxTweets,
+          duplicateStopCount: twitterConfig.duplicateStopCount
+        };
+      }
       actualTaskId = taskIdOrUndefined || '';
     } else {
       // 旧的 SpiderTaskConfig 格式
@@ -59,7 +71,10 @@ export class TwitterTaskExecutor extends BaseTaskExecutor {
     }
 
     try {
-      console.log(`开始执行Twitter List爬取任务: ${taskConfig.listId}`);
+      const taskTarget = taskConfig.username
+        ? `Twitter用户 @${taskConfig.username}`
+        : `Twitter List ${taskConfig.listId}`;
+      console.log(`开始执行爬取任务: ${taskTarget}`);
 
       // 如果没有传入taskId，则创建新的任务记录（兼容直接调用的情况）
       if (!actualTaskId) {
@@ -160,11 +175,15 @@ export class TwitterTaskExecutor extends BaseTaskExecutor {
    * 执行爬取逻辑
    */
   private async executeCrawling(taskConfig: SpiderTaskConfig, taskId: string) {
-    // 导航到Twitter List页面
-    const listUrl = `https://twitter.com/i/lists/${taskConfig.listId}`;
-    console.log(`导航到List页面: ${listUrl}`);
+    // 根据任务类型构建URL
+    const targetUrl = taskConfig.username
+      ? `https://x.com/${taskConfig.username}`
+      : `https://twitter.com/i/lists/${taskConfig.listId}`;
 
-    await this.browserManager!.navigateToUrl(listUrl);
+    const taskType = taskConfig.username ? '用户' : 'List';
+    console.log(`导航到Twitter ${taskType}页面: ${targetUrl}`);
+
+    await this.browserManager!.navigateToUrl(targetUrl);
 
     // 等待页面加载
     await new Promise(resolve => setTimeout(resolve, 5000));
@@ -178,13 +197,13 @@ export class TwitterTaskExecutor extends BaseTaskExecutor {
     let scrollAttempts = 0;
     let endReason: TaskEndReason = 'TARGET_REACHED';
 
-    // 获取数据库中已有的推文ID
-    const existingTweetIds = await this.storageService.getExistingTweetIds(taskConfig.listId);
+    // 获取数据库中已有的推文ID (全局排重)
+    const existingTweetIds = await this.storageService.getExistingTweetIds();
     const processedTweetIds = new Set<string>();
 
     // 滚动检测相关变量
     let consecutiveNoScrollCount = 0;
-    const maxConsecutiveNoScroll = 3; // 连续3次无滚动效果则终止
+    const maxConsecutiveNoScroll = 5; // 连续5次无滚动效果则终止
 
     const maxTweets = taskConfig.maxTweets || config.spider.twitterList.maxTweets;
     const maxScrollAttempts = 50; // 防止无限滚动
@@ -205,9 +224,10 @@ export class TwitterTaskExecutor extends BaseTaskExecutor {
 
         // 处理当前页面的推文
         const pageResult = await this.twitterSelector!.processCurrentPage(
-          taskConfig.listId,
+          taskConfig.listId || '0',
           existingTweetIds,
-          processedTweetIds
+          processedTweetIds,
+          taskConfig.username // 传递目标用户名
         );
 
         // 保存新推文
@@ -246,9 +266,10 @@ export class TwitterTaskExecutor extends BaseTaskExecutor {
           break;
         }
 
-        // 检查当前页面的推文数量
-        if (pageResult.totalProcessed === 0 && scrollAttempts > 0) {
-          console.log('🏁 当前页面没有找到任何推文，已到达底部');
+        // 检查当前页面的推文元素数量（使用totalTweetElements而非totalProcessed）
+        // totalTweetElements是页面实际找到的推文元素数，不受username过滤影响
+        if (pageResult.totalTweetElements === 0 && scrollAttempts > 0) {
+          console.log('🏁 当前页面没有找到任何推文元素，已到达底部');
           endReason = 'NO_MORE_CONTENT';
           break;
         }
@@ -273,12 +294,12 @@ export class TwitterTaskExecutor extends BaseTaskExecutor {
         const afterScrollPosition = await this.browserManager!.getScrollPosition();
         const scrollDistance = afterScrollPosition - beforeScrollPosition;
 
-        if (scrollDistance < 100) {
+        if (scrollDistance <= 0) {
           consecutiveNoScrollCount++;
-          console.log(`⚠️ 滚动距离很小 (${scrollDistance}px)，连续无效滚动: ${consecutiveNoScrollCount}/${maxConsecutiveNoScroll}`);
+          console.log(`⚠️ 滚动距离为0或负数 (${scrollDistance}px)，连续无效滚动: ${consecutiveNoScrollCount}/${maxConsecutiveNoScroll}`);
 
           if (consecutiveNoScrollCount >= maxConsecutiveNoScroll) {
-            console.log(`🏁 连续 ${maxConsecutiveNoScroll} 次无效滚动，页面无法继续滚动`);
+            console.log(`🏁 连续 ${maxConsecutiveNoScroll} 次滚动距离<=0，页面无法继续滚动`);
             endReason = 'NO_MORE_CONTENT';
             break;
           }

@@ -6,7 +6,7 @@
 export type TaskStatus = 'created' | 'queued' | 'running' | 'completed' | 'failed';
 
 // 任务类型枚举
-export type TaskType = 'twitter_list' | 'youtube_channel';
+export type TaskType = 'twitter_list' | 'twitter_user' | 'youtube_channel';
 
 // 任务结束原因枚举
 export type TaskEndReason = 
@@ -49,7 +49,8 @@ export interface TweetData {
 
 // 爬虫任务配置
 export interface SpiderTaskConfig {
-  listId: string;                // Twitter List ID
+  listId?: string;               // Twitter List ID (按List爬取时使用)
+  username?: string;             // Twitter Username (按用户爬取时使用，不带@)
   maxTweets?: number;            // 最大爬取推文数量
   duplicateStopCount?: number;   // 连续重复停止数量
 }
@@ -146,6 +147,7 @@ export interface PageProcessResult {
   replySkipCount: number;         // 被回复推文跳过数量
   shouldContinue: boolean;
   totalProcessed: number;
+  totalTweetElements: number;     // 页面上实际找到的推文元素数量（包括被过滤的）
 }
 
 // ==================== YouTube 相关类型定义 ====================
@@ -182,13 +184,24 @@ export interface BaseTaskConfig {
   maxRetries?: number;
 }
 
-// Twitter 任务配置 (扩展现有)
-export interface TwitterTaskConfig extends BaseTaskConfig {
+// Twitter List 任务配置
+export interface TwitterListTaskConfig extends BaseTaskConfig {
   type: 'twitter_list';
   listId: string;
   maxTweets?: number;
   duplicateStopCount?: number;
 }
+
+// Twitter User 任务配置
+export interface TwitterUserTaskConfig extends BaseTaskConfig {
+  type: 'twitter_user';
+  username: string;              // Twitter用户名（不带@）
+  maxTweets?: number;
+  duplicateStopCount?: number;
+}
+
+// Twitter 任务配置联合类型
+export type TwitterTaskConfig = TwitterListTaskConfig | TwitterUserTaskConfig;
 
 // YouTube 任务配置
 export interface YouTubeTaskConfig extends BaseTaskConfig {

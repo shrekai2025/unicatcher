@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '~/components/dashboard-layout';
 
 interface AIConfig {
-  provider: 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
+  provider: 'openai' | 'openai-badger' | 'zhipu' | 'anthropic' | 'deepseek';
   model: string;
   apiKey: string;
   baseURL?: string;
@@ -852,6 +852,11 @@ function AIConfigModal({
           { value: 'claude-3-opus-20240229', label: 'Claude-3-Opus' },
           { value: 'claude-3-sonnet-20240229', label: 'Claude-3-Sonnet' }
         ];
+      case 'deepseek':
+        return [
+          { value: 'deepseek-chat', label: 'DeepSeek-Chat' },
+          { value: 'deepseek-coder', label: 'DeepSeek-Coder' }
+        ];
       default:
         return [];
     }
@@ -868,6 +873,8 @@ function AIConfigModal({
         return 'glm-4.5-flash';
       case 'anthropic':
         return 'claude-3-5-sonnet-20241022';
+      case 'deepseek':
+        return 'deepseek-chat';
       default:
         return '';
     }
@@ -965,6 +972,7 @@ function AIConfigModal({
                   <option value="openai-badger">OpenAI-Badger</option>
                   <option value="zhipu">智谱AI (GLM)</option>
                   <option value="anthropic">Anthropic Claude</option>
+                  <option value="deepseek">DeepSeek</option>
                 </select>
               </div>
 
@@ -1020,6 +1028,7 @@ function AIConfigModal({
                   <option value="openai-badger">OpenAI-Badger</option>
                   <option value="zhipu">智谱AI (GLM)</option>
                   <option value="anthropic">Anthropic Claude</option>
+                  <option value="deepseek">DeepSeek</option>
                 </select>
               </div>
 

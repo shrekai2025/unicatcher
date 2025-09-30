@@ -394,7 +394,7 @@ export const tweetProcessingRouter = createTRPCRouter({
       batchSize: z.number().min(1).max(100).default(10),
       batchProcessingMode: z.enum(['optimized', 'traditional']).default('optimized'),
       systemPrompt: z.string().optional(),
-      aiProvider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic']).default('openai'),
+      aiProvider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic', 'deepseek']).default('openai'),
       aiModel: z.string().default('gpt-4o'),
     }))
     .mutation(async ({ input }) => {
@@ -489,7 +489,7 @@ export const tweetProcessingRouter = createTRPCRouter({
       batchSize: z.number().min(1).max(100).default(10),
       batchProcessingMode: z.enum(['optimized', 'traditional']).default('optimized'),
       systemPrompt: z.string().optional(),
-      aiProvider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic']).default('openai'),
+      aiProvider: z.enum(['openai', 'openai-badger', 'zhipu', 'anthropic', 'deepseek']).default('openai'),
       aiModel: z.string().default('gpt-4o'),
     }))
     .mutation(async ({ input }) => {

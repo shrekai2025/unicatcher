@@ -5,3 +5,4 @@
 export { OpenAIService } from './openai-service';
 export { ZhipuService } from './zhipu-service';
 export { AnthropicService } from './anthropic-service';
+export { DeepSeekService } from './deepseek-service';

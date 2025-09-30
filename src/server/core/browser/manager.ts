@@ -214,17 +214,17 @@ export class BrowserManager {
     try {
       // 获取当前滚动位置
       const beforeScroll = await this.page.evaluate(() => window.pageYOffset);
-      
-      // 分步滚动，每次滚动1.5个屏幕高度，确保有足够的新内容
+
+      // 分步滚动，每次滚动1个屏幕高度，避免跨越太多内容
       await this.page.evaluate(() => {
-        const scrollStep = window.innerHeight * 1.5; // 滚动1.5个屏幕高度
+        const scrollStep = window.innerHeight * 1.0; // 滚动1个屏幕高度
         const currentScroll = window.pageYOffset;
         window.scrollTo({
           top: currentScroll + scrollStep,
           behavior: 'smooth'
         });
       });
-      
+
       // 等待滚动动画完成
       await this.page.waitForTimeout(1500);
       

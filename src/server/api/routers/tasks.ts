@@ -15,7 +15,7 @@ const unifiedTaskManager = UnifiedTaskManager.getInstance();
 
 export const tasksRouter = createTRPCRouter({
   /**
-   * 创建爬取任务
+   * 创建爬取任务 (List模式)
    */
   create: protectedProcedure
     .input(
@@ -46,6 +46,47 @@ export const tasksRouter = createTRPCRouter({
           listId: input.listId,
           maxTweets: input.maxTweets,
         });
+
+        return {
+          success: true,
+          message: "任务创建成功",
+          data: {
+            executorTaskId,
+          },
+        };
+      } catch (error) {
+        throw new Error(
+          error instanceof Error ? error.message : "创建任务失败"
+        );
+      }
+    }),
+
+  /**
+   * 创建Username爬取任务
+   */
+  createByUsername: protectedProcedure
+    .input(
+      z.object({
+        username: z.string().min(1, "Username不能为空"),
+        maxTweets: z.number().int().min(1).max(100).optional().default(20),
+      })
+    )
+    .mutation(async ({ input }) => {
+      try {
+        // 验证Username格式（不允许包含@符号）
+        if (input.username.includes('@')) {
+          throw new Error("Username不能包含@符号");
+        }
+
+        // 暂时跳过重复检查,允许同时爬取多个用户
+        // TODO: 如果需要限制同一用户的并发爬取,需要在SpiderTask表中增加username字段
+
+        // 提交任务到统一管理器
+        const executorTaskId = await unifiedTaskManager.submitTwitterTask({
+          type: 'twitter_user',
+          username: input.username,
+          maxTweets: input.maxTweets,
+        } as any);
 
         return {
           success: true,

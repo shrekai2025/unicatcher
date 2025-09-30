@@ -111,7 +111,7 @@ export interface CommentGenerateRequest {
   language: 'zh-CN' | 'en-US'; // 语言：简体中文 | 美国英语
   aiConfig?: {
     apiKey: string;
-    provider: 'openai' | 'openai-badger' | 'zhipu' | 'anthropic';
+    provider: 'openai' | 'openai-badger' | 'zhipu' | 'anthropic' | 'deepseek';
     model: string;
     baseURL?: string;
   }; // AI服务配置

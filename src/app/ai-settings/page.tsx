@@ -29,6 +29,7 @@ const AI_PROVIDERS = [
   { value: 'openai-badger', label: 'OpenAI Badger' },
   { value: 'zhipu', label: '智谱AI' },
   { value: 'anthropic', label: 'Anthropic' },
+  { value: 'deepseek', label: 'DeepSeek' },
 ];
 
 export default function AISettingsPage() {
