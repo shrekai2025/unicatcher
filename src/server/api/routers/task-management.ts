@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { deduplicationManager } from "~/server/services/cache-manager";
+import { deduplicationManager, analysisCacheManager } from "~/server/services/cache-manager";
 
 export const taskManagementRouter = createTRPCRouter({
 
@@ -124,6 +124,47 @@ export const taskManagementRouter = createTRPCRouter({
       } catch (error) {
         console.error('获取任务详情失败:', error);
         throw new Error(error instanceof Error ? error.message : '获取任务详情失败');
+      }
+    }),
+
+
+  /**
+   * 清除用户分析缓存
+   */
+  clearUserCache: publicProcedure
+    .input(z.object({
+      username: z.string().min(1, '用户名不能为空')
+    }))
+    .mutation(async ({ input }) => {
+      try {
+        analysisCacheManager.clearUserCache(input.username);
+
+        return {
+          success: true,
+          message: `已清除用户 ${input.username} 的分析缓存`
+        };
+      } catch (error) {
+        console.error('清除缓存失败:', error);
+        throw new Error('清除缓存失败');
+      }
+    }),
+
+
+  /**
+   * 获取缓存统计信息
+   */
+  getCacheStats: publicProcedure
+    .query(async () => {
+      try {
+        const stats = analysisCacheManager.getAllStats();
+
+        return {
+          success: true,
+          stats
+        };
+      } catch (error) {
+        console.error('获取缓存统计失败:', error);
+        throw new Error('获取缓存统计失败');
       }
     })
 });

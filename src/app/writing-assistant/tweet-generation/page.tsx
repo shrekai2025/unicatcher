@@ -130,26 +130,35 @@ export default function TweetGenerationPage() {
             </div>
 
             {/* 内容类型选择 */}
-            {selectedUsername && (
+            {selectedUsername && typesData && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h2 className="text-lg font-medium text-gray-900 mb-4">2. 选择内容类型</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {userStats?.data.types.map((type) => (
-                    <button
-                      key={type.contentType}
-                      onClick={() => setSelectedContentType(type.contentType)}
-                      className={`p-4 rounded-lg border-2 transition-all text-left ${
-                        selectedContentType === type.contentType
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-300'
-                      }`}
-                    >
-                      <div className="font-medium text-gray-900">{type.contentType}</div>
-                      <div className="text-sm text-gray-500 mt-1">
-                        {type.sampleCount}条样本
-                      </div>
-                    </button>
-                  ))}
+                  {typesData.types.map((type) => {
+                    const userTypeData = userStats?.data.types.find(t => t.contentType === type.value);
+                    const hasSamples = userTypeData && userTypeData.sampleCount > 0;
+
+                    return (
+                      <button
+                        key={type.value}
+                        onClick={() => setSelectedContentType(type.value)}
+                        className={`p-4 rounded-lg border-2 transition-all text-left ${
+                          selectedContentType === type.value
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        <div className="font-medium text-gray-900">{type.label}</div>
+                        <div className="text-sm text-gray-500 mt-1">
+                          {hasSamples ? (
+                            <span className="text-green-600">✓ {userTypeData.sampleCount}条样本</span>
+                          ) : (
+                            <span className="text-orange-500">○ 未分析</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {selectedContentType && typesData && (

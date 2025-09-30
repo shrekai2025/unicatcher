@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { api } from '~/trpc/react';
 
 interface ExtractResult {
   success: boolean;
@@ -43,6 +44,16 @@ export default function DataExtractPage() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<string>('');
+
+  // 清除缓存mutation
+  const clearCache = api.taskManagement.clearUserCache.useMutation({
+    onSuccess: (data) => {
+      alert(data.message);
+    },
+    onError: (error) => {
+      alert('清除缓存失败: ' + error.message);
+    }
+  });
 
   const handleExtract = async () => {
     if (!username.trim()) {
@@ -355,25 +366,51 @@ export default function DataExtractPage() {
               </p>
             </div>
 
-            <button
-              onClick={handleAnalysis}
-              disabled={isAnalyzing || !analysisUsername.trim()}
-              className="w-full bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isAnalyzing ? (
-                <>
+            <div className="flex gap-3">
+              <button
+                onClick={handleAnalysis}
+                disabled={isAnalyzing || !analysisUsername.trim()}
+                className="flex-1 bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    分析中...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    开始分析
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (!analysisUsername.trim()) {
+                    alert('请先输入用户名');
+                    return;
+                  }
+                  if (confirm(`确定要清除用户 ${analysisUsername.trim()} 的分析缓存吗？清除后将重新进行完整分析。`)) {
+                    clearCache.mutate({ username: analysisUsername.trim() });
+                  }
+                }}
+                disabled={!analysisUsername.trim() || clearCache.isPending}
+                className="px-6 py-3 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                title="清除该用户的分析缓存，重新分析"
+              >
+                {clearCache.isPending ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  分析中...
-                </>
-              ) : (
-                <>
+                ) : (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
-                  开始分析
-                </>
-              )}
-            </button>
+                )}
+                清除缓存
+              </button>
+            </div>
 
             {/* 当前步骤显示 */}
             {currentStep && (

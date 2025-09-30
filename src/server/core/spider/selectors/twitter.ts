@@ -512,26 +512,45 @@ export class TwitterSelector {
 
   /**
    * 提取推文正文（包含处理Show more按钮）
+   * 🔧 排除引用推文(Quote Tweet)的内容
    */
   async extractTweetText(tweetElement: any): Promise<string> {
     try {
       // 尝试查找和点击Show more按钮
       const expandedSuccessfully = await this.findAndClickShowMoreButton(tweetElement);
-      
-      // 提取推文文本（展开后的完整内容）
-      const textElement = await tweetElement.$(this.selectors.tweetText);
-      if (!textElement) {
+
+      // 查找所有推文文本元素
+      const textElements = await tweetElement.$$(this.selectors.tweetText);
+
+      if (textElements.length === 0) {
         return '';
       }
-      
-      const text = await textElement.textContent();
+
+      // 如果只有一个文本元素,直接返回
+      if (textElements.length === 1) {
+        const text = await textElements[0].textContent();
+        const fullText = text?.trim() || '';
+
+        if (expandedSuccessfully && fullText.length > 100) {
+          console.log(`✅ 成功提取完整推文文本 (${fullText.length} 字符)`);
+        }
+
+        return fullText;
+      }
+
+      // 如果有多个文本元素,第一个是主推文,后面的是引用推文
+      // 只取第一个(主推文)
+      const mainTextElement = textElements[0];
+      const text = await mainTextElement.textContent();
       const fullText = text?.trim() || '';
-      
+
+      console.log(`🔍 检测到引用推文，只提取主推文内容 (${fullText.length} 字符)`);
+
       // 记录文本长度以便调试
       if (expandedSuccessfully && fullText.length > 100) {
         console.log(`✅ 成功提取完整推文文本 (${fullText.length} 字符)`);
       }
-      
+
       return fullText;
     } catch (error) {
       console.error('提取推文正文失败:', error);
