@@ -92,6 +92,33 @@ export default function ApiDocsClientPage() {
           endpoints: apiEndpoints.filter(ep => ep.path.includes('/url2text'))
         }
       }
+    },
+    'writing-analysis': {
+      title: '写作分析模块',
+      description: '推文风格分析与个人化写作特征提取',
+      icon: '🔍',
+      subcategories: {
+        'data-management': {
+          title: '数据管理',
+          description: '推文数据合并与获取API接口',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/writing-analysis/merge-tweets'))
+        },
+        'type-analysis': {
+          title: '类型分析',
+          description: '推文类型自动标注与分布统计',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/writing-analysis/analyze-types'))
+        },
+        'style-analysis': {
+          title: '风格分析',
+          description: '用户写作风格特征提取与档案管理',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/writing-analysis/analyze-style'))
+        },
+        'complete-workflow': {
+          title: '完整分析流程',
+          description: '一键完成数据合并、类型分析、风格分析的完整流程',
+          endpoints: apiEndpoints.filter(ep => ep.path.includes('/writing-analysis/complete-analysis'))
+        }
+      }
     }
   };
 

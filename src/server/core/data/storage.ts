@@ -896,34 +896,163 @@ export class StorageService {
   }
 
   /**
-   * 获取数据提取记录列表
+   * 获取写作分析推文数据 (从WritingAnalysisTweet表获取)
    */
-  async getExtractRecords(page = 1, limit = 20) {
+  async getExtractedTweets(page = 1, limit = 20, batchId?: string) {
     try {
       const skip = (page - 1) * limit;
 
-      const [records, total] = await Promise.all([
-        db.dataSyncRecord.findMany({
-          where: { extractType: 'data_export' },
+      // 构建查询条件 - 从WritingAnalysisTweet表获取提取的推文
+      const whereCondition: any = {};
+
+      // 如果指定了batchId，按批次筛选
+      if (batchId) {
+        whereCondition.extractBatchId = batchId;
+      }
+
+      const [tweets, total] = await Promise.all([
+        db.writingAnalysisTweet.findMany({
+          where: whereCondition,
           orderBy: { createdAt: 'desc' },
           skip,
           take: limit,
+          select: {
+            id: true,
+            tweetId: true,
+            content: true,
+            userUsername: true,
+            publishedAt: true,
+            sourceType: true,
+            createdAt: true,
+          }
         }),
-        db.dataSyncRecord.count({
-          where: { extractType: 'data_export' }
-        }),
+        db.writingAnalysisTweet.count({
+          where: whereCondition
+        })
       ]);
 
+      // 获取所有推文的类型标注
+      // 注意：TweetTypeAnnotation.tweetId 关联的是 WritingAnalysisTweet.id，而不是 WritingAnalysisTweet.tweetId
+      const writingAnalysisTweetIds = tweets.map(t => t.id);
+      const typeAnnotations = await db.tweetTypeAnnotation.findMany({
+        where: {
+          tweetId: { in: writingAnalysisTweetIds }
+        },
+        select: {
+          id: true,
+          tweetId: true,
+          tweetTypes: true,
+          confidenceScore: true,
+          annotationMethod: true,
+          annotatedAt: true,
+        }
+      });
+
+      // 创建 WritingAnalysisTweet.id 到 typeAnnotation 的映射
+      const annotationMap = new Map(
+        typeAnnotations.map(ann => [ann.tweetId, ann])
+      );
+
+      // 转换BigInt为字符串并添加类型标注
+      const processedTweets = tweets.map(tweet => ({
+        ...tweet,
+        publishedAt: tweet.publishedAt ? tweet.publishedAt.toString() : '0',
+        typeAnnotation: annotationMap.get(tweet.id) || null,
+      }));
+
       return {
-        records,
+        tweets: processedTweets,
         total,
         page,
         limit,
-        hasMore: page * limit < total
+        hasMore: skip + limit < total,
+        totalRecords: total
       };
     } catch (error) {
-      console.error('获取提取记录失败:', error);
-      throw new Error('获取提取记录失败');
+      console.error('获取提取推文失败:', error);
+      throw new Error('获取提取推文失败');
+    }
+  }
+
+  /**
+   * 删除写作分析推文 (物理删除)
+   */
+  async markTweetAsDeleted(tweetId: string, deletedBy: string) {
+    try {
+      // 这里的tweetId实际上是WritingAnalysisTweet表的id
+      await db.writingAnalysisTweet.delete({
+        where: { id: tweetId }
+      });
+
+      return {
+        id: tweetId,
+        message: '推文删除成功'
+      };
+    } catch (error) {
+      console.error('删除推文失败:', error);
+      throw new Error('删除推文失败');
+    }
+  }
+
+  /**
+   * 获取写作分析推文统计信息
+   */
+  async getWritingAssistantTweetStats() {
+    try {
+      // 获取基础统计
+      const [totalTweets, totalBatches, recentTweets] = await Promise.all([
+        // 总推文数
+        db.writingAnalysisTweet.count({
+          where: { isDeleted: false }
+        }),
+        // 总批次数（包括extract和其他类型）
+        db.writingAnalysisTweet.groupBy({
+          by: ['extractBatchId'],
+          where: {
+            isDeleted: false,
+            extractBatchId: { not: null }
+          }
+        }).then(groups => groups.length),
+        // 最近的推文
+        db.writingAnalysisTweet.findMany({
+          where: {
+            isDeleted: false,
+            extractedAt: { not: null }
+          },
+          orderBy: { extractedAt: 'desc' },
+          take: 1000,
+          select: {
+            extractedAt: true,
+            extractBatchId: true,
+          }
+        })
+      ]);
+
+      // 计算日期范围 - 使用 ISO 字符串以避免 JSON 序列化问题
+      let dateRange = null;
+      if (recentTweets.length > 0) {
+        const validDates = recentTweets
+          .map(t => t.extractedAt)
+          .filter((d): d is Date => d !== null)
+          .map(d => new Date(d).getTime());
+
+        if (validDates.length > 0) {
+          dateRange = {
+            earliest: new Date(Math.min(...validDates)).toISOString(),
+            latest: new Date(Math.max(...validDates)).toISOString(),
+          };
+        }
+      }
+
+      return {
+        totalTweets,
+        totalBatches,
+        dateRange,
+        recentCount: recentTweets.length,
+      };
+    } catch (error) {
+      console.error('获取写作分析推文统计失败:', error);
+      throw new Error('获取统计信息失败');
     }
   }
 } 

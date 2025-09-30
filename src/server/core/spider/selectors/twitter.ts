@@ -617,9 +617,9 @@ export class TwitterSelector {
         console.warn('⚠️ 无法提取用户名，将影响推文URL生成');
       }
 
-      return { 
-        nickname, 
-        username: username ? `@${username}` : '' // 添加@前缀用于显示
+      return {
+        nickname,
+        username: username || '' // 不添加@前缀，保持纯用户名
       };
     } catch (error) {
       console.error('提取用户信息失败:', error);

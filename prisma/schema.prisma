@@ -589,6 +589,8 @@ model ArticleGenerationTask {
   id                      String   @id @default(cuid())
   topic                   String   // 内容主题
   platformId              String   // 内容平台ID
+  username                String?  // 用户名，用于个性化风格
+  contentType             String?  // 内容类型，如"科普"、"观点表达"等
   referenceArticleIds     String?  // 参考文章IDs（JSON数组）
   referenceArticleCount   Int      @default(0) // 参考文章数量
   additionalRequirements  String?  // 附加要求
@@ -610,25 +612,71 @@ model ArticleGenerationTask {
   @@index([status])
   @@index([createdAt])
   @@index([platformId])
+  @@index([username])
+  @@index([contentType])
 }
 
 // 文章生成结果表 - 写作辅助模块
 model ArticleGenerationResult {
   id               String   @id @default(cuid())
   taskId           String   @unique // 关联任务ID
-  generatedContent String   // 生成的文章内容
+
+  // 三阶段生成内容
+  generationStage  String   @default("final") @map("generation_stage") // 'outline', 'draft', 'final'
+  outlineContent   String?  @map("outline_content") // 大纲内容
+  draftContent     String?  @map("draft_content") // 初稿内容
+  finalContent     String?  @map("final_content") // 最终内容
+  generatedContent String   // 兼容原有字段，等同于finalContent
+  selfReviewNotes  String?  @map("self_review_notes") // 自查优化说明
+  stageTokens      String?  @map("stage_tokens") // 各阶段token消耗 JSON格式
+
+  // 基础信息
   wordCount        Int      // 实际字数
   aiProvider       String   // AI供应商
   aiModel          String   // AI模型
-  generatedAt      DateTime @default(now())
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+
+  // 用户反馈字段
+  userRating       Int?     @map("user_rating") // 1-5评分
+  userFeedback     String?  @map("user_feedback") // 具体反馈文本
+  feedbackTags     String?  @map("feedback_tags") // JSON格式的反馈标签
+  adjustmentTarget String?  @map("adjustment_target") // 'overview' | 'profile'
+  isImproved       Boolean  @default(false) @map("is_improved") // 是否已改进
+
+  // 时间字段
+  generatedAt      DateTime @default(now()) @map("generated_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   // 关联关系
   task ArticleGenerationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
   @@index([generatedAt])
+  @@index([generationStage])
+  @@index([userRating])
+  @@index([adjustmentTarget])
+  @@map("article_generation_result")
+}
+
+// 反馈模式表 - 用户反馈的问题模式统计
+model FeedbackPattern {
+  id           String   @id @default(cuid())
+  username     String
+  contentType  String   @map("content_type") // 内容类型
+  feedbackType String   @map("feedback_type") // 'negative', 'positive', 'suggestion'
+  pattern      String   // 具体问题模式，如"太书面化"、"表达不够口语化"
+  frequency    Int      @default(1) // 出现频次
+  lastOccurred DateTime @map("last_occurred") // 最后出现时间
+  isResolved   Boolean  @default(false) @map("is_resolved") // 是否已解决
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([username, contentType, pattern])
+  @@index([username, contentType])
+  @@index([feedbackType, isResolved])
+  @@index([frequency])
+  @@index([lastOccurred])
+  @@map("feedback_pattern")
 }
 
 // AI评论配置表 - 存储AI评论生成的系统提示词模板
@@ -670,4 +718,327 @@ model URL2TextResult {
   @@index([originalUrl])
   @@index([createdAt])
   @@map("url2text_result")
+}
+
+
+// 写作分析推文数据表 - 写作辅助模块的统一推文数据表
+model WritingAnalysisTweet {
+  id            String   @id @default(cuid())
+  content       String   // 推文内容
+  tweetId       String   @unique // 原始推文ID（用于排重）
+  userUsername  String   // 用户名
+  userNickname  String?  // 用户昵称（显示名）
+  publishedAt   BigInt   // 发布时间戳
+
+  // 数据来源标识
+  sourceType    String   // 数据来源：tweet, manual
+  sourceId      String   // 原始记录的ID
+
+  // 基础统计字段（从Tweet表继承，Manual类型默认为0）
+  replyCount    Int      @default(0) // 评论数
+  retweetCount  Int      @default(0) // 转发数
+  likeCount     Int      @default(0) // 点赞数
+  viewCount     Int      @default(0) // 浏览数
+
+  // 额外信息字段
+  profileImageUrl String? // 用户头像URL
+  tweetUrl      String?   // 推文完整链接
+  scrapedAt     BigInt?   // 爬取时间戳
+
+  // 数据提取相关信息
+  extractBatchId String?  // 提取批次ID
+  extractedAt   DateTime? // 提取时间
+  extractType   String?   @default("writing_assistant") // 提取类型
+
+  // 逻辑删除相关字段
+  isDeleted     Boolean  @default(false) // 是否已被逻辑删除
+  deletedAt     DateTime? // 删除时间
+  deletedBy     String?  // 删除操作的用户
+
+  // 写作风格分析字段（基于参考文档设计）
+  analysisStatus    String?   @default("pending") // 分析状态：pending, processing, completed, failed
+
+  // 文本预处理结果
+  cleanedContent    String?   // 清洗后的文本内容
+  textLength        Int?      // 字符数
+  wordCount         Int?      // 分词后词数
+  sentenceCount     Int?      // 句子数
+
+  // 语言风格分析结果（JSON格式存储）
+  lexicalFeatures   String?   // 词汇特征：词汇丰富度、复杂度、高频词等
+  syntaxFeatures    String?   // 句式特征：句长分布、句型占比、标点符号使用
+  rhetoricalFeatures String?  // 修辞特征：修辞手法、语气词、口语化程度等
+
+  // 内容分析结果
+  topicClassification String? // 主题分类结果（一级、二级主题）
+  contentDepthLevel  String?  // 内容深度等级：shallow, medium, deep
+  structurePattern   String?  // 结构模式分析结果
+
+  // 互动效果评分
+  engagementScore    Float?   // 互动评分（NES）
+  contentQualityScore Float?  // 内容质量评分（CQ）
+  overallScore       Float?   // 综合评分（OS）
+
+  // 处理时间记录
+  analyzedAt        DateTime? // 分析完成时间
+  batchId           String?   // 分析批次ID
+
+  // 标准时间字段
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // 关联的类型标注
+  typeAnnotations   TweetTypeAnnotation[]
+
+  @@index([userUsername])
+  @@index([publishedAt])
+  @@index([sourceType])
+  @@index([analysisStatus])
+  @@index([userUsername, publishedAt])
+  @@index([isDeleted])
+  @@index([extractBatchId])
+  @@index([extractedAt])
+  @@index([isDeleted, extractedAt])
+  @@index([createdAt])
+  @@map("writing_analysis_tweet")
+}
+
+// 推文类型配置表
+model TweetTypeConfig {
+  id                   String   @id @default(cuid())
+  typeName             String   @unique @map("type_name")
+  typeCategory         String   @map("type_category")
+  description          String?
+  typicalStructure     String?  @map("typical_structure")
+  commonOpenings       String?  @map("common_openings") // JSON
+  toneCharacteristics  String?  @map("tone_characteristics")
+  isActive             Boolean  @default(true) @map("is_active")
+
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("tweet_type_config")
+}
+
+// 推文类型标注表
+model TweetTypeAnnotation {
+  id               String   @id @default(cuid())
+  tweetId          String   @map("tweet_id")
+  username         String
+  tweetTypes       String   @map("tweet_types") // JSON: 推文类型及权重
+  confidenceScore  Float    @map("confidence_score")
+  annotationMethod String   @map("annotation_method") // auto/manual/hybrid
+  annotatedAt      DateTime @default(now()) @map("annotated_at")
+
+  // 关联到写作分析推文
+  tweet WritingAnalysisTweet @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+
+  @@index([username])
+  @@index([tweetId])
+  @@index([annotatedAt])
+  @@index([username, annotatedAt])
+  @@index([annotationMethod])
+  @@index([confidenceScore])
+  @@map("tweet_type_annotation")
+}
+
+// 用户风格档案表
+model UserStyleProfile {
+  id                       String   @id @default(cuid())
+  username                 String
+  contentType              String   @map("content_type") // 内容类型：如"科普"、"观点表达"等
+
+  // 词汇特征
+  signatureWords           String?  @map("signature_words") // JSON
+  vocabDiversity           Float?   @map("vocab_diversity")
+  wordComplexity           Float?   @map("word_complexity")
+
+  // 句式特征
+  avgSentenceLength        Float?   @map("avg_sentence_length")
+  sentenceTypeDist         String?  @map("sentence_type_dist") // JSON
+  punctuationPattern       String?  @map("punctuation_pattern") // JSON
+
+  // 专业度与行业知识处理
+  technicalTermUsage       Float?   @map("technical_term_usage") // 0-1
+  dataCitationStyle        String?  @map("data_citation_style") // JSON
+  professionalTopicStyle   String?  @map("professional_topic_style") // JSON
+  industryKnowledgeLevel   String?  @map("industry_knowledge_level") // basic/intermediate/expert
+
+  // 该类型下的常用开头和结尾模式
+  commonOpenings           String?  @map("common_openings") // JSON: 该类型常用开头
+  commonClosings           String?  @map("common_closings") // JSON: 该类型常用结尾
+  avgContentLength         Float?   @map("avg_content_length") // 该类型平均内容长度
+  toneFeatures             String?  @map("tone_features") // JSON: 该类型语调特征
+
+  // 样本统计
+  sampleCount              Int?     @map("sample_count") // 该类型样本数量
+  lastAnalyzedAt           DateTime? @map("last_analyzed_at") // 最后分析时间
+
+  // 生成配置
+  generationConfig         String?  @map("generation_config") // JSON
+
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  @@unique([username, contentType])
+  @@index([username])
+  @@index([contentType])
+  @@index([lastAnalyzedAt])
+  @@map("user_style_profile")
+}
+
+// 用户写作概览表 - LLM驱动的写作风格分析
+model UserWritingOverview {
+  id               String   @id @default(cuid())
+  username         String   @unique
+
+  // 概览内容（JSON格式存储完整的UserWritingOverview接口）
+  overviewContent  String   @map("overview_content") // JSON
+
+  // 元数据
+  totalTweetsAnalyzed Int    @default(0) @map("total_tweets_analyzed")
+  lastUpdated      DateTime @map("last_updated")
+  version          Int      @default(1)
+
+  // 更新历史（JSON格式记录主要更新）
+  updateHistory    String?  @map("update_history")
+
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // 关联的更新日志
+  updateLogs       OverviewUpdateLog[]
+
+  @@index([username])
+  @@index([lastUpdated])
+  @@index([version])
+  @@map("user_writing_overview")
+}
+
+// 概览更新日志表
+model OverviewUpdateLog {
+  id              String   @id @default(cuid())
+  username        String
+
+  // 更新信息
+  updateType      String   @map("update_type") // INITIAL, INCREMENTAL, MAJOR_REVISION
+  newTweetsCount  Int?     @map("new_tweets_count")
+  changesMade     String?  @map("changes_made") // JSON: 具体更改内容
+
+  // LLM信息
+  llmModel        String?  @map("llm_model")
+  promptTokens    Int?     @map("prompt_tokens")
+  completionTokens Int?    @map("completion_tokens")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // 关联到用户写作概览
+  userOverview    UserWritingOverview @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  @@index([username])
+  @@index([updateType])
+  @@index([createdAt])
+  @@index([username, createdAt])
+  @@map("overview_update_log")
+}
+
+// 写作辅助AI配置表 - 专门用于写作概览和生成功能的AI配置
+model WritingAssistantAIConfig {
+  id                String   @id @default(cuid())
+  configName        String   @unique // 配置名称，如：default, premium, fast等
+  provider          String   // AI供应商：openai, anthropic, zhipu等
+  model             String   // 模型名称
+  temperature       Float    @default(0.3) // 温度参数
+  maxTokens         Int      @default(4000) // 最大token数
+  isActive          Boolean  @default(true) // 是否启用
+  isDefault         Boolean  @default(false) // 是否为默认配置
+  description       String?  // 配置描述
+
+  // 特定配置
+  analysisModel     String?  // 用于分析的模型（可与生成模型不同）
+  generationModel   String?  // 用于生成的模型
+  updateCheckModel  String?  // 用于更新检查的快速模型
+
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([configName])
+  @@index([isActive])
+  @@index([isDefault])
+  @@map("writing_assistant_ai_config")
+}
+
+// 推文生成任务表
+model TweetGenerationTask {
+  id                String   @id @default(cuid())
+
+  // 基本输入参数
+  username          String   // 目标用户名 @testuser
+  contentType       String   // 内容类型,对应TWEET_TYPES
+  topic             String?  // 可选的主题/话题
+
+  // 生成配置
+  generateCount     Int      @default(3) // 生成推文数量
+  lengthPreference  String   @default("auto") // auto | short | medium | long
+
+  // AI配置
+  aiProvider        String   @default("openai")
+  aiModel           String   @default("gpt-4o")
+  temperature       Float    @default(0.7) // 较高温度保持创意
+
+  // 任务状态
+  status            String   @default("pending") // pending | processing | completed | failed
+  errorMessage      String?
+
+  // 时间字段
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // 关联的生成结果
+  results           TweetGenerationResult[]
+
+  @@index([username])
+  @@index([contentType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("tweet_generation_task")
+}
+
+// 推文生成结果表
+model TweetGenerationResult {
+  id                String   @id @default(cuid())
+  taskId            String   // 关联任务
+
+  // 生成内容
+  generatedContent  String   // 生成的推文内容
+  contentLength     Int      // 字符数
+
+  // 风格一致性评分
+  styleScore        Float?   // AI自评的风格匹配度 0-1
+  styleAnalysis     String?  // JSON: 风格分析说明
+
+  // 使用的风格数据快照
+  styleDataSnapshot String?  // JSON: 记录使用了哪些风格特征
+
+  // 用户反馈
+  userRating        Int?     // 1-5星评分
+  userFeedback      String?  // 用户反馈文本
+  isSelected        Boolean  @default(false) // 是否被用户选中使用
+
+  // 元数据
+  aiProvider        String
+  aiModel           String
+  generatedAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  task              TweetGenerationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userRating])
+  @@index([isSelected])
+  @@index([generatedAt])
+  @@map("tweet_generation_result")
 }

@@ -5,6 +5,7 @@ import { twitterAIBatchEndpoints } from './twitter-ai-batch';
 import { twitterProcessingEndpoints } from './twitter-processing';
 import { manualTweetsEndpoints } from './manual-tweets';
 import { writingAssistantEndpoints } from './writing-assistant';
+import { writingAnalysisEndpoints } from './writing-analysis';
 
 export const apiEndpoints: ApiEndpoint[] = [
   ...twitterTasksEndpoints,
@@ -13,6 +14,7 @@ export const apiEndpoints: ApiEndpoint[] = [
   ...twitterProcessingEndpoints,
   ...manualTweetsEndpoints,
   ...writingAssistantEndpoints,
+  ...writingAnalysisEndpoints,
 ];
 
 export {
@@ -22,4 +24,5 @@ export {
   twitterProcessingEndpoints,
   manualTweetsEndpoints,
   writingAssistantEndpoints,
+  writingAnalysisEndpoints,
 };

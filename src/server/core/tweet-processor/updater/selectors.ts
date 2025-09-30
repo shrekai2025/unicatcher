@@ -263,7 +263,7 @@ export class TweetDetailSelectors {
         if (href) {
           const match = href.match(/\/([^\/]+)$/);
           if (match && match[1]) {
-            username = `@${match[1]}`;
+            username = match[1]; // 不添加@前缀，保持纯用户名
           }
         }
       }

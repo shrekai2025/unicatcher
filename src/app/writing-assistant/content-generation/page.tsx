@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { api } from '~/trpc/react';
 import { Plus, FileText, Send, Loader2, Copy, Trash2, RefreshCw, Settings } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog';
+import { GenerationStagesViewer } from '~/components/generation/GenerationStagesViewer';
 
 // AI配置常量
 const AI_PROVIDERS = [
@@ -640,84 +641,20 @@ function TaskDetailDialog({ taskId, onClose, onCopy }: {
   onClose: () => void;
   onCopy: (text: string) => void;
 }) {
-  const { data: task, refetch } = api.articleGeneration.getTask.useQuery({ taskId });
-
-  useEffect(() => {
-    if (task?.status === 'processing') {
-      const interval = setInterval(() => {
-        refetch();
-      }, 2000);
-      return () => clearInterval(interval);
-    }
-  }, [task?.status, refetch]);
-
-  if (!task) return null;
-
   return (
     <Dialog open={true} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center">
-            文章详情
-            <span className={`ml-3 px-2 py-1 text-xs rounded-full ${getStatusColor(task.status)}`}>
-              {getStatusText(task.status)}
-            </span>
-          </DialogTitle>
+          <DialogTitle>文章详情</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 p-6 pt-0">
-          {/* 任务信息 */}
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-2">任务信息</h4>
-            <div className="bg-gray-50 p-3 rounded text-sm space-y-1">
-              <div><span className="font-medium">主题：</span>{task.topic}</div>
-              <div><span className="font-medium">平台：</span>{task.platform.name}</div>
-              <div><span className="font-medium">创建时间：</span>{new Date(task.createdAt).toLocaleString('zh-CN')}</div>
-              {task.additionalRequirements && (
-                <div><span className="font-medium">附加要求：</span>{task.additionalRequirements}</div>
-              )}
-            </div>
-          </div>
-
-          {/* 生成结果 */}
-          {task.status === 'processing' && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-              <span className="ml-2 text-gray-600">正在生成文章，请稍候...</span>
-            </div>
-          )}
-
-          {task.status === 'failed' && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-red-800 mb-2">生成失败</h4>
-              <p className="text-sm text-red-600">{task.errorMessage || '未知错误'}</p>
-            </div>
-          )}
-
-          {task.result && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-medium text-gray-700">生成的文章内容</h4>
-                <button
-                  onClick={() => onCopy(task.result!.generatedContent)}
-                  className="flex items-center px-3 py-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
-                >
-                  <Copy className="h-4 w-4 mr-1" />
-                  复制全文
-                </button>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto">
-                <pre className="whitespace-pre-wrap text-sm text-gray-800">
-                  {task.result!.generatedContent}
-                </pre>
-              </div>
-              <div className="mt-2 text-xs text-gray-500">
-                字数：{task.result!.wordCount}字 •
-                模型：{task.result!.aiProvider}/{task.result!.aiModel} •
-                生成时间：{new Date(task.result!.generatedAt).toLocaleString('zh-CN')}
-              </div>
-            </div>
-          )}
+        <div className="p-6 pt-0">
+          <GenerationStagesViewer
+            taskId={taskId}
+            username="default-user" // 可以从context或者props获取
+            contentType="通用" // 可以从任务信息获取
+            onCopy={onCopy}
+          />
         </div>
       </DialogContent>
     </Dialog>

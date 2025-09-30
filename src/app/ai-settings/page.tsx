@@ -10,6 +10,20 @@ interface ProviderConfig {
   isActive: boolean;
 }
 
+interface WritingAssistantConfig {
+  configName: string;
+  provider: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  isActive: boolean;
+  isDefault: boolean;
+  description: string;
+  analysisModel?: string;
+  generationModel?: string;
+  updateCheckModel?: string;
+}
+
 const AI_PROVIDERS = [
   { value: 'openai', label: 'OpenAI' },
   { value: 'openai-badger', label: 'OpenAI Badger' },
@@ -28,10 +42,17 @@ export default function AISettingsPage() {
   );
   const [providersLastUpdated, setProvidersLastUpdated] = useState<string | null>(null);
 
+  // 写作辅助AI配置状态
+  const [writingConfigs, setWritingConfigs] = useState<WritingAssistantConfig[]>([]);
+  const [supportedProviders, setSupportedProviders] = useState<string[]>([]);
+  const [providerModels, setProviderModels] = useState<Record<string, string[]>>({});
+  const [writingLastUpdated, setWritingLastUpdated] = useState<string | null>(null);
+
   // 加载和保存状态
   const [loading, setLoading] = useState(true);
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [savingProviders, setSavingProviders] = useState(false);
+  const [savingWriting, setSavingWriting] = useState(false);
 
   useEffect(() => {
     loadAllConfigs();
@@ -67,6 +88,22 @@ export default function AISettingsPage() {
           });
           setProviderConfigs(mergedConfigs);
           setProvidersLastUpdated(loadedConfigs[0]?.updatedAt || null);
+        }
+      }
+
+      // 加载写作辅助AI配置
+      const writingResponse = await fetch('/api/external/writing-assistant-ai-config', {
+        headers: { 'x-api-key': 'unicatcher-api-key-demo' }
+      });
+      if (writingResponse.ok) {
+        const writingResult = await writingResponse.json();
+        if (writingResult.success) {
+          setWritingConfigs(writingResult.data.configs || []);
+          setSupportedProviders(writingResult.data.supportedProviders || []);
+          setProviderModels(writingResult.data.providerModels || {});
+          if (writingResult.data.configs.length > 0) {
+            setWritingLastUpdated(writingResult.data.configs[0]?.updatedAt || null);
+          }
         }
       }
     } catch (error) {
@@ -149,6 +186,78 @@ export default function AISettingsPage() {
     setProviderConfigs(prev => prev.map(p =>
       p.provider === provider ? { ...p, [field]: value } : p
     ));
+  };
+
+  const handleSaveWritingConfigs = async () => {
+    try {
+      setSavingWriting(true);
+      console.log('[写作AI设置] 准备保存配置:', writingConfigs);
+
+      const response = await fetch('/api/external/writing-assistant-ai-config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'unicatcher-api-key-demo'
+        },
+        body: JSON.stringify({ configs: writingConfigs })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[写作AI设置] 响应错误:', errorText);
+        throw new Error(`保存失败: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        setWritingLastUpdated(result.data.configs[0]?.updatedAt || null);
+        alert('✅ 写作辅助AI配置已保存成功！');
+        await loadAllConfigs();
+      } else {
+        throw new Error(result.error?.message || '保存失败');
+      }
+    } catch (error) {
+      console.error('[写作AI设置] 保存失败:', error);
+      alert(`❌ 保存失败: ${error instanceof Error ? error.message : '请重试'}`);
+    } finally {
+      setSavingWriting(false);
+    }
+  };
+
+  const updateWritingConfig = (configName: string, field: keyof WritingAssistantConfig, value: any) => {
+    setWritingConfigs(prev => prev.map(config =>
+      config.configName === configName ? { ...config, [field]: value } : config
+    ));
+  };
+
+  const addWritingConfig = () => {
+    const newConfigName = `config_${Date.now()}`;
+    const newConfig: WritingAssistantConfig = {
+      configName: newConfigName,
+      provider: supportedProviders[0] || 'openai',
+      model: '',
+      temperature: 0.3,
+      maxTokens: 4000,
+      isActive: true,
+      isDefault: writingConfigs.length === 0, // 如果是第一个配置，设为默认
+      description: '',
+    };
+    setWritingConfigs(prev => [...prev, newConfig]);
+  };
+
+  const removeWritingConfig = (configName: string) => {
+    if (writingConfigs.find(c => c.configName === configName)?.isDefault) {
+      alert('不能删除默认配置');
+      return;
+    }
+    setWritingConfigs(prev => prev.filter(config => config.configName !== configName));
+  };
+
+  const setAsDefault = (configName: string) => {
+    setWritingConfigs(prev => prev.map(config => ({
+      ...config,
+      isDefault: config.configName === configName
+    })));
   };
 
   if (loading) {
@@ -261,6 +370,226 @@ export default function AISettingsPage() {
                   </>
                 ) : (
                   '保存服务商配置'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 写作辅助AI配置 */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-medium text-gray-900">写作辅助AI配置</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              配置用于LLM写作概览分析和内容生成的AI模型，支持多种配置方案
+            </p>
+            {writingLastUpdated && (
+              <p className="mt-1 text-xs text-gray-500">
+                最后更新：{new Date(writingLastUpdated).toLocaleString('zh-CN')}
+              </p>
+            )}
+          </div>
+
+          <div className="p-6">
+            {writingConfigs.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">暂无写作辅助AI配置</p>
+                <button
+                  onClick={addWritingConfig}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  添加配置
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {writingConfigs.map((config, index) => (
+                  <div key={config.configName} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <h3 className="text-sm font-semibold text-gray-900">
+                          配置 {index + 1}
+                          {config.isDefault && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                              默认
+                            </span>
+                          )}
+                        </h3>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <label className="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={config.isActive}
+                            onChange={(e) => updateWritingConfig(config.configName, 'isActive', e.target.checked)}
+                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                          />
+                          <span className="ml-2 text-sm text-gray-600">启用</span>
+                        </label>
+                        {!config.isDefault && (
+                          <>
+                            <button
+                              onClick={() => setAsDefault(config.configName)}
+                              className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors"
+                            >
+                              设为默认
+                            </button>
+                            <button
+                              onClick={() => removeWritingConfig(config.configName)}
+                              className="px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                            >
+                              删除
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          配置名称 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={config.configName}
+                          onChange={(e) => updateWritingConfig(config.configName, 'configName', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="配置名称"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          AI供应商 <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={config.provider}
+                          onChange={(e) => {
+                            updateWritingConfig(config.configName, 'provider', e.target.value);
+                            updateWritingConfig(config.configName, 'model', ''); // 重置模型选择
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">选择供应商</option>
+                          {supportedProviders.map(provider => (
+                            <option key={provider} value={provider}>
+                              {AI_PROVIDERS.find(p => p.value === provider)?.label || provider}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          模型 <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={config.model}
+                          onChange={(e) => updateWritingConfig(config.configName, 'model', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          disabled={!config.provider}
+                        >
+                          <option value="">选择模型</option>
+                          {config.provider && providerModels[config.provider]?.map(model => (
+                            <option key={model} value={model}>{model}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          温度参数
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="2"
+                          step="0.1"
+                          value={config.temperature}
+                          onChange={(e) => updateWritingConfig(config.configName, 'temperature', parseFloat(e.target.value))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          最大Token数
+                        </label>
+                        <input
+                          type="number"
+                          min="100"
+                          max="8000"
+                          step="100"
+                          value={config.maxTokens}
+                          onChange={(e) => updateWritingConfig(config.configName, 'maxTokens', parseInt(e.target.value))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          更新检查模型 (可选)
+                        </label>
+                        <select
+                          value={config.updateCheckModel || ''}
+                          onChange={(e) => updateWritingConfig(config.configName, 'updateCheckModel', e.target.value || null)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">使用主模型</option>
+                          {config.provider && providerModels[config.provider]?.map(model => (
+                            <option key={model} value={model}>{model}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        描述 (可选)
+                      </label>
+                      <textarea
+                        value={config.description}
+                        onChange={(e) => updateWritingConfig(config.configName, 'description', e.target.value)}
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="配置说明..."
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                <div className="flex justify-between">
+                  <button
+                    onClick={addWritingConfig}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    添加新配置
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={loadAllConfigs}
+                disabled={loading || savingWriting}
+                className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                重新加载
+              </button>
+              <button
+                onClick={handleSaveWritingConfigs}
+                disabled={loading || savingWriting}
+                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              >
+                {savingWriting ? (
+                  <>
+                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    保存中...
+                  </>
+                ) : (
+                  '保存写作AI配置'
                 )}
               </button>
             </div>

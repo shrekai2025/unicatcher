@@ -56,9 +56,9 @@ export default function Url2TextPage() {
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ConversionResult | null>(null);
+  const [taskSubmitted, setTaskSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(false);
-  const [copied, setCopied] = useState(false);
   // 历史结果相关状态
   const [historyResults, setHistoryResults] = useState<HistoryResult[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -139,7 +139,7 @@ export default function Url2TextPage() {
     setShowConfig(false);
   };
 
-  // URL转文本处理
+  // URL转文本任务提交
   const handleConversion = async () => {
     if (!url.trim()) {
       setError('请输入有效的URL地址');
@@ -155,12 +155,14 @@ export default function Url2TextPage() {
     setIsLoading(true);
     setError(null);
     setResult(null);
+    setTaskSubmitted(false);
 
     try {
-      const response = await fetch('/api/url2text', {
+      const response = await fetch('/api/external/writing-assistant/url2text', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-api-key': 'unicatcher-api-key-demo'
         },
         body: JSON.stringify({
           url: url.trim(),
@@ -170,44 +172,25 @@ export default function Url2TextPage() {
 
       const data: ApiResponse = await response.json();
 
-      if (data.success && data.data) {
-        setResult(data.data);
-        // 转换成功后刷新历史记录
+      if (data.success) {
+        setTaskSubmitted(true);
+        // 任务提交成功后，定期刷新历史记录查看结果
         setTimeout(() => {
           loadHistoryResults();
-        }, 1000);
+        }, 2000);
+        // 清空URL，准备下一个任务
+        setUrl('');
       } else {
-        setError(data.error?.message || '转换失败，请稍后重试');
+        setError(data.error?.message || '任务提交失败，请稍后重试');
       }
     } catch (err) {
-      console.error('Conversion error:', err);
+      console.error('Task submission error:', err);
       setError('网络请求失败，请检查网络连接');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 复制正文内容
-  const copyContent = async () => {
-    if (!result?.content) return;
-
-    try {
-      await navigator.clipboard.writeText(result.content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Copy failed:', err);
-      // 降级方案：使用传统方法复制
-      const textArea = document.createElement('textarea');
-      textArea.value = result.content;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   // 处理键盘事件
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -223,7 +206,7 @@ export default function Url2TextPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">URL转文本</h1>
           <p className="mt-2 text-sm text-gray-600">
-            将网页URL转换为结构化文本内容
+            将网页URL转换为结构化文本内容（异步处理，结果显示在下方历史记录中）
           </p>
         </div>
 
@@ -248,7 +231,7 @@ export default function Url2TextPage() {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="请输入URL地址，例如：https://example.com/article"
+                  placeholder="请输入URL地址，例如：https://example.com/article（提交后后台异步处理）"
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
                   disabled={isLoading}
                 />
@@ -269,10 +252,10 @@ export default function Url2TextPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    转换中
+                    提交中
                   </>
                 ) : (
-                  '转换'
+                  '提交任务'
                 )}
               </button>
             </div>
@@ -285,72 +268,19 @@ export default function Url2TextPage() {
               <span className="text-sm text-red-700">{error}</span>
             </div>
           )}
+
+          {/* 任务提交成功提示 */}
+          {taskSubmitted && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md flex items-start">
+              <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-green-700">
+                <p className="font-medium">任务已提交成功！</p>
+                <p className="mt-1">正在后台处理中，请稍后查看下方“历史记录”获取结果。</p>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* 结果展示区域 */}
-        {result && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">📄 转换结果</h2>
-
-              {/* 标题和作者信息 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">标题</label>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                    <p className="text-sm text-gray-900">{result.title || '未获取到标题'}</p>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">作者</label>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                    <p className="text-sm text-gray-900">{result.author || '未获取到作者'}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 正文内容 */}
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <label className="block text-sm font-medium text-gray-700">正文内容</label>
-                <button
-                  onClick={copyContent}
-                  className={cn(
-                    "flex items-center px-3 py-1.5 text-sm rounded-md transition-colors",
-                    copied
-                      ? "bg-green-100 text-green-700 cursor-default"
-                      : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                  )}
-                >
-                  {copied ? (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      已复制
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4 mr-1" />
-                      复制正文
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <div className="border border-gray-200 rounded-md bg-white">
-                {result.content ? (
-                  <div className="p-4 prose prose-sm max-w-none">
-                    <ReactMarkdown>{result.content}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <div className="p-4 text-gray-500 text-center">
-                    未获取到正文内容
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* 历史结果列表 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">

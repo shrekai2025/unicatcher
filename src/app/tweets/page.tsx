@@ -8,7 +8,7 @@ import { CommentDialog } from '~/components/ui/comment-dialog';
 import { GenerateCommentDialog } from '~/components/ui/generate-comment-dialog';
 
 export default function TweetsPage() {
-  const [activeTab, setActiveTab] = useState<'auto' | 'manual'>('auto');
+  const [activeTab, setActiveTab] = useState<'auto' | 'manual' | 'extracts'>('auto');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTweets, setSelectedTweets] = useState<string[]>([]);
@@ -22,6 +22,9 @@ export default function TweetsPage() {
   const [manualTweets, setManualTweets] = useState<any[]>([]);
   const [loadingManualTweets, setLoadingManualTweets] = useState(false);
 
+  // 提取推文数据的状态
+  const [extractPage, setExtractPage] = useState(1);
+
   // 评论弹窗状态
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [viewingComments, setViewingComments] = useState<any[]>([]);
@@ -33,6 +36,7 @@ export default function TweetsPage() {
   const [currentGenerateTweet, setCurrentGenerateTweet] = useState<{ id: string; content: string } | null>(null);
   const [generatedComments, setGeneratedComments] = useState<{ [tweetId: string]: any[] }>({});
   const [expandedGeneratedComments, setExpandedGeneratedComments] = useState<string[]>([]);
+  const [expandedTypeAnnotations, setExpandedTypeAnnotations] = useState<string[]>([]);
 
   // AI服务配置状态
   const [showAIConfigModal, setShowAIConfigModal] = useState(false);
@@ -62,6 +66,12 @@ export default function TweetsPage() {
     search: searchQuery || undefined,
   });
 
+  // 提取推文查询
+  const extractedTweetsQuery = api.extracts.getExtractedTweets.useQuery({
+    page: extractPage,
+    limit: 10,
+  });
+
   // API 变更
   const deleteTweet = api.tweets.delete.useMutation({
     onSuccess: () => {
@@ -77,6 +87,12 @@ export default function TweetsPage() {
   });
 
   const exportTweets = api.tweets.export.useMutation();
+
+  const deleteExtractedTweet = api.extracts.deleteTweet.useMutation({
+    onSuccess: () => {
+      void extractedTweetsQuery.refetch();
+    },
+  });
 
   // 获取手动采集的推文
   const fetchManualTweets = async () => {
@@ -452,6 +468,14 @@ export default function TweetsPage() {
     // 可以添加一个提示toast
   };
 
+  const handleToggleTypeAnnotation = (tweetId: string) => {
+    setExpandedTypeAnnotations(prev =>
+      prev.includes(tweetId)
+        ? prev.filter(id => id !== tweetId)
+        : [...prev, tweetId]
+    );
+  };
+
   // 保存AI配置到localStorage
   const saveAIConfig = (config: any) => {
     setAIConfig(config);
@@ -459,6 +483,14 @@ export default function TweetsPage() {
       localStorage.setItem('unicatcher-comment-generation-ai-config', JSON.stringify(config));
     }
     setShowAIConfigModal(false);
+  };
+
+  const handleDeleteExtractedTweet = (tweetId: string) => {
+    const session = getSession();
+    deleteExtractedTweet.mutate({
+      id: tweetId,
+      deletedBy: session.username || 'unknown'
+    });
   };
 
   const headerActions = (
@@ -517,6 +549,16 @@ export default function TweetsPage() {
               }`}
             >
               ✋ 手动采集
+            </button>
+            <button
+              onClick={() => setActiveTab('extracts')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'extracts'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              📊 提取推文
             </button>
           </nav>
         </div>
@@ -961,6 +1003,276 @@ export default function TweetsPage() {
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {/* 提取推文列表 */}
+      {activeTab === 'extracts' && (
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg leading-6 font-medium text-gray-900">
+                提取推文数据
+              </h3>
+              <button
+                onClick={() => extractedTweetsQuery.refetch()}
+                disabled={extractedTweetsQuery.isLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {extractedTweetsQuery.isLoading ? '刷新中...' : '刷新'}
+              </button>
+            </div>
+          </div>
+
+          {/* 表格 */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    用户
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    推文内容
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    发布时间
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    操作
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {extractedTweetsQuery.data?.data?.tweets?.map((tweet: any) => (
+                  <tr key={tweet.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center border-2 border-blue-300">
+                            <span className="text-blue-700 font-semibold text-sm">
+                              {tweet.userUsername?.[0]?.toUpperCase() || 'U'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm text-gray-500">
+                            @{tweet.userUsername}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 max-w-md">
+                        {expandedTweets.includes(tweet.id) ? (
+                          <div>
+                            {tweet.content}
+                            <button
+                              onClick={() => handleToggleExpand(tweet.id)}
+                              className="ml-2 text-blue-600 hover:text-blue-800"
+                            >
+                              收起
+                            </button>
+                          </div>
+                        ) : (
+                          <div>
+                            {truncateText(tweet.content)}
+                            {tweet.content.length > 100 && (
+                              <button
+                                onClick={() => handleToggleExpand(tweet.id)}
+                                className="ml-2 text-blue-600 hover:text-blue-800"
+                              >
+                                展开
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-3 mt-2">
+                        <span className="text-xs text-gray-500">
+                          ID: {tweet.tweetId || tweet.id}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          来源: {tweet.sourceType === 'tweet' ? '爬取' : '手采'}
+                        </span>
+                      </div>
+
+                      {/* 类型标注展示 */}
+                      {tweet.typeAnnotation && (
+                        <div className="mt-3 border-t pt-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center">
+                              <span className="text-sm font-medium text-indigo-700 mr-2">
+                                🏷️ 类型标注
+                              </span>
+                              {!expandedTypeAnnotations.includes(tweet.id) && (
+                                <span className="text-xs text-indigo-600">
+                                  ({(() => {
+                                    try {
+                                      const types = JSON.parse(tweet.typeAnnotation.tweetTypes);
+                                      return Array.isArray(types) ? types.length : Object.keys(types).length;
+                                    } catch {
+                                      return 0;
+                                    }
+                                  })()})
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => handleToggleTypeAnnotation(tweet.id)}
+                              className="text-xs text-indigo-600 hover:text-indigo-800"
+                            >
+                              {expandedTypeAnnotations.includes(tweet.id) ? '收起' : '展开'}
+                            </button>
+                          </div>
+
+                          {expandedTypeAnnotations.includes(tweet.id) && (
+                            <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
+                              <div className="space-y-2">
+                                {/* 推文类型 */}
+                                <div>
+                                  <div className="text-xs font-medium text-indigo-700 mb-1">类型:</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {(() => {
+                                      try {
+                                        const types = JSON.parse(tweet.typeAnnotation.tweetTypes);
+                                        if (Array.isArray(types)) {
+                                          return types.map((type: string, idx: number) => (
+                                            <span key={idx} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                              {type}
+                                            </span>
+                                          ));
+                                        } else if (typeof types === 'object') {
+                                          return Object.entries(types).map(([key, value]: [string, any], idx: number) => (
+                                            <span key={idx} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                              {key}: {typeof value === 'number' ? value.toFixed(2) : value}
+                                            </span>
+                                          ));
+                                        }
+                                        return <span className="text-xs text-gray-500">无法解析</span>;
+                                      } catch (e) {
+                                        return <span className="text-xs text-red-500">解析失败</span>;
+                                      }
+                                    })()}
+                                  </div>
+                                </div>
+
+                                {/* 置信度 */}
+                                {tweet.typeAnnotation.confidenceScore && (
+                                  <div>
+                                    <div className="text-xs font-medium text-indigo-700 mb-1">置信度:</div>
+                                    <div className="flex items-center">
+                                      <div className="flex-1 bg-gray-200 rounded-full h-2 mr-2">
+                                        <div
+                                          className="bg-indigo-600 h-2 rounded-full"
+                                          style={{ width: `${tweet.typeAnnotation.confidenceScore * 100}%` }}
+                                        ></div>
+                                      </div>
+                                      <span className="text-xs text-indigo-800">
+                                        {(tweet.typeAnnotation.confidenceScore * 100).toFixed(1)}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* 标注方法和时间 */}
+                                <div className="flex items-center justify-between text-xs text-indigo-600 pt-2 border-t border-indigo-200">
+                                  <span>方法: {tweet.typeAnnotation.annotationMethod || 'N/A'}</span>
+                                  <span>
+                                    {tweet.typeAnnotation.annotatedAt
+                                      ? new Date(tweet.typeAnnotation.annotatedAt).toLocaleString('zh-CN')
+                                      : 'N/A'
+                                    }
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDate(tweet.publishedAt)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => handleDeleteExtractedTweet(tweet.id)}
+                        disabled={deleteExtractedTweet.isPending}
+                        className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                      >
+                        删除
+                      </button>
+                    </td>
+                  </tr>
+                )) || (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                      {extractedTweetsQuery.isLoading ? '加载中...' : '暂无提取推文'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 分页 */}
+          {extractedTweetsQuery.data?.data?.tweets && extractedTweetsQuery.data.data.tweets.length > 0 && (
+            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+              <div className="flex-1 flex justify-between sm:hidden">
+                <button
+                  onClick={() => setExtractPage(Math.max(1, extractPage - 1))}
+                  disabled={extractPage === 1}
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  上一页
+                </button>
+                <button
+                  onClick={() => setExtractPage(extractPage + 1)}
+                  disabled={!extractedTweetsQuery.data?.data?.hasMore}
+                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  下一页
+                </button>
+              </div>
+              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-gray-700">
+                    显示第 <span className="font-medium">{(extractPage - 1) * 10 + 1}</span> 到{' '}
+                    <span className="font-medium">
+                      {Math.min(extractPage * 10, extractedTweetsQuery.data?.data?.total || 0)}
+                    </span>{' '}
+                    条，共 <span className="font-medium">{extractedTweetsQuery.data?.data?.total || 0}</span> 条推文
+                    {extractedTweetsQuery.data?.data?.totalRecords && (
+                      <span className="text-gray-500">
+                        （来自 {extractedTweetsQuery.data.data.totalRecords} 个提取批次）
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <button
+                      onClick={() => setExtractPage(Math.max(1, extractPage - 1))}
+                      disabled={extractPage === 1}
+                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      上一页
+                    </button>
+                    <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                      {extractPage}
+                    </span>
+                    <button
+                      onClick={() => setExtractPage(extractPage + 1)}
+                      disabled={!extractedTweetsQuery.data?.data?.hasMore}
+                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      下一页
+                    </button>
+                  </nav>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

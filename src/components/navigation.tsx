@@ -39,9 +39,14 @@ const adminTopLevelNavigation: NavigationItem[] = [
     name: '写作辅助',
     icon: '✍️',
     children: [
+      { name: '推文生成', href: '/writing-assistant/tweet-generation', icon: '✨' },
       { name: '内容生成', href: '/writing-assistant/content-generation', icon: '📝' },
       { name: '采集参考', href: '/writing-assistant/reference-collection', icon: '📚' },
       { name: 'URL转文本', href: '/writing-assistant/url2text', icon: '🔗' },
+      { name: '数据提取和分析', href: '/writing-assistant/data-extract', icon: '📊' },
+      { name: '风格档案', href: '/writing-assistant/style-profiles', icon: '👤' },
+      { name: '写作概览', href: '/writing-assistant/writing-overviews', icon: '🧠' },
+      { name: '任务管理', href: '/writing-assistant/task-management', icon: '⚙️' },
     ]
   },
 ];
